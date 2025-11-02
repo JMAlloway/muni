@@ -3,17 +3,6 @@
   "message": "Success",
   "payload": {
     "projects": {
-      "203189": {
-        "ProjectID": "203189",
-        "PrivateProjectID": "956e03b799c9e9a0408f8f884b5657e1",
-        "ReferenceID": "RFSQ-25-001",
-        "ProjectStatusID": "2",
-        "ProjectSubStatusID": "1",
-        "ProjectVisibilityID": "1",
-        "ProjectName": "Consultant Construction Administration and Observation Services for 2026 - 2028",
-        "DateClose": "2025-10-30 21:00:00",
-        "DepartmentID": "627"
-      },
       "204536": {
         "ProjectID": "204536",
         "PrivateProjectID": "ef816d213e727b56f1998f368c86ef1b",
