@@ -1,9 +1,18 @@
-﻿.venv/
+.venv/
 venv/
 __pycache__/
 *.pyc
+
+# local dbs
+*.db
 muni_local.db
+app.db
+
+# secrets
 .env
 .env.*
+
+# misc
 .vscode/
 .wdm/
+chromedriver.exe
