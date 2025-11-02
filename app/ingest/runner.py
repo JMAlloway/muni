@@ -249,7 +249,7 @@ async def run_ingestors_once() -> int:
 
     sources = [
          #mock_ingestor.fetch,
-         #city_columbus.fetch,
+         city_columbus.fetch,
          #city_grove_city.fetch,
          #city_gahanna.fetch,
          #city_marysville.fetch,
@@ -257,7 +257,7 @@ async def run_ingestors_once() -> int:
          #city_worthington.fetch,
          #city_grandview_heights.fetch,
          #swaco.fetch,
-         cota.fetch,
+         #cota.fetch,
          #franklin_county.fetch,
          #city_westerville.fetch,
          #columbus_metropolitan_library.fetch,

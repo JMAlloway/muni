@@ -11,6 +11,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.remote.webdriver import WebDriver
+from app.ingest.utils import safe_source_url
+
 
 # Optional: undetected_chromedriver; we default to plain Selenium for stability
 try:
@@ -400,7 +402,7 @@ def fetch_sync() -> List[RawOpportunity]:
                         items.append(
                             RawOpportunity(
                                 source="city_columbus",
-                                source_url=src_url,
+                                source_url=safe_source_url(AGENCY_NAME, src_url, LIST_URL),
                                 title=final_title,
                                 summary=f"{dept} | {typ}".strip(" |"),
                                 description=desc_text,          # <<< added

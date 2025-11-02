@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from app.ingest.base import RawOpportunity
 from app.ingest.municipalities.city_columbus import _classify_keyword_tag
+from app.ingest.utils import safe_source_url
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +237,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
             cleaned_due = _clean_due_string(due_text_raw)
             due_dt = _parse_due_datetime(cleaned_due)
 
-            detail_url = DETAIL_URL_TEMPLATE.format(RID=record_id if record_id else "UNKNOWN")
+            detail_url = DETAIL_URL_TEMPLATE.format(RID=record_id) if record_id else LIST_URL
 
             description_text = ""
             posted_dt = None
@@ -279,7 +280,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     prebid_date=None,
 
                     source="cota",
-                    source_url=detail_url,
+                    source_url=safe_source_url(AGENCY_NAME, detail_url, LIST_URL),
                     category="Transit / Transportation",
                     location_geo="Franklin County, OH",
                     attachments=attachment_urls,

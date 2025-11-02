@@ -132,7 +132,7 @@ async def opportunities(request: Request):
                     due_date,
                     source_url,
                     status,
-                    category          -- we show this as "Type"
+                    COALESCE(ai_category, category) AS category
                 FROM opportunities
                 WHERE {where_sql}
                 ORDER BY {order_sql}
@@ -198,6 +198,12 @@ async def opportunities(request: Request):
     </div>
 </div>
 """
+    # fallback URLs for agencies whose scraped link is a JS action
+    agency_fallback_urls = {
+        "Central Ohio Transit Authority (COTA)": "https://cota.dbesystem.com/FrontEnd/proposalsearchpublic.asp",
+        "City of Columbus": "https://vendors.columbus.gov/",
+        # add more as you run into them...
+    }
 
         # -------- build HTML table rows --------
     table_rows_html = []
@@ -231,18 +237,49 @@ async def opportunities(request: Request):
         # pill/badge for status
         badge_html = f"<span class='pill'>{status or 'open'}</span>"
 
-        # NEW: source link column content
-        if url:
+                # NEW: source link column content (with agency fallback)
+        fallback_url = agency_fallback_urls.get(agency or "")
+
+        def is_bad(u: str) -> bool:
+            if not u:
+                return True
+            u = u.strip().lower()
+            # COTA detail pages require a session cookie — they won't open directly
+            if "cota.dbesystem.com" in u and "detail" in u:
+                return True
+            return (
+                u.startswith("javascript:")
+                or u == "#"
+                or u == "about:blank"
+                or "rid=unknown" in u
+            )
+
+
+        if url and not is_bad(url):
+            # good, real URL from the ingestor
             link_html = (
                 f"<a href='{url}' target='_blank' "
                 "style='color:var(--accent-text);text-decoration:underline;'>Open</a>"
             )
+        elif fallback_url:
+            # bad/missing link → fall back to the agency's main bid list
+            if "cota" in (agency or "").lower() and external_id:
+                label = f"Open list (find {external_id})"
+            else:
+                label = "Open list"
+            link_html = (
+                f"<a href='{fallback_url}' target='_blank' "
+                f"style='color:var(--accent-text);text-decoration:underline;'>{label}</a>"
+            )
+
         else:
+            # nothing we can do
             link_html = "<span class='muted'>—</span>"
+
 
         # build the row AFTER we've defined everything
         row_html = (
-            "<tr>"
+            f"<tr data-external-id='{external_id or ''}' data-agency='{agency or ''}'>"
             f"<td style='vertical-align:top;font-size:14px;font-weight:500;color:#111827;'>{rfq_html}</td>"
             f"<td style='vertical-align:top;font-size:14px;color:#111827;'>{title}</td>"
             f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{agency or ''}</td>"
@@ -251,7 +288,8 @@ async def opportunities(request: Request):
             f"<td style='vertical-align:top;'>{badge_html}</td>"
             f"<td style='vertical-align:top;font-size:13px;'>{link_html}</td>"
             "</tr>"
-        )
+)
+
 
         table_rows_html.append(row_html)
 
@@ -635,6 +673,53 @@ async def opportunities(request: Request):
     }
     </script>
     """
+    highlight_js = """
+    <style>
+    .highlight-opportunity {
+        animation: pulse-highlight 1.3s ease-out 1;
+        outline: 2px solid #f97316;
+        outline-offset: 2px;
+        background: rgba(249, 115, 22, 0.08);
+    }
+    @keyframes pulse-highlight {
+        0%   { background: rgba(249, 115, 22, 0.25); }
+        50%  { background: rgba(249, 115, 22, 0.10); }
+        100% { background: transparent; }
+}
+
+    </style>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const params = new URLSearchParams(window.location.search);
+        const ext = params.get("ext");
+        const agency = params.get("agency") || "";
+        const id = params.get("id");
+
+        const lookup = ext || id;
+        if (!lookup) return;
+
+        const selector =
+            "[data-external-id='" + lookup + "'], " +
+            "[data-id='" + lookup + "'], " +
+            "[data-opportunity='" + lookup + "']";
+
+        const row = document.querySelector(selector);
+
+        if (row) {
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            row.classList.add("highlight-opportunity");
+            setTimeout(() => {
+                row.classList.remove("highlight-opportunity");
+            }, 1600);
+        }
+
+        if (typeof openDetailModal === "function") {
+            openDetailModal(lookup, agency);
+        }
+    });
+    </script>
+    """
 
     # -------- final page HTML --------
     body_html = f"""
@@ -681,6 +766,7 @@ async def opportunities(request: Request):
     </section>
 
     {modal_js}
+    {highlight_js}
     """
 
     return HTMLResponse(
