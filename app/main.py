@@ -15,6 +15,8 @@ from app.routers import columbus_detail
 from app.routers import cota_detail
 from app.routers import gahanna_detail
 from app.routers import columbus_airports_detail
+from app.routers import opportunity_web
+
 
 # if you also have users.router, include that too
 
@@ -51,4 +53,5 @@ app.include_router(columbus_detail.router)   # "/columbus_detail/{rfq_id}"
 app.include_router(cota_detail.router)
 app.include_router(gahanna_detail.router)
 app.include_router(columbus_airports_detail.router)
+app.include_router(opportunity_web.router)
 
