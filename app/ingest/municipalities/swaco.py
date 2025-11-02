@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
@@ -72,21 +73,79 @@ def _parse_prebid_date(text_in: str) -> Optional[datetime]:
 
 
 # --------------------------
+# Bid number extraction
+# --------------------------
+
+_BID_NO_REGEXES = [
+    # Bid No. 8045
+    re.compile(r"bid\s*no\.?\s*[:#]?\s*([A-Za-z0-9\-/\.]+)", re.IGNORECASE),
+    # Bid Number: 8045
+    re.compile(r"bid\s*number\.?\s*[:#]?\s*([A-Za-z0-9\-/\.]+)", re.IGNORECASE),
+    # Sometimes they smash it: "Bid No.8045"
+    re.compile(r"bid\s*no\.?([0-9]{3,})", re.IGNORECASE),
+]
+
+
+def _run_bid_regex(text: str) -> Optional[str]:
+    for rx in _BID_NO_REGEXES:
+        m = rx.search(text)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+def _extract_bid_number(soup: BeautifulSoup, url: str = "") -> Optional[str]:
+    """
+    Make this as robust as we can:
+    - look for any element that has "Bid No" or "Bid Number"
+    - then run regex on that element's text
+    - if no luck, run regex on the whole page text
+    """
+    # 1) any obvious tags that might carry "Bid No."
+    candidates = []
+
+    # spans/divs/p
+    for tag in soup.find_all(["span", "div", "p", "li", "h1", "h2", "h3"]):
+        txt = tag.get_text(" ", strip=True)
+        if "bid no" in txt.lower() or "bid number" in txt.lower():
+            candidates.append(txt)
+
+    for txt in candidates:
+        num = _run_bid_regex(txt)
+        if num:
+            return num
+
+    # 2) try the whole page text
+    full_text = soup.get_text(" ", strip=True)
+    num = _run_bid_regex(full_text)
+    if num:
+        return num
+
+    # 3) last resort: sometimes CivicPlus puts it in the page title
+    title_tag = soup.find("title")
+    if title_tag:
+        num = _run_bid_regex(title_tag.get_text(" ", strip=True))
+        if num:
+            return num
+
+    # 4) log miss so we can see it in your console
+    logger.debug(f"SWACO: could not find Bid No. on page {url}")
+    return None
+
+
+# --------------------------
 # Detail page
 # --------------------------
 
 async def _fetch_detail_description_and_dates_and_attachments(
     session: aiohttp.ClientSession,
     url: str
-) -> Tuple[str, Optional[datetime], Optional[datetime], Optional[datetime], List[str]]:
-    """
-    Fetch the detail page for a single bid and parse its description, dates, and attachments.
-    """
+) -> Tuple[str, Optional[datetime], Optional[datetime], Optional[datetime], List[str], Optional[str]]:
     try:
         html = await _fetch(session, url)
     except Exception as e:
         logger.warning(f"SWACO detail fetch failed {url}: {e}")
-        return ("", None, None, None, [])
+        return ("", None, None, None, [], None)
 
     soup = BeautifulSoup(html, "html.parser")
     text_all = soup.get_text(" ", strip=True)
@@ -120,7 +179,7 @@ async def _fetch_detail_description_and_dates_and_attachments(
         desc_block = soup.find("div", {"id": "content"}) or soup.find("div", {"role": "main"})
     description_text = desc_block.get_text(" ", strip=True) if desc_block else text_all
 
-    # Collect attachments
+    # attachments
     attachment_urls: List[str] = []
     for a in soup.find_all("a", href=True):
         href = a["href"]
@@ -133,7 +192,10 @@ async def _fetch_detail_description_and_dates_and_attachments(
             else:
                 attachment_urls.append(BASE_URL + "/" + href.lstrip("/"))
 
-    return (description_text, posted_dt, due_dt, prebid_dt, attachment_urls)
+    # NOW: extract bid number with the robust routine
+    bid_no = _extract_bid_number(soup, url=url)
+
+    return (description_text, posted_dt, due_dt, prebid_dt, attachment_urls, bid_no)
 
 
 # --------------------------
@@ -217,15 +279,25 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
     async with aiohttp.ClientSession() as session:
         for (title, detail_url, row_text) in unique_rows:
             due_dt_row = _parse_date_mmddyyyy(row_text)
-            desc, posted_dt, due_dt_detail, prebid_dt, attachment_urls = \
-                await _fetch_detail_description_and_dates_and_attachments(session, detail_url)
+
+            (
+                desc,
+                posted_dt,
+                due_dt_detail,
+                prebid_dt,
+                attachment_urls,
+                bid_no,
+            ) = await _fetch_detail_description_and_dates_and_attachments(session, detail_url)
+
             best_summary = desc or row_text
             best_due = due_dt_detail or due_dt_row
+
+            display_title = f"{bid_no} {title}".strip() if bid_no else title
 
             out.append(
                 RawOpportunity(
                     agency_name=AGENCY_NAME,
-                    title=title,
+                    title=display_title,
                     summary=best_summary,
                     description=desc,
                     due_date=best_due,
@@ -233,10 +305,13 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     prebid_date=prebid_dt,
                     source=detail_url,
                     source_url=detail_url,
-                    category=AGENCY_NAME,
+                    # you can swap this to your new taxonomy
+                    category="Solid Waste / Recycling / Environmental",
                     location_geo=None,
                     attachments=attachment_urls,
                     status="open",
+                    date_added=datetime.now(timezone.utc),
+                    external_id=bid_no if bid_no else None,
                 )
             )
 
@@ -266,6 +341,7 @@ if __name__ == "__main__":
         for o in opps:
             print("-----")
             print("title:", o.title)
+            print("external_id:", getattr(o, "external_id", None))
             print("due:", o.due_date)
             print("url:", o.source_url)
             print("posted:", o.posted_date)
