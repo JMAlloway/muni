@@ -2,15 +2,26 @@
 import json
 import inspect
 import hashlib
-from typing import List
+from typing import List, Set, Optional
 from sqlalchemy import text
 
 # --- AI imports ---------------------------------------------------------------
 from app.ai.classifier import classify_opportunity
 from app.ai.extract_fields import extract_key_fields
 from app.ai.client import get_llm_client
-LLM_CLIENT = get_llm_client()
 
+# these two are NEW but optional
+try:
+    from app.ai.summarize_scope import summarize_scope
+except Exception:
+    summarize_scope = None
+
+try:
+    from app.ai.auto_tags import auto_tags_from_blob
+except Exception:
+    auto_tags_from_blob = None
+
+LLM_CLIENT = get_llm_client()
 
 # --- Ingestors ----------------------------------------------------------------
 from app.ingest import mock_ingestor
@@ -41,6 +52,56 @@ from app.db_core import save_opportunities, engine
 # Helpers
 # ------------------------------------------------------------------------------
 
+# we'll cache the table columns so we only check once
+_OPP_COLUMNS: Optional[Set[str]] = None
+
+
+async def _get_opportunity_columns(conn) -> Set[str]:
+    """
+    Try to discover available columns on the 'opportunities' table.
+    Works for SQLite (PRAGMA) and falls back to INFORMATION_SCHEMA for Postgres.
+    We keep it flexible so the rest of the code can be additive.
+    """
+    global _OPP_COLUMNS
+    if _OPP_COLUMNS is not None:
+        return _OPP_COLUMNS
+
+    cols: Set[str] = set()
+
+    # 1) try SQLite style
+    try:
+        res = await conn.execute(text("PRAGMA table_info(opportunities)"))
+        rows = res.fetchall()
+        if rows:
+            for r in rows:
+                # sqlite returns: cid, name, type, notnull, dflt_value, pk
+                name = r[1]
+                cols.add(name)
+    except Exception:
+        pass
+
+    # 2) try Postgres / others
+    if not cols:
+        try:
+            res = await conn.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'opportunities'
+                    """
+                )
+            )
+            rows = res.fetchall()
+            for r in rows:
+                cols.add(r[0])
+        except Exception:
+            pass
+
+    _OPP_COLUMNS = cols
+    return cols
+
+
 async def ai_enrich_opportunity(conn, external_id: str, agency_name: str):
     """
     Enrich a newly inserted/updated opportunity with AI metadata.
@@ -69,20 +130,43 @@ async def ai_enrich_opportunity(conn, external_id: str, agency_name: str):
     # prefer the longest/most detailed text we have
     blob = full_text or desc or title
 
-    # run AI
+    # --- existing AI ---------------------------------------------------------
     cat, conf = classify_opportunity(
         title=title,
         agency=agency,
         description=blob,
-        llm_client=None,   # plug in OpenAI later
+        llm_client=LLM_CLIENT,   # plug in OpenAI later
     )
-    fields = extract_key_fields(blob, llm_client=None)
+    fields = extract_key_fields(blob, llm_client=LLM_CLIENT)
 
-    # 👇 now we print the REAL title, not the external_id
+    # --- NEW: optional summary + tags ----------------------------------------
+    # only run these if the helpers are actually importable
+    ai_summary = ""
+    ai_tags = []
+    if summarize_scope is not None:
+        ai_summary = summarize_scope(
+            title=title,
+            description=desc,
+            full_text=full_text,
+            llm_client=LLM_CLIENT,
+        ) or ""
+    if auto_tags_from_blob is not None:
+        ai_tags = auto_tags_from_blob(
+            title=title,
+            description=desc,
+            full_text=full_text,
+            llm_client=LLM_CLIENT,
+        ) or []
+
     print(
-        f"[AI] title={title[:120]!r} | agency={agency!r} | ext={external_id!r} | cat={cat} | conf={conf} | fields={fields}"
+        f"[AI] title={title[:120]!r} | agency={agency!r} | ext={external_id!r} "
+        f"| cat={cat} | conf={conf} | fields={fields} | tags={ai_tags}"
     )
 
+    # figure out which columns we actually have
+    cols = await _get_opportunity_columns(conn)
+
+    # baseline update (what you had)
     await conn.execute(
         text("""
             UPDATE opportunities
@@ -102,6 +186,24 @@ async def ai_enrich_opportunity(conn, external_id: str, agency_name: str):
         },
     )
 
+    # additive update if columns exist
+    if "ai_summary" in cols or "ai_tags_json" in cols:
+        await conn.execute(
+            text("""
+                UPDATE opportunities
+                SET
+                    ai_summary = CASE WHEN :summary IS NULL THEN ai_summary ELSE :summary END,
+                    ai_tags_json = CASE WHEN :tags_json IS NULL THEN ai_tags_json ELSE :tags_json END,
+                    ai_version = :ver
+                WHERE id = :id
+            """),
+            {
+                "summary": ai_summary if "ai_summary" in cols else None,
+                "tags_json": json.dumps(ai_tags) if "ai_tags_json" in cols else None,
+                "ver": "v1.1",
+                "id": row["id"],
+            },
+        )
 
 
 class RowAdapter:
@@ -146,27 +248,27 @@ async def run_ingestors_once() -> int:
     """
 
     sources = [
-         mock_ingestor.fetch,
-         city_columbus.fetch,
-         city_grove_city.fetch,
+         #mock_ingestor.fetch,
+         #city_columbus.fetch,
+         #city_grove_city.fetch,
          #city_gahanna.fetch,
-         city_marysville.fetch,
-         city_whitehall.fetch,
-         city_worthington.fetch,
-         city_grandview_heights.fetch,
-         swaco.fetch,
+         #city_marysville.fetch,
+         #city_whitehall.fetch,
+         #city_worthington.fetch,
+         #city_grandview_heights.fetch,
+         #swaco.fetch,
          cota.fetch,
-         franklin_county.fetch,
-         city_westerville.fetch,
-         columbus_metropolitan_library.fetch,
-         cmha.fetch,
-         metro_parks.fetch,
-         columbus_airports.fetch,
-         morpc.fetch,
-         dublin_city_schools.fetch,
-         minerva_park.fetch,
-         city_new_albany.fetch,
-        # ohiobuys.fetch,
+         #franklin_county.fetch,
+         #city_westerville.fetch,
+         #columbus_metropolitan_library.fetch,
+         #cmha.fetch,
+         #metro_parks.fetch,
+         #columbus_airports.fetch,
+         #morpc.fetch,
+         #dublin_city_schools.fetch,
+         #minerva_park.fetch,
+         #city_new_albany.fetch,
+         #ohiobuys.fetch,
     ]
 
     total = 0
@@ -247,11 +349,93 @@ async def run_ingestors_once() -> int:
 
         # --- AI enrichment step (for new/updated records) ---------------------
         async with engine.begin() as conn:
+            cols = await _get_opportunity_columns(conn)  # warm cache once per loop
             for r in batch:
                 ext_id = r.get("external_id") if isinstance(r, dict) else getattr(r, "external_id", "")
                 agency = r.get("agency_name") if isinstance(r, dict) else getattr(r, "agency_name", "")
                 if ext_id and agency:
+                    # ✅ your original path: update by PK
                     await ai_enrich_opportunity(conn, ext_id, agency)
+                else:
+                    # ✅ NEW: fallback so these rows don't stay NULL
+                    title = r.get("title") if isinstance(r, dict) else getattr(r, "title", "")
+                    desc = (
+                        (r.get("full_text") if isinstance(r, dict) else getattr(r, "full_text", ""))
+                        or (r.get("summary") if isinstance(r, dict) else getattr(r, "summary", ""))
+                        or (r.get("description") if isinstance(r, dict) else getattr(r, "description", ""))
+                        or title
+                    )
+                    hash_body = r.get("hash_body") if isinstance(r, dict) else getattr(r, "hash_body", "")
+                    blob = desc or title
+
+                    cat, conf = classify_opportunity(
+                        title=title or "",
+                        agency=agency or "",
+                        description=blob,
+                        llm_client=LLM_CLIENT,
+                    )
+                    fields = extract_key_fields(blob, llm_client=LLM_CLIENT)
+
+                    # optional summary/tags
+                    ai_summary = ""
+                    ai_tags = []
+                    if summarize_scope is not None:
+                        ai_summary = summarize_scope(
+                            title=title or "",
+                            description=desc or "",
+                            full_text=blob or "",
+                            llm_client=LLM_CLIENT,
+                        ) or ""
+                    if auto_tags_from_blob is not None:
+                        ai_tags = auto_tags_from_blob(
+                            title=title or "",
+                            description=desc or "",
+                            full_text=blob or "",
+                            llm_client=LLM_CLIENT,
+                        ) or []
+
+                    # baseline update (what you had)
+                    await conn.execute(
+                        text("""
+                            UPDATE opportunities
+                            SET
+                                ai_category = :cat,
+                                ai_category_conf = :conf,
+                                ai_fields_json = :fields_json,
+                                ai_version = :ver
+                            WHERE title = :title
+                              AND (:hash IS NULL OR :hash = '' OR hash_body = :hash)
+                        """),
+                        {
+                            "cat": cat or "other",
+                            "conf": float(conf or 0.0),
+                            "fields_json": json.dumps(fields),
+                            "ver": "v1.0",
+                            "title": title or "",
+                            "hash": (hash_body or None),
+                        },
+                    )
+
+                    # additive update if columns exist
+                    if "ai_summary" in cols or "ai_tags_json" in cols:
+                        await conn.execute(
+                            text("""
+                                UPDATE opportunities
+                                SET
+                                    ai_summary = CASE WHEN :summary IS NULL THEN ai_summary ELSE :summary END,
+                                    ai_tags_json = CASE WHEN :tags_json IS NULL THEN ai_tags_json ELSE :tags_json END,
+                                    ai_version = :ver
+                                WHERE title = :title
+                                  AND (:hash IS NULL OR :hash = '' OR hash_body = :hash)
+                            """),
+                            {
+                                "summary": ai_summary if "ai_summary" in cols else None,
+                                "tags_json": json.dumps(ai_tags) if "ai_tags_json" in cols else None,
+                                "ver": "v1.1",
+                                "title": title or "",
+                                "hash": (hash_body or None),
+                            },
+                        )
 
     print(f"✅ Completed ingestion run. Total processed: {total}")
     return total
