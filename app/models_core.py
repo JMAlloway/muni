@@ -13,34 +13,48 @@ opportunities = Table(
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
 
-    # source info
+    # ------------------------------------------------------
+    # Source info / identification
+    # ------------------------------------------------------
     Column("source", String, nullable=False),
     Column("source_url", String, nullable=False, unique=True),
 
-    # content
+    # ------------------------------------------------------
+    # Content and classification
+    # ------------------------------------------------------
     Column("title", String, nullable=False),
-    Column("summary", Text),          # short summary / dept
-    Column("full_text", Text),        # long description / scope body
-    Column("category", String),       # will show as "Type" in the UI
-    Column("external_id", String),    # <--- NEW: RFQ / Solicitation #
-    Column("keyword_tag", String),   # <-- NEW
+    Column("summary", Text),
+    Column("full_text", Text),
+    Column("category", String),            # "construction", "it", etc.
+    Column("external_id", String),         # e.g., "2025-46-19"
+    Column("keyword_tag", String),
 
     Column("agency_name", String),
     Column("location_geo", String),
 
-    # dates
+    # ------------------------------------------------------
+    # Dates (agency-posted)
+    # ------------------------------------------------------
     Column("posted_date", DateTime),
     Column("due_date", DateTime),
     Column("prebid_date", DateTime),
 
-    # extras
+    # ------------------------------------------------------
+    # Attachments / misc
+    # ------------------------------------------------------
     Column("attachments", JSON),
     Column("status", String, default="open"),
 
-    # tracking
+    # ------------------------------------------------------
+    # Tracking / hashing
+    # ------------------------------------------------------
     Column("hash_body", String),
 
-    # bookkeeping
+    # ------------------------------------------------------
+    # Bookkeeping
+    # ------------------------------------------------------
+    Column("date_added", DateTime, default=datetime.utcnow, nullable=False),  # first-seen timestamp
+    Column("last_seen", DateTime),  # 👈 NEW: last time the bid was seen in a scrape
     Column("created_at", DateTime, default=datetime.utcnow),
     Column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
 )

@@ -6,7 +6,7 @@ class Base(DeclarativeBase):
     pass
 
 class User(Base):
-    __tablename__ = "user"
+    __tablename__ = "users"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)

@@ -417,6 +417,7 @@ def fetch_sync() -> List[RawOpportunity]:
                                 hash_body=hash_body_val,        # <<< added
                                 external_id=rfq_id,             # <<< added (Solicitation # / RFQ)
                                 keyword_tag=keyword_tag,
+                                date_added=datetime.now(timezone.utc),  # 👈 NEW
                             )
                         )
                         added += 1

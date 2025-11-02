@@ -4,6 +4,9 @@ import inspect
 import hashlib
 from typing import List, Set, Optional
 from sqlalchemy import text
+import asyncio
+from sqlalchemy import text
+from app.db_core import engine
 
 # --- AI imports ---------------------------------------------------------------
 from app.ai.classifier import classify_opportunity
@@ -51,6 +54,37 @@ from app.db_core import save_opportunities, engine
 # ------------------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------------------
+
+async def close_missing_opportunities():
+    async with engine.begin() as conn:
+        # 1️⃣ get distinct agency names
+        result = await conn.execute(
+            text("SELECT DISTINCT agency_name FROM opportunities WHERE agency_name IS NOT NULL;")
+        )
+        agencies = [r[0] for r in result.fetchall() if r[0]]
+
+        print(f"Found {len(agencies)} agencies to check…")
+
+        # 2️⃣ loop through each and mark stale as closed
+        for agency in agencies:
+            await conn.execute(
+                text("""
+                    UPDATE opportunities
+                    SET status = 'closed'
+                    WHERE agency_name = :agency
+                      AND status = 'open'
+                      AND (last_seen IS NULL OR last_seen < datetime('now', '-1 day'));
+                """),
+                {"agency": agency},
+            )
+            print(f"✅ Checked {agency}")
+
+    print("🎯 Done marking missing RFPs as closed.")
+
+
+# ---- for local testing ----
+if __name__ == "__main__":
+    asyncio.run(close_missing_opportunities())
 
 # we'll cache the table columns so we only check once
 _OPP_COLUMNS: Optional[Set[str]] = None
@@ -250,24 +284,24 @@ async def run_ingestors_once() -> int:
     sources = [
          #mock_ingestor.fetch,
          city_columbus.fetch,
-         #city_grove_city.fetch,
-         #city_gahanna.fetch,
-         #city_marysville.fetch,
-         #city_whitehall.fetch,
-         #city_worthington.fetch,
-         #city_grandview_heights.fetch,
-         #swaco.fetch,
-         #cota.fetch,
-         #franklin_county.fetch,
-         #city_westerville.fetch,
-         #columbus_metropolitan_library.fetch,
-         #cmha.fetch,
-         #metro_parks.fetch,
-         #columbus_airports.fetch,
-         #morpc.fetch,
-         #dublin_city_schools.fetch,
-         #minerva_park.fetch,
-         #city_new_albany.fetch,
+         city_grove_city.fetch,
+         city_gahanna.fetch,
+         city_marysville.fetch,
+         city_whitehall.fetch,
+         city_worthington.fetch,
+         city_grandview_heights.fetch,
+         swaco.fetch,
+         cota.fetch,
+         franklin_county.fetch,
+         city_westerville.fetch,
+         columbus_metropolitan_library.fetch,
+         cmha.fetch,
+         metro_parks.fetch,
+         columbus_airports.fetch,
+         morpc.fetch,
+         dublin_city_schools.fetch,
+         minerva_park.fetch,
+         city_new_albany.fetch,
          #ohiobuys.fetch,
     ]
 

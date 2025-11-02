@@ -1,8 +1,10 @@
 import asyncio
-import datetime
 import logging
 import re
 from typing import List, Dict, Any, Optional
+import datetime
+from datetime import datetime, timezone
+
 
 import requests
 from bs4 import BeautifulSoup
@@ -54,7 +56,7 @@ def _clean_html_to_text(fragment: str) -> str:
     return frag.strip()
 
 
-def _parse_due_date(txt: str) -> Optional[datetime.datetime]:
+def _parse_due_date(txt: str) -> Optional[datetime]:
     """
     Try multiple formats. Returns a naive datetime or None.
     """
@@ -69,7 +71,7 @@ def _parse_due_date(txt: str) -> Optional[datetime.datetime]:
     ]
     for fmt in fmts:
         try:
-            return datetime.datetime.strptime(raw, fmt)
+            return datetime.strptime(raw, fmt)
         except ValueError:
             pass
 
@@ -385,6 +387,8 @@ def _parse_rows_from_html(html: str) -> List[Dict[str, Any]]:
                 "keyword_tag": None,
                 "location_geo": "",
                 "prebid_date": None,
+                "date_added": datetime.now(timezone.utc),  # 👈 NEW
+                
             }
         )
 

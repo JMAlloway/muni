@@ -6,6 +6,7 @@ from app.session import get_current_user_email
 
 router = APIRouter(tags=["marketing"])
 
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     user_email = get_current_user_email(request)
@@ -44,6 +45,74 @@ async def home(request: Request):
                 <div class="mini-head">📬 Automated Alerts</div>
                 <div class="mini-desc">Daily or weekly email summaries tailored to your agency preferences.</div>
             </div>
+        </div>
+    </section>
+    """
+
+    # NEW: internal / ops view – reflects latest stuff we added
+    internal_overview = """
+    <section class="card" style="border:1px solid rgba(249,115,22,0.25);">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+            <div style="flex:1 1 260px;min-width:240px;">
+                <h2 class="section-heading" style="display:flex;align-items:center;gap:6px;">
+                    <span>System overview (internal)</span>
+                    <span style="
+                        background:rgba(16,185,129,0.12);
+                        color:#047857;
+                        font-size:11px;
+                        padding:2px 8px;
+                        border-radius:12px;
+                        border:1px solid rgba(4,120,87,0.35);
+                    ">2025</span>
+                </h2>
+                <p class="subtext">
+                    This instance is now set up for local ingest + Heroku web, with AI category, source-link fallbacks, and email digests.
+                </p>
+            </div>
+            <div style="flex:2 1 380px;min-width:260px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+                    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 12px;">
+                        <div style="font-size:12px;font-weight:600;color:#c2410c;margin-bottom:4px;">AI & categories</div>
+                        <div style="font-size:12px;color:#7c2d12;line-height:1.45;">
+                            <strong>ai_category</strong> now saved on <code>opportunities</code>.
+                            Rule-first, LLM fallback (Ollama local → OpenAI on Heroku).
+                        </div>
+                    </div>
+                    <div style="background:#eff6ff;border:1px solid #dbeafe;border-radius:12px;padding:10px 12px;">
+                        <div style="font-size:12px;font-weight:600;color:#1d4ed8;margin-bottom:4px;">Source link fallback</div>
+                        <div style="font-size:12px;color:#1e40af;line-height:1.45;">
+                            COTA / Columbus now point to an agency-level page when scraped URL is blank or JS-only.
+                        </div>
+                    </div>
+                    <div style="background:#ecfdf3;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px;">
+                        <div style="font-size:12px;font-weight:600;color:#15803d;margin-bottom:4px;">Heroku split</div>
+                        <div style="font-size:12px;color:#166534;line-height:1.45;">
+                            Web dyno: FastAPI only. Worker dyno: <code>ingest.runner</code> + digests.
+                        </div>
+                    </div>
+                    <div style="background:#f3e8ff;border:1px solid #e9d5ff;border-radius:12px;padding:10px 12px;">
+                        <div style="font-size:12px;font-weight:600;color:#6b21a8;margin-bottom:4px;">Email digests</div>
+                        <div style="font-size:12px;color:#581c87;line-height:1.45;">
+                            Uses Mailtrap SMTP; respects user agency filters. Good for pilot.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <h3 style="font-size:13px;font-weight:600;margin-bottom:4px;">Current coverage</h3>
+            <p style="font-size:12px;line-height:1.45;color:#374151;">
+                City of Columbus, City of Gahanna, City of Grove City, City of Marysville, City of Whitehall,
+                City of Grandview Heights, City of Worthington, Delaware County, SWACO,
+                Central Ohio Transit Authority (COTA), Columbus Regional Airport Authority (CRAA),
+                Mid-Ohio Regional Planning Commission (MORPC), Columbus & Franklin County Metro Parks,
+                Columbus Metropolitan Library, Dublin City Schools, Westerville (Bonfire).
+            </p>
+        </div>
+
+        <div style="margin-top:10px;font-size:11px;color:#6b7280;">
+            Reminder: on Heroku we must create both ORM tables AND core <code>opportunities</code> on startup.
         </div>
     </section>
     """
@@ -88,16 +157,18 @@ async def home(request: Request):
     footer = """
     <section class="card" style="text-align:center;">
         <p class="muted">
-            Built in Ohio • v0.2 Alpha • <a href="/signup" class="cta-link">Create Account</a>
+            Built in Ohio • v0.3 Alpha • <a href="/signup" class="cta-link">Create Account</a>
         </p>
     </section>
     """
 
-    body_html = hero + why + pricing + trust + footer
+    body_html = hero + why + internal_overview + pricing + trust + footer
     return HTMLResponse(page_shell(body_html, title="Muni Alerts – Stop Missing Local Bids", user_email=user_email))
+
 
 @router.get("/landing-test", response_class=HTMLResponse)
 async def landing_test(request: Request):
+    # KEEPING your existing test landing page as-is
     user_email = get_current_user_email(request)
 
     hero = """
@@ -137,7 +208,7 @@ async def landing_test(request: Request):
             margin:0 auto 20px auto;
             color:#4b5563;
         ">
-            We watch City of Columbus, Gahanna, Grove City, Delaware County and more —
+            We watch City of Columbus, Gahanna, Grove City, Delaware County and more — 
             and send you bids, deadlines, and documents straight to your inbox.
             No more portal-hopping.
         </p>
@@ -200,7 +271,6 @@ async def landing_test(request: Request):
     </section>
     """
 
-    # Who it's for / pain we solve
     audience = """
     <section class="card reveal" style="border:1px solid var(--border-card);">
         <div style="display:flex;flex-wrap:wrap;row-gap:16px;column-gap:24px;align-items:flex-start;">
@@ -228,7 +298,6 @@ async def landing_test(request: Request):
     </section>
     """
 
-    # Feature value props
     features = """
     <section class="card reveal">
         <h2 class="section-heading" style="margin-bottom:16px;">What you get</h2>
@@ -303,7 +372,6 @@ async def landing_test(request: Request):
     </section>
     """
 
-    # Coverage / proof
     coverage = """
     <section class="card reveal">
         <h2 class="section-heading" style="margin-bottom:8px;">Currently monitoring</h2>
@@ -333,7 +401,6 @@ async def landing_test(request: Request):
     </section>
     """
 
-    # Pricing / ROI positioning
     pricing = """
     <section class="card reveal" style="text-align:center;">
         <h2 class="section-heading" style="margin-bottom:8px;">Pricing</h2>
@@ -381,7 +448,6 @@ async def landing_test(request: Request):
     </section>
     """
 
-    # Final CTA banner / sticky feeling
     closer = """
     <section class="card reveal" style="
         text-align:center;

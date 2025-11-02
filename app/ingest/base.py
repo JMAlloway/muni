@@ -1,32 +1,49 @@
 # app/ingest/base.py
-from dataclasses import dataclass
+
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+
 
 @dataclass
 class RawOpportunity:
-    # source metadata
-    source: str                        # e.g. "city_columbus"
-    source_url: str                    # canonical link or hash back to source portal
-    title: str                         # bid title / project name
+    # ------------------------------------------------------------------
+    # Source / identity (ingestor-level metadata)
+    # ------------------------------------------------------------------
+    source: str                      # e.g. "city_columbus", "franklin_county"
+    source_url: str                  # canonical/public URL to the opportunity
+    title: str                       # bid title / project name
 
-    # descriptive text
-    summary: str = ""                  # short blurb or department
-    description: str = ""              # long body/scope text
-    category: str = ""                 # we'll surface this as "Type" in UI
-    agency_name: str = ""              # e.g. "City of Columbus"
-    location_geo: str = ""             # e.g. "Columbus, OH"
+    # ------------------------------------------------------------------
+    # Descriptive / classification
+    # ------------------------------------------------------------------
+    summary: str = ""                # short blurb for table/email
+    description: str = ""            # longer scope / detail text
+    category: str = ""               # "construction", "it", etc. (your AI fills this)
+    agency_name: str = ""            # e.g. "City of Columbus"
+    location_geo: str = ""           # e.g. "Columbus, OH"
 
-    # dates
-    posted_date: Optional[datetime] = None
-    due_date: Optional[datetime] = None
-    prebid_date: Optional[datetime] = None
+    # ------------------------------------------------------------------
+    # Dates
+    # ------------------------------------------------------------------
+    posted_date: Optional[datetime] = None   # what the agency shows
+    due_date: Optional[datetime] = None      # what the agency shows
+    prebid_date: Optional[datetime] = None   # optional
+    # 👇 NEW: when *we* first saw/ingested it (for digests)
+    date_added: Optional[datetime] = None
 
-    # extras
-    attachments: list[dict] | None = None
+    # ------------------------------------------------------------------
+    # Extras
+    # ------------------------------------------------------------------
+    # most of your ingestors pass a list of URLs, not dicts → make that the default
+    attachments: List[str] = field(default_factory=list)
     status: str = "open"
-    hash_body: str | None = None
+    hash_body: Optional[str] = None
 
-    # NEW: Solicitation # / RFQ / external reference ID
-    external_id: str = ""              # e.g. "RFQ031521"
-    keyword_tag: str = ""   # <-- NEW
+    # ------------------------------------------------------------------
+    # IDs / tags
+    # ------------------------------------------------------------------
+    # e.g. "RFP# 2025-46-19" → "2025-46-19"
+    external_id: str = ""
+    # you had this in your file – leaving it in
+    keyword_tag: str = ""

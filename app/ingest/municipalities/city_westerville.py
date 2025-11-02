@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 import requests
@@ -187,6 +187,7 @@ def _project_to_raw(proj: Dict[str, Any]) -> RawOpportunity:
         hash_body=hb,
         external_id=external_id,
         keyword_tag=category,
+        date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
     )
 
 

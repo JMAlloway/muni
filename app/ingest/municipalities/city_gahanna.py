@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 import aiohttp
@@ -294,6 +294,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     hash_body=hash_body,
                     external_id=external_id,
                     keyword_tag=keyword_tag,
+                    date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
                 )
             )
 

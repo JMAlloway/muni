@@ -1,7 +1,8 @@
 import asyncio
 import logging
-from datetime import datetime
+import re
 from typing import List, Optional, Tuple
+from datetime import datetime, timezone
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -18,6 +19,25 @@ LIST_URL = BASE_URL + "/"  # public listing table
 # ---------------------------------
 # HTTP helpers
 # ---------------------------------
+
+def _normalize_ref_no(ref_no: str) -> str:
+    """
+    Turn things like:
+      "RFP# 2025-46-19"
+      "RFQ#2025-10"
+      "Bid # 25-003"
+    into just:
+      "2025-46-19"
+      "2025-10"
+      "25-003"
+    """
+    if not ref_no:
+        return ""
+
+    txt = ref_no.strip()
+    # drop leading label like RFP / RFQ / BID / ITB, with optional # and spaces
+    txt = re.sub(r"^(rfp|rfq|itb|bid)\s*#?\s*", "", txt, flags=re.IGNORECASE)
+    return txt.strip()
 
 async def _read_text_with_fallback(resp: aiohttp.ClientResponse) -> str:
     """
@@ -345,6 +365,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
 
     async with aiohttp.ClientSession() as session:
         for row in rows:
+            # fetch detail page for each row
             detail_desc, attachment_urls = await _fetch_detail_description_and_attachments(
                 session,
                 row["detail_url"],
@@ -357,11 +378,14 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                 contact_bits.append(f"Email: {row['contact_email']}")
             contact_summary = " | ".join(contact_bits)
 
-            # “Opening Date” isn’t the vendor due date → treat as informational only
             opening_dt = row["opening_dt"]
-            due_dt = None  # mark as TBD
+            due_dt = None  # Franklin County shows Opening, not vendor due
 
-            trimmed_desc = (detail_desc[:400] + " ...") if detail_desc and len(detail_desc) > 400 else detail_desc
+            trimmed_desc = (
+                (detail_desc[:400] + " ...")
+                if detail_desc and len(detail_desc) > 400
+                else detail_desc
+            )
             summary_text = trimmed_desc or ""
             if opening_dt:
                 summary_text = f"{summary_text} (Opening: {opening_dt.strftime('%m/%d/%Y')})"
@@ -369,18 +393,21 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                 summary_text = (summary_text + " " + contact_summary).strip()
 
             category_guess = _tag_category(
-                title=f"{row['ref_no']} - {row['title']}",
+                title=row["title"],
                 desc=detail_desc,
             )
+
+            # 👇 normalize the “RFP# …” cell to just “2025-46-19”
+            clean_ref = _normalize_ref_no(row["ref_no"])
 
             out.append(
                 RawOpportunity(
                     agency_name=AGENCY_NAME,
-                    title=f"{row['ref_no']} - {row['title']}",
+                    title=row["title"],
                     summary=summary_text.strip(),
                     description=detail_desc,
-                    due_date=due_dt,              # ⬅️ now explicitly None (TBD)
-                    posted_date=opening_dt,        # ⬅️ store original Opening Date
+                    due_date=due_dt,
+                    posted_date=opening_dt,
                     prebid_date=None,
                     source=row["detail_url"],
                     source_url=row["detail_url"],
@@ -388,6 +415,8 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     location_geo=None,
                     attachments=attachment_urls,
                     status="open",
+                    external_id=clean_ref,  # ✅ now the opportunities table gets 2025-46-19
+                    date_added=datetime.now(timezone.utc),
                 )
             )
 

@@ -1,7 +1,7 @@
 # app/ingest/municipalities/city_new_albany.py
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 import aiohttp
 from bs4 import BeautifulSoup
@@ -91,6 +91,7 @@ async def _scrape_listing(session: aiohttp.ClientSession) -> List[RawOpportunity
                 location_geo=None,
                 attachments=[],
                 status="open",
+                date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
             )
         )
 

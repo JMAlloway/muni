@@ -1,6 +1,6 @@
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from bs4 import BeautifulSoup
@@ -220,6 +220,7 @@ def fetch() -> List[RawOpportunity]:
             hash_body=None,
             external_id="",          # no solicitation # exposed in listing
             keyword_tag="",
+            date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
         )
 
         out.append(opp)

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 import aiohttp
@@ -256,6 +256,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     location_geo=None,
                     attachments=attachment_urls,
                     status="open",
+                    date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
                 )
             )
 

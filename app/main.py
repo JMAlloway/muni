@@ -16,6 +16,7 @@ from app.routers import cota_detail
 from app.routers import gahanna_detail
 from app.routers import columbus_airports_detail
 from app.routers import opportunity_web
+from app.models_core import metadata as core_metadata
 
 
 # if you also have users.router, include that too
@@ -23,6 +24,25 @@ from app.routers import opportunity_web
 
 app = FastAPI(title="Muni Alerts", version="0.1")
 
+from app.models_core import metadata as core_metadata
+
+@app.on_event("startup")
+async def on_startup():
+    async with engine.begin() as conn:
+        # ORM tables
+        await conn.run_sync(Base.metadata.create_all)
+        # Core tables (opportunities)
+        await conn.run_sync(core_metadata.create_all)
+    ...
+
+@app.on_event("startup")
+async def on_startup():
+    async with engine.begin() as conn:
+        # ORM tables
+        await conn.run_sync(Base.metadata.create_all)
+        # Core tables (opportunities)
+        await conn.run_sync(core_metadata.create_all)
+    ...
 
 @app.on_event("startup")
 async def on_startup():

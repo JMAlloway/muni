@@ -1,6 +1,6 @@
 import re
 from urllib.parse import urljoin
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 import requests
@@ -291,6 +291,7 @@ def fetch() -> List[RawOpportunity]:
             hash_body=None,
             external_id=external_id,
             keyword_tag="",
+            date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
         )
 
         opportunities.append(opp)

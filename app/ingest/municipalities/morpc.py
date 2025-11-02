@@ -1,7 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from app.ingest.base import RawOpportunity
@@ -257,6 +257,7 @@ def fetch() -> List[RawOpportunity]:
             hash_body=None,
             external_id=_guess_external_id(title_text),
             keyword_tag="",
+            date_added=datetime.now(timezone.utc),  # 👈 NEW LINE
         )
 
         results.append(opp)

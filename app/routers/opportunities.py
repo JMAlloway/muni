@@ -132,7 +132,8 @@ async def opportunities(request: Request):
                     due_date,
                     source_url,
                     status,
-                    COALESCE(ai_category, category) AS category
+                    COALESCE(ai_category, category) AS category,
+                    date_added
                 FROM opportunities
                 WHERE {where_sql}
                 ORDER BY {order_sql}
@@ -208,7 +209,7 @@ async def opportunities(request: Request):
         # -------- build HTML table rows --------
     table_rows_html = []
 
-    for external_id, title, agency, due, url, status, category in rows:
+    for external_id, title, agency, due, url, status, category, date_added in rows:
         # format due date like "10/27/2025 08:00 AM"
         if due:
             try:
@@ -276,19 +277,40 @@ async def opportunities(request: Request):
             # nothing we can do
             link_html = "<span class='muted'>—</span>"
 
+         # ✅ ADD THIS RIGHT HERE
+        # format date_added like "11/02/2025"
+        if date_added:
+            try:
+                if hasattr(date_added, "strftime"):
+                    date_added_str = date_added.strftime("%m/%d/%Y")
+                else:
+                    date_added_str = str(date_added).split(" ")[0]
+            except Exception:
+                date_added_str = "—"
+        else:
+            date_added_str = "—"
 
         # build the row AFTER we've defined everything
         row_html = (
             f"<tr data-external-id='{external_id or ''}' data-agency='{agency or ''}'>"
+            # 1) Solicitation #
             f"<td style='vertical-align:top;font-size:14px;font-weight:500;color:#111827;'>{rfq_html}</td>"
+            # 2) Title
             f"<td style='vertical-align:top;font-size:14px;color:#111827;'>{title}</td>"
+            # 3) Agency
             f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{agency or ''}</td>"
+            # 4) Date Added  ✅
+            f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{date_added_str}</td>"
+            # 5) Due Date
             f"<td style='vertical-align:top;font-size:13px;color:#111827;'>{due_str}</td>"
+            # 6) Type
             f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{category or ''}</td>"
+            # 7) Status
             f"<td style='vertical-align:top;'>{badge_html}</td>"
+            # 8) Source Link
             f"<td style='vertical-align:top;font-size:13px;'>{link_html}</td>"
             "</tr>"
-)
+        )
 
 
         table_rows_html.append(row_html)
@@ -741,6 +763,7 @@ async def opportunities(request: Request):
                     <th style="min-width:140px;">Solicitation #</th>
                     <th style="min-width:280px;">Title</th>
                     <th style="min-width:160px;">Agency</th>
+                    <th style="min-width:140px;">Date Added</th>
                     <th style="min-width:140px;">Due Date</th>
                     <th style="min-width:140px;">Type</th>
                     <th style="min-width:80px;">Status</th>
