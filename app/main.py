@@ -1,0 +1,54 @@
+import sys
+import asyncio
+from fastapi import FastAPI
+
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from app.db import engine, AsyncSessionLocal
+from app.models import Base
+from app.auth import create_admin_if_missing
+from app.scheduler import start_scheduler
+from app.routers import marketing, opportunities, preferences, auth_web, admin
+from app.routers import onboarding
+from app.routers import columbus_detail
+from app.routers import cota_detail
+from app.routers import gahanna_detail
+from app.routers import columbus_airports_detail
+
+# if you also have users.router, include that too
+
+
+app = FastAPI(title="Muni Alerts", version="0.1")
+
+
+@app.on_event("startup")
+async def on_startup():
+    # ensure tables exist
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # ensure ADMIN_EMAIL user exists / etc.
+    async with AsyncSessionLocal() as db:
+        await create_admin_if_missing(db)
+
+    # kick off scraper + digests
+    start_scheduler()
+
+
+# Public product pages
+app.include_router(marketing.router)        # "/"
+app.include_router(opportunities.router)    # "/opportunities"
+app.include_router(preferences.router)      # "/preferences"
+app.include_router(onboarding.router)       # "/onboarding" 👈 new
+
+# Auth / account
+app.include_router(auth_web.router)         # "/signup", "/login", "/account", "/logout"
+
+# Internal/admin tools
+app.include_router(admin.router)            # "/admin/*"
+app.include_router(columbus_detail.router)   # "/columbus_detail/{rfq_id}"
+app.include_router(cota_detail.router)
+app.include_router(gahanna_detail.router)
+app.include_router(columbus_airports_detail.router)
+
