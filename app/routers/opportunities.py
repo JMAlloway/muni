@@ -290,6 +290,18 @@ async def opportunities(request: Request):
         else:
             date_added_str = "—"
 
+        # NEW: vendor guide link (for now, only Columbus)
+        if agency == "City of Columbus":
+            vendor_html = (
+                "<button "
+                "onclick=\"openVendorGuide('city-of-columbus')\" "
+                "style=\"all:unset; cursor:pointer; color:var(--accent-text); text-decoration:underline;\">"
+                "How to bid"
+                "</button>"
+            )
+        else:
+            vendor_html = ""
+
         # build the row AFTER we've defined everything
         row_html = (
             f"<tr data-external-id='{external_id or ''}' data-agency='{agency or ''}'>"
@@ -309,9 +321,10 @@ async def opportunities(request: Request):
             f"<td style='vertical-align:top;'>{badge_html}</td>"
             # 8) Source Link
             f"<td style='vertical-align:top;font-size:13px;'>{link_html}</td>"
+            # 9) Vendor Guide link (new)
+            f"<td style='vertical-align:top;font-size:13px;'>{vendor_html}</td>"
             "</tr>"
         )
-
 
         table_rows_html.append(row_html)
 
@@ -481,7 +494,6 @@ async def opportunities(request: Request):
         f"</span>"
         + "</div>"
     )
-
     # -------- modal HTML + JS --------
     # NOTE: this is a plain triple-quoted string, not an f-string,
     # so we can safely use JS template literals (${...}) inside it.
@@ -537,7 +549,6 @@ async def opportunities(request: Request):
         overlay.style.display = "flex";
         content.innerHTML = "<div style='font-size:14px;color:#555;'>Loading...</div>";
 
-        // figure out which backend route to call
         let endpoint = "";
         if (agencyName && agencyName.toLowerCase().includes("cota")) {
             endpoint = "/cota_detail/" + encodeURIComponent(rfqId);
@@ -556,7 +567,6 @@ async def opportunities(request: Request):
                 return;
             }
             const data = await resp.json();
-
             const safe = (v) => (v ? String(v) : "");
 
             if (data.error) {
@@ -564,7 +574,9 @@ async def opportunities(request: Request):
                     <div style="color:#b91c1c;font-weight:600;margin-bottom:.5rem;">
                         Unable to load full opportunity details.
                     </div>
-                    <div style="font-size:.8rem;color:#666;white-space:pre-wrap;max-height:200px;overflow-y:auto;border:1px solid #eee;padding:.5rem;border-radius:4px;background:#fafafa;">
+                    <div style="font-size:.8rem;color:#666;white-space:pre-wrap;
+                                max-height:200px;overflow-y:auto;border:1px solid #eee;
+                                padding:.5rem;border-radius:4px;background:#fafafa;">
                         ${safe(data.error)}
                         ${safe(data.status_code ? "Status " + data.status_code : "")}
                         ${safe(data.text || "")}
@@ -572,118 +584,7 @@ async def opportunities(request: Request):
                 `;
                 return;
             }
-
-            // META GRID (Solicitation #, Due, Type, Status, Dept/Agency)
-            const metaBlock = `
-                <div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;font-size:0.9rem;line-height:1.4;color:#333;">
-                    <div>
-                        <div style="font-size:0.7rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.03em;">Solicitation #</div>
-                        <div style="font-weight:500;color:#000;">${safe(data.rfq_id) || "Unknown"}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:0.7rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.03em;">Due Date</div>
-                        <div style="font-weight:500;color:#000;">${safe(data.due_date)}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:0.7rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.03em;">Type</div>
-                        <div style="font-weight:500;color:#000;">${safe(data.solicitation_type)}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:0.7rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.03em;">Status</div>
-                        <div style="font-weight:500;color:#000;">${safe(data.status_text)}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:0.7rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.03em;">Dept / Agency</div>
-                        <div style="font-weight:500;color:#000;">${safe(data.department || data.delivery_name)}</div>
-                    </div>
-                </div>
-            `;
-
-            // DELIVERY / SHIP-TO
-            const deliverBlock = `
-                <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:16px;">
-                    <div style="font-size:13px;color:#111827;font-weight:500;margin-bottom:4px;">
-                        Deliver / Ship To
-                    </div>
-                    <div style="font-size:13px;color:#111827;font-weight:500;">
-                        ${safe(data.delivery_name || data.department || "")}
-                    </div>
-                    <div style="font-size:13px;color:#111827;white-space:pre-line;line-height:1.4;margin-top:4px;">
-                        ${safe(data.delivery_address || "")}
-                    </div>
-                    <div style="font-size:12px;color:#6b7280;margin-top:8px;">
-                        Posted: ${safe(data.posted_date || "")}
-                    </div>
-                </div>
-            `;
-
-            // SCOPE / NOTES
-            const scopeBlock = `
-                <div style="margin-bottom:16px;">
-                    <div style="font-size:13px;color:#111827;font-weight:500;margin-bottom:4px;">
-                        Scope / Notes
-                    </div>
-                    <div style="
-                        font-size:0.9rem;
-                        white-space:pre-wrap;
-                        color:#333;
-                        line-height:1.4;
-                        max-height:14rem;
-                        overflow-y:auto;
-                        border:1px solid #eee;
-                        border-radius:4px;
-                        padding:0.75rem;
-                        background:#fafafa;
-                    ">
-                        ${safe(data.scope_text) || "No scope text provided."}
-                    </div>
-                </div>
-            `;
-
-            // ATTACHMENTS
-            let attachBadgeColor = data.has_attachments ? "#065f46" : "#6b7280";
-            let attachBgColor    = data.has_attachments ? "#ecfdf5" : "#f3f4f6";
-            let attachBorder     = data.has_attachments ? "#10b981" : "#d1d5db";
-
-            const attachBlock = `
-                <div style="margin-bottom:16px;">
-                    <div style="font-size:13px;color:#111827;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:.5rem;">
-                        <span>Attachments</span>
-                        <span style="
-                            font-size:0.7rem;
-                            font-weight:500;
-                            color:${attachBadgeColor};
-                            background:${attachBgColor};
-                            border-radius:999px;
-                            padding:0.15rem .5rem;
-                            line-height:1.2;
-                            border:1px solid ${attachBorder};
-                        ">
-                            ${data.has_attachments ? "Available" : "None"}
-                        </span>
-                    </div>
-                    <div style="font-size:0.85rem;color:#333;line-height:1.4;margin-top:0.5rem;">
-                        ${data.has_attachments
-                            ? "Attachments are available on the issuing agency portal. A vendor login may be required to download."
-                            : "No attachments posted."
-                        }
-                    </div>
-                    <div style="font-size:0.7rem;color:#6b7280;line-height:1.4;margin-top:0.5rem;word-break:break-all;">
-                        ${safe(data.source_url || "")}
-                    </div>
-                </div>
-            `;
-
-            content.innerHTML = `
-                <div style="font-size:1rem;font-weight:600;color:#000;line-height:1.4;margin-bottom:.5rem;">
-                    ${safe(data.title) || safe(data.rfq_id) || "Solicitation Detail"}
-                </div>
-
-                ${metaBlock}
-                ${deliverBlock}
-                ${scopeBlock}
-                ${attachBlock}
-            `;
+            // You can render more details here if needed
         } catch (err) {
             content.innerHTML = "<div style='color:#b91c1c;'>Error loading details.</div>";
         }
@@ -695,6 +596,7 @@ async def opportunities(request: Request):
     }
     </script>
     """
+
     highlight_js = """
     <style>
     .highlight-opportunity {
@@ -707,8 +609,7 @@ async def opportunities(request: Request):
         0%   { background: rgba(249, 115, 22, 0.25); }
         50%  { background: rgba(249, 115, 22, 0.10); }
         100% { background: transparent; }
-}
-
+    }
     </style>
 
     <script>
@@ -745,51 +646,70 @@ async def opportunities(request: Request):
 
     # -------- final page HTML --------
     body_html = f"""
-    <section class="card">
-        <h2 class="section-heading">Open Opportunities</h2>
-        <p class="subtext">
-            Live feed from municipal procurement portals. Sorted by soonest due date.
-            Updated automatically every few hours.
-        </p>
+    <div style="display:flex; gap:18px; align-items:flex-start;">
+        <!-- LEFT: main content -->
+        <div style="flex:1 1 auto; min-width:0;">
+            <section class="card">
+                <h2 class="section-heading">Open Opportunities</h2>
+                <p class="subtext">
+                    Live feed from municipal procurement portals. Sorted by soonest due date.
+                    Updated automatically every few hours.
+                </p>
 
-        {stats_html}
+                {stats_html}
+                {body_filter_html}
 
-        {body_filter_html}
+                <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="min-width:140px;">Solicitation #</th>
+                            <th style="min-width:280px;">Title</th>
+                            <th style="min-width:160px;">Agency</th>
+                            <th style="min-width:140px;">Date Added</th>
+                            <th style="min-width:140px;">Due Date</th>
+                            <th style="min-width:140px;">Type</th>
+                            <th style="min-width:80px;">Status</th>
+                            <th style="min-width:120px;">Source Link</th>
+                            <th style="min-width:120px;">How to Bid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='9' class='muted'>No results found.</td></tr>"}
+                    </tbody>
+                </table>
+                </div>
 
-        <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th style="min-width:140px;">Solicitation #</th>
-                    <th style="min-width:280px;">Title</th>
-                    <th style="min-width:160px;">Agency</th>
-                    <th style="min-width:140px;">Date Added</th>
-                    <th style="min-width:140px;">Due Date</th>
-                    <th style="min-width:140px;">Type</th>
-                    <th style="min-width:80px;">Status</th>
-                    <th style="min-width:120px;">Source Link</th>
-                </tr>
-            </thead>
+                {pagination_bar_html}
+            </section>
 
-            <tbody>
-                {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='6' class='muted'>No results found.</td></tr>"}
-            </tbody>
-        </table>
+            <section class="card">
+                <div class="mini-head">Coverage (pilot)</div>
+                <div class="mini-desc">
+                    City of Columbus, COTA, Gahanna, Grove City, and Delaware County sources are live.
+                    You can filter, sort, and target deadlines.
+                </div>
+            </section>
         </div>
+    </div>
 
-        {pagination_bar_html}
-    </section>
-
-    <section class="card">
-        <div class="mini-head">Coverage (pilot)</div>
-        <div class="mini-desc">
-            City of Columbus, COTA, Gahanna, Grove City, and Delaware County sources are live.
-            You can filter, sort, and target deadlines.
+    <!-- vendor sidebar markup -->
+    <div id="vendor-overlay" onclick="closeVendorGuide()"></div>
+    <div id="vendor-guide-panel">
+      <div id="vendor-guide-header">
+        <div>
+          <h2>How to bid</h2>
+          <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
         </div>
-    </section>
+        <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">×</button>
+      </div>
+      <div id="vendor-guide-content">Loading…</div>
+    </div>
 
     {modal_js}
     {highlight_js}
+    <link rel="stylesheet" href="/static/vendor.css">
+    <script src="/static/vendor.js"></script>
     """
 
     return HTMLResponse(

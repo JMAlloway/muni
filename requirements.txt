@@ -22,3 +22,5 @@ itsdangerous==2.1.2
 passlib==1.7.4
 bcrypt==4.2.0   # instead of python_bcrypt
 PyJWT==2.10.1   # keep only one
+markdown
+

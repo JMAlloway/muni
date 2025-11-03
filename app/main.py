@@ -17,12 +17,16 @@ from app.routers import gahanna_detail
 from app.routers import columbus_airports_detail
 from app.routers import opportunity_web
 from app.models_core import metadata as core_metadata
+from app.routers import vendor_guides
+
+from fastapi.staticfiles import StaticFiles
 
 
 # if you also have users.router, include that too
 
 
 app = FastAPI(title="Muni Alerts", version="0.1")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 from app.models_core import metadata as core_metadata
 
@@ -74,4 +78,5 @@ app.include_router(cota_detail.router)
 app.include_router(gahanna_detail.router)
 app.include_router(columbus_airports_detail.router)
 app.include_router(opportunity_web.router)
+app.include_router(vendor_guides.router)
 
