@@ -7,6 +7,7 @@ def _nav_links_html(user_email: Optional[str]) -> str:
         return """
         <a href="/">Overview</a>
         <a href="/opportunities">Open Opportunities</a>
+        <a href="/tracker/dashboard">My Dashboard</a>
         <a href="/onboarding">Preferences</a>
         <a href="/account">My Account</a>
         <a href="/logout">Logout</a>

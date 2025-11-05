@@ -1,0 +1,9 @@
+.highlight-opportunity{
+  animation:pulse-highlight 1.3s ease-out 1;
+  outline:2px solid #f97316;outline-offset:2px;background:rgba(249,115,22,.08);
+}
+@keyframes pulse-highlight{
+  0%{background:rgba(249,115,22,.25)}
+  50%{background:rgba(249,115,22,.10)}
+  100%{background:transparent}
+}

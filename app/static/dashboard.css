@@ -1,0 +1,48 @@
+/* Minimal, clean, modern */
+.toolbar { display:flex; gap:12px; align-items:center; margin:12px 0; }
+.toolbar .filters select { padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px; }
+
+.tracked-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap:14px;
+}
+
+.tracked-card {
+  background:#fff; border:1px solid #eef2f7; border-radius:16px;
+  box-shadow: 0 2px 10px rgba(15,23,42,.04);
+  display:flex; flex-direction:column; gap:10px; padding:14px;
+}
+
+.tracked-card .top { display:flex; justify-content:space-between; gap:12px; }
+.tracked-card .title { font-weight:600; line-height:1.25; }
+.tracked-card .meta { color:#64748b; font-size:12px; display:flex; gap:10px; flex-wrap:wrap; }
+
+.status-badge {
+  font-size:12px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; align-self:flex-start;
+}
+
+.progress {
+  height:6px; background:#f1f5f9; border-radius:999px; overflow:hidden;
+}
+.progress > div { height:100%; width:0%; transition:width .25s ease; }
+
+.actions { display:flex; gap:8px; flex-wrap:wrap; }
+.actions .btn, .actions .btn-secondary { padding:8px 10px; border-radius:10px; cursor:pointer; border:0; }
+.actions .btn { background:#2563eb; color:#fff; }
+.actions .btn-secondary { background:#f1f5f9; color:#0f172a; }
+
+.card-list { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
+.card-list li { display:flex; align-items:center; gap:8px; font-size:13px; color:#334155; }
+.card-list li .dot { width:8px; height:8px; border-radius:999px; background:#94a3b8; }
+
+#guide-overlay { position:fixed; inset:0; background:rgba(2,6,23,.4); display:none; }
+#guide-drawer {
+  position:fixed; top:0; right:-520px; width:520px; height:100%; background:#fff;
+  border-left:1px solid #e5e7eb; box-shadow:-6px 0 20px rgba(2,6,23,.08);
+  display:flex; flex-direction:column; transition:right .25s ease;
+}
+#guide-drawer[aria-hidden="false"] { right:0; }
+#guide-drawer header { display:flex; align-items:center; justify-content:space-between; padding:14px; border-bottom:1px solid #eef2f7; }
+#guide-drawer .guide-content { padding:14px; display:grid; gap:12px; }
+.icon-btn { border:0; background:#e2e8f0; width:28px; height:28px; border-radius:999px; cursor:pointer; }

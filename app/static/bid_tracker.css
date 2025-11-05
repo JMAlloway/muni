@@ -1,0 +1,29 @@
+/* Drawer (LIGHT THEME, scoped) */
+#bid-drawer.drawer{
+  position:fixed;right:0;top:0;height:100%;width:420px;
+  background:#fff;color:#0f172a;box-shadow:-8px 0 24px rgba(0,0,0,.12);
+  border-left:1px solid #e5e7eb;display:flex;flex-direction:column;z-index:1000;
+}
+#bid-drawer.hidden{display:none}
+#bid-drawer .drawer-header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid #e5e7eb}
+#bid-drawer .drawer-body{padding:12px 16px;overflow:auto;height:calc(100% - 56px)}
+#bid-drawer .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}
+#bid-drawer .label{display:block;font-size:12px;color:#334155;margin-bottom:6px}
+#bid-drawer .btn{background:#2563eb;color:#fff;border:0;padding:8px 12px;border-radius:10px;cursor:pointer}
+#bid-drawer .btn-secondary{background:#f8fafc;color:#1f2937;border:1px solid #e5e7eb;padding:8px 12px;border-radius:10px;cursor:pointer}
+#bid-drawer .file-list{list-style:none;margin:0;padding:0}
+#bid-drawer .file-list li{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #e5e7eb}
+#bid-drawer .file-list a{color:var(--accent-text,#2563eb);text-decoration:underline}
+#bid-drawer .row{display:flex;align-items:center;justify-content:space-between}
+
+/* Drag & Drop zone */
+#bid-drawer .dz{
+  background:#f8fafc;border:2px dashed #d1d5db;border-radius:12px;
+  padding:18px;text-align:center;transition:background .15s ease,border-color .15s ease;user-select:none;
+}
+#bid-drawer .dz.dragover{background:#eef2ff;border-color:#6366f1}
+#bid-drawer .dz-inner{display:grid;gap:6px;justify-items:center}
+#bid-drawer .dz-icon{font-size:28px;line-height:1;opacity:.7}
+#bid-drawer .dz-title{font-weight:600;color:#111827}
+#bid-drawer .dz-sub{font-size:12px;color:#6b7280}

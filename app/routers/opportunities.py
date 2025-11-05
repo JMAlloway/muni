@@ -9,6 +9,7 @@ import json
 from app.db_core import engine
 from app.routers._layout import page_shell
 from app.auth_utils import require_login
+from app.data.agencies import AGENCIES
 
 router = APIRouter(tags=["opportunities"])
 
@@ -174,31 +175,22 @@ async def opportunities(request: Request):
         next_due_str = "—"
 
     stats_html = f"""
-<div style="
-    display:flex;
-    flex-wrap:wrap;
-    gap:24px;
-    align-items:flex-start;
-    background:#f9fafb;
-    border:1px solid #e5e7eb;
-    border-radius:12px;
-    padding:12px 16px;
-    margin:12px 0 20px;
-">
-    <div style="flex:0 0 auto;">
-        <div style="font-size:18px;font-weight:600;color:#111;">{open_count}</div>
-        <div class="muted" style="font-size:12px;line-height:16px;">Open bids</div>
-    </div>
-    <div style="flex:0 0 auto;">
-        <div style="font-size:18px;font-weight:600;color:#111;">{agency_count}</div>
-        <div class="muted" style="font-size:12px;line-height:16px;">Municipalities</div>
-    </div>
-    <div style="flex:0 0 auto;">
-        <div style="font-size:18px;font-weight:600;color:#111;">{next_due_str}</div>
-        <div class="muted" style="font-size:12px;line-height:16px;">Next due date</div>
-    </div>
+<div class="stats">
+  <div class="item">
+    <div class="value">{open_count}</div>
+    <div class="label">Open bids</div>
+  </div>
+  <div class="item">
+    <div class="value">{agency_count}</div>
+    <div class="label">Municipalities</div>
+  </div>
+  <div class="item">
+    <div class="value">{next_due_str}</div>
+    <div class="label">Next due date</div>
+  </div>
 </div>
 """
+
     # fallback URLs for agencies whose scraped link is a JS action
     agency_fallback_urls = {
         "Central Ohio Transit Authority (COTA)": "https://cota.dbesystem.com/FrontEnd/proposalsearchpublic.asp",
@@ -290,7 +282,19 @@ async def opportunities(request: Request):
         else:
             date_added_str = "—"
 
-        # NEW: vendor guide link (for now, only Columbus)
+                # NEW: vendor guide link (for now, only Columbus)
+            if agency == "City of Columbus":
+                    vendor_html = (
+                        "<button "
+                        "onclick=\"openVendorGuide('city-of-columbus')\" "
+                        "style=\"all:unset; cursor:pointer; color:var(--accent-text); text-decoration:underline;\">"
+                        "How to bid"
+                        "</button>"
+                    )
+            else:
+                    vendor_html = ""
+                    # NEW: vendor guide link (keep only for Columbus if you want that help link)
+        vendor_html = ""
         if agency == "City of Columbus":
             vendor_html = (
                 "<button "
@@ -299,30 +303,27 @@ async def opportunities(request: Request):
                 "How to bid"
                 "</button>"
             )
-        else:
-            vendor_html = ""
+
+        # ✅ Track & Upload button — always shown for every agency
+        track_btn_html = (
+            "<button onclick=\"trackAndOpenUploads('{ext}')\" "
+            "style='background:#2563eb;color:#fff;border:0;padding:6px 10px;"
+            "border-radius:6px;cursor:pointer;'>Track & Upload</button>"
+        ).replace("{ext}", external_id or "")
 
         # build the row AFTER we've defined everything
         row_html = (
             f"<tr data-external-id='{external_id or ''}' data-agency='{agency or ''}'>"
-            # 1) Solicitation #
-            f"<td style='vertical-align:top;font-size:14px;font-weight:500;color:#111827;'>{rfq_html}</td>"
-            # 2) Title
-            f"<td style='vertical-align:top;font-size:14px;color:#111827;'>{title}</td>"
-            # 3) Agency
-            f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{agency or ''}</td>"
-            # 4) Date Added  ✅
-            f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{date_added_str}</td>"
-            # 5) Due Date
-            f"<td style='vertical-align:top;font-size:13px;color:#111827;'>{due_str}</td>"
-            # 6) Type
-            f"<td style='vertical-align:top;font-size:13px;color:#4b5563;'>{category or ''}</td>"
-            # 7) Status
-            f"<td style='vertical-align:top;'>{badge_html}</td>"
-            # 8) Source Link
-            f"<td style='vertical-align:top;font-size:13px;'>{link_html}</td>"
-            # 9) Vendor Guide link (new)
-            f"<td style='vertical-align:top;font-size:13px;'>{vendor_html}</td>"
+            f"<td class='w-140'><span style='font-weight:500;'>{rfq_html}</span></td>"
+            f"<td class='w-280'>{title}</td>"
+            f"<td class='w-160 muted'>{agency or ''}</td>"
+            f"<td class='w-140 muted'>{date_added_str}</td>"
+            f"<td class='w-140'>{due_str}</td>"
+            f"<td class='w-140 muted'>{category or ''}</td>"
+            f"<td><span class='pill'>{status or 'open'}</span></td>"
+            f"<td class='w-120'>{link_html}</td>"
+            f"<td class='w-120'>{vendor_html}</td>"
+            f"<td class='w-140'>{track_btn_html}</td>"
             "</tr>"
         )
 
@@ -330,29 +331,7 @@ async def opportunities(request: Request):
 
 
     # -------- filter form HTML --------
-    agencies = [
-        "City of Columbus",
-        "City of Gahanna",
-        "City of Grove City",
-        "City of Marysville",
-        "City of Whitehall",
-        "City of Grandview Heights",
-        "City of Worthington",
-        "Delaware County",
-        "Solid Waste Authority of Central Ohio (SWACO)",
-        "Central Ohio Transit Authority (COTA)",
-        "Franklin County, Ohio",
-        "City of Westerville",
-        "Columbus Metropolitan Library",
-        "Columbus Metropolitan Housing Authority",
-        "Columbus and Franklin County Metro Parks",
-        "Columbus Regional Airport Authority (CRAA)",
-        "Mid-Ohio Regional Planning Commission (MORPC)",
-        "Dublin City Schools",
-        "Village of Minerva Park",
-        "City of New Albany",
-        "Ohio Buys",
-    ]
+    agencies = AGENCIES
 
     agency_options_html = [
         f"<option value='' {'selected' if not agency_filter else ''}>All agencies</option>"
@@ -391,48 +370,43 @@ async def opportunities(request: Request):
 
     body_filter_html = f"""
     <form method="GET" action="/opportunities" style="margin-bottom:16px;">
-        <div class="form-row">
-            <div class="form-col">
-                <label class="label-small">Agency</label>
-                <select name="agency">
-                    {''.join(agency_options_html)}
-                </select>
-            </div>
-
-            <div class="form-col">
-                <label class="label-small">Search title</label>
-                <input
-                    type="text"
-                    name="search"
-                    value="{search_filter}"
-                    placeholder="road, IT managed services..."
-                />
-            </div>
-
-            <div class="form-col">
-                <label class="label-small">Due within</label>
-                <select name="due_within">
-                    {''.join(duewithin_options_html)}
-                </select>
-            </div>
-
-            <div class="form-col">
-                <label class="label-small">Sort by</label>
-                <select name="sort_by">
-                    {''.join(sort_options_html)}
-                </select>
-            </div>
-
-            <div class="form-col" style="align-self:flex-end;">
-                <button class="button-primary" type="submit">Filter →</button>
-                <div style="margin-top:8px;">
-                    <a href="/opportunities?agency="
-                       style="font-size:12px;color:var(--accent-text);text-decoration:underline;">
-                        Reset / Show all bids
-                    </a>
-                </div>
-            </div>
+    <div class="form-row">
+        <div class="form-col">
+        <label class="label-small">Agency</label>
+        <select name="agency">
+            {''.join(
+                [f"<option value='' {'selected' if not agency_filter else ''}>All agencies</option>"] +
+                [f"<option value='{ag}' {'selected' if ag == agency_filter else ''}>{ag}</option>" for ag in AGENCIES]
+            )}
+        </select>
         </div>
+
+        <div class="form-col">
+        <label class="label-small">Search title</label>
+        <input type="text" name="search" value="{search_filter}" placeholder="road, IT managed services..." />
+        </div>
+
+        <div class="form-col">
+        <label class="label-small">Due within</label>
+        <select name="due_within">
+            {''.join([f"<option value='{val}' {'selected' if ((val=='' and due_within is None) or (val and due_within is not None and val==str(due_within))) else ''}>{label}</option>" for val,label in [('', 'Any due date'), ('7','Next 7 days'), ('30','Next 30 days'), ('90','Next 90 days')]])}
+        </select>
+        </div>
+
+        <div class="form-col">
+        <label class="label-small">Sort by</label>
+        <select name="sort_by">
+            {''.join([f"<option value='{v}' {'selected' if sort_by==v else ''}>{l}</option>" for v,l in [('soonest_due','Soonest due'),('latest_due','Latest due'),('agency_az','Agency A–Z'),('title_az','Title A–Z')]])}
+        </select>
+        </div>
+
+        <div class="form-col" style="align-self:flex-end;">
+        <button class="button-primary" type="submit">Filter →</button>
+        <div style="margin-top:8px;">
+            <a href="/opportunities?agency=" style="font-size:12px;color:var(--accent-text);text-decoration:underline;">Reset / Show all bids</a>
+        </div>
+        </div>
+    </div>
     </form>
     """
 
@@ -498,151 +472,57 @@ async def opportunities(request: Request):
     # NOTE: this is a plain triple-quoted string, not an f-string,
     # so we can safely use JS template literals (${...}) inside it.
     modal_js = """
-    <!-- Modal overlay for RFQ / solicitation detail -->
-    <div id="rfq-modal-overlay" style="
-        display:none;
-        position:fixed;
-        left:0;
-        top:0;
-        width:100vw;
-        height:100vh;
-        background:rgba(0,0,0,0.4);
-        z-index:1000;
-        align-items:flex-start;
-        justify-content:center;
-        overflow-y:auto;
-        padding:40px 16px;
-    ">
-        <div id="rfq-modal-card" style="
-            background:#fff;
-            border-radius:12px;
-            box-shadow:0 20px 40px rgba(0,0,0,0.2);
-            max-width:800px;
-            width:100%;
-            padding:24px;
-            position:relative;
-            font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">
-            <button onclick="closeDetailModal()" style="
-                position:absolute;
-                top:12px;
-                right:12px;
-                border:0;
-                background:#eee;
-                border-radius:6px;
-                font-size:14px;
-                line-height:1;
-                padding:4px 8px;
-                cursor:pointer;
-            ">✕</button>
-            <div id="rfq-modal-content" style="font-size:14px; color:#111;">
-                Loading...
+<!-- Track & Upload Drawer -->
+<div id="bid-drawer" class="drawer hidden">
+  <div class="drawer-header">
+    <h3 id="drawer-title">Bid Tracker</h3>
+    <button onclick="closeDrawer()" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <section id="upload-area">
+      <div class="card">
+        <label class="label">Upload RFP Files (PDF, DOCX, XLSX, ZIP)</label>
+
+        <form id="upload-form">
+          <input type="hidden" name="opportunity_id" id="opp-id">
+
+          <!-- Drag & Drop zone -->
+          <div id="dropzone" class="dz" aria-label="Drag and drop files here">
+            <div class="dz-inner">
+              <div class="dz-icon">⬆︎</div>
+              <div class="dz-title">Drag & drop files here</div>
+              <div class="dz-sub">or</div>
+              <button type="button" id="browse-btn" class="btn">Choose Files</button>
+              <input type="file" name="files" id="file-input" multiple hidden>
             </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <button type="submit" class="btn">Upload</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <div class="row">
+          <h4 style="margin:0;">My Files</h4>
+          <button onclick="downloadZip()" class="btn-secondary">Download ZIP</button>
         </div>
-    </div>
+        <ul id="file-list" class="file-list"></ul>
+      </div>
+    </section>
+  </div>
+</div>
 
-    <script>
-    async function openDetailModal(rfqId, agencyName) {
-        const overlay = document.getElementById("rfq-modal-overlay");
-        const content = document.getElementById("rfq-modal-content");
+<!-- Modal overlay for RFQ / solicitation detail -->
+<div id="rfq-modal-overlay" style="display:none;">
+  <div id="rfq-modal-card">
+    <button onclick="closeDetailModal()" id="rfq-close">✕</button>
+    <div id="rfq-modal-content">Loading...</div>
+  </div>
+</div>
+"""
 
-        overlay.style.display = "flex";
-        content.innerHTML = "<div style='font-size:14px;color:#555;'>Loading...</div>";
-
-        let endpoint = "";
-        if (agencyName && agencyName.toLowerCase().includes("cota")) {
-            endpoint = "/cota_detail/" + encodeURIComponent(rfqId);
-        } else if (agencyName && agencyName.toLowerCase().includes("columbus")) {
-            endpoint = "/columbus_detail/" + encodeURIComponent(rfqId);
-        } else if (agencyName && agencyName.toLowerCase().includes("gahanna")) {
-            endpoint = "/gahanna_detail/" + encodeURIComponent(rfqId);
-        } else {
-            endpoint = "/columbus_detail/" + encodeURIComponent(rfqId);
-        }
-
-        try {
-            const resp = await fetch(endpoint);
-            if (!resp.ok) {
-                content.innerHTML = "<div style='color:#b91c1c;'>Unable to load details.</div>";
-                return;
-            }
-            const data = await resp.json();
-            const safe = (v) => (v ? String(v) : "");
-
-            if (data.error) {
-                content.innerHTML = `
-                    <div style="color:#b91c1c;font-weight:600;margin-bottom:.5rem;">
-                        Unable to load full opportunity details.
-                    </div>
-                    <div style="font-size:.8rem;color:#666;white-space:pre-wrap;
-                                max-height:200px;overflow-y:auto;border:1px solid #eee;
-                                padding:.5rem;border-radius:4px;background:#fafafa;">
-                        ${safe(data.error)}
-                        ${safe(data.status_code ? "Status " + data.status_code : "")}
-                        ${safe(data.text || "")}
-                    </div>
-                `;
-                return;
-            }
-            // You can render more details here if needed
-        } catch (err) {
-            content.innerHTML = "<div style='color:#b91c1c;'>Error loading details.</div>";
-        }
-    }
-
-    function closeDetailModal() {
-        const overlay = document.getElementById("rfq-modal-overlay");
-        overlay.style.display = "none";
-    }
-    </script>
-    """
-
-    highlight_js = """
-    <style>
-    .highlight-opportunity {
-        animation: pulse-highlight 1.3s ease-out 1;
-        outline: 2px solid #f97316;
-        outline-offset: 2px;
-        background: rgba(249, 115, 22, 0.08);
-    }
-    @keyframes pulse-highlight {
-        0%   { background: rgba(249, 115, 22, 0.25); }
-        50%  { background: rgba(249, 115, 22, 0.10); }
-        100% { background: transparent; }
-    }
-    </style>
-
-    <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const params = new URLSearchParams(window.location.search);
-        const ext = params.get("ext");
-        const agency = params.get("agency") || "";
-        const id = params.get("id");
-
-        const lookup = ext || id;
-        if (!lookup) return;
-
-        const selector =
-            "[data-external-id='" + lookup + "'], " +
-            "[data-id='" + lookup + "'], " +
-            "[data-opportunity='" + lookup + "']";
-
-        const row = document.querySelector(selector);
-
-        if (row) {
-            row.scrollIntoView({ behavior: "smooth", block: "center" });
-            row.classList.add("highlight-opportunity");
-            setTimeout(() => {
-                row.classList.remove("highlight-opportunity");
-            }, 1600);
-        }
-
-        if (typeof openDetailModal === "function") {
-            openDetailModal(lookup, agency);
-        }
-    });
-    </script>
-    """
 
     # -------- final page HTML --------
     body_html = f"""
@@ -660,22 +540,25 @@ async def opportunities(request: Request):
                 {body_filter_html}
 
                 <div class="table-wrap">
-                <table>
+                    <table>
                     <thead>
                         <tr>
-                            <th style="min-width:140px;">Solicitation #</th>
-                            <th style="min-width:280px;">Title</th>
-                            <th style="min-width:160px;">Agency</th>
-                            <th style="min-width:140px;">Date Added</th>
-                            <th style="min-width:140px;">Due Date</th>
-                            <th style="min-width:140px;">Type</th>
-                            <th style="min-width:80px;">Status</th>
-                            <th style="min-width:120px;">Source Link</th>
-                            <th style="min-width:120px;">How to Bid</th>
+                            <th class="w-140">Solicitation #</th>
+                            <th class="w-280">Title</th>
+                            <th class="w-160">Agency</th>
+                            <th class="w-140">Date Added</th>
+                            <th class="w-140">Due Date</th>
+                            <th class="w-140">Type</th>
+                            <th class="w-80">Status</th>
+                            <th class="w-120">Source Link</th>
+                            <th class="w-120">How to Bid</th>
+                            <th class="w-140">Track</th>
                         </tr>
-                    </thead>
+                        </thead>
+
                     <tbody>
-                        {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='9' class='muted'>No results found.</td></tr>"}
+                        {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='10' class='muted'>No results found.</td></tr>"
+}
                     </tbody>
                 </table>
                 </div>
@@ -693,6 +576,7 @@ async def opportunities(request: Request):
         </div>
     </div>
 
+    
     <!-- vendor sidebar markup -->
     <div id="vendor-overlay" onclick="closeVendorGuide()"></div>
     <div id="vendor-guide-panel">
@@ -707,9 +591,16 @@ async def opportunities(request: Request):
     </div>
 
     {modal_js}
-    {highlight_js}
     <link rel="stylesheet" href="/static/vendor.css">
+    <link rel="stylesheet" href="/static/highlight.css">
+    <link rel="stylesheet" href="/static/bid_tracker.css">
+    <link rel="stylesheet" href="/static/opportunities.css"> 
+
     <script src="/static/vendor.js"></script>
+    <script src="/static/highlight.js"></script>
+    <script src="/static/rfq_modal.js"></script>
+    <script src="/static/bid_tracker.js"></script>
+
     """
 
     return HTMLResponse(
