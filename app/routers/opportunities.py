@@ -127,7 +127,8 @@ async def opportunities(request: Request):
         result = await conn.execute(
             text(f"""
                 SELECT
-                    external_id,      -- RFQ / Solicitation #
+                    id AS opp_id,
+                    external_id,
                     title,
                     agency_name,
                     due_date,
@@ -198,11 +199,25 @@ async def opportunities(request: Request):
         # add more as you run into them...
     }
 
-        # -------- build HTML table rows --------
+    # --- tiny helper for safe HTML attribute values ---
+    def _esc_attr(val: str) -> str:
+        if val is None:
+            return ""
+        # minimal but robust escaping for HTML attributes
+        return (
+            str(val)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#39;")
+        )
+
+    # -------- build HTML table rows --------
     table_rows_html = []
 
-    for external_id, title, agency, due, url, status, category, date_added in rows:
-        # format due date like "10/27/2025 08:00 AM"
+    for opp_id, external_id, title, agency, due, url, status, category, date_added in rows:
+        # format due date
         if due:
             try:
                 if hasattr(due, "strftime"):
@@ -210,67 +225,11 @@ async def opportunities(request: Request):
                 else:
                     due_str = str(due)
             except Exception:
-                due_str = "TBD"
+                due_str = "—"
         else:
-            due_str = "TBD"
+            due_str = "—"
 
-        # clickable solicitation # -> opens modal, and now we pass agency
-        if external_id:
-            safe_agency_attr = agency.replace('"', "&quot;") if agency else ""
-            rfq_html = (
-                "<button "
-                f"onclick=\"openDetailModal('{external_id}', '{safe_agency_attr}')\" "
-                "style=\"all:unset; cursor:pointer; color:var(--accent-text); "
-                "text-decoration:underline; font-weight:500;\">"
-                f"{external_id} &#8595;</button>"
-            )
-        else:
-            rfq_html = "—"
-
-        # pill/badge for status
-        badge_html = f"<span class='pill'>{status or 'open'}</span>"
-
-                # NEW: source link column content (with agency fallback)
-        fallback_url = agency_fallback_urls.get(agency or "")
-
-        def is_bad(u: str) -> bool:
-            if not u:
-                return True
-            u = u.strip().lower()
-            # COTA detail pages require a session cookie — they won't open directly
-            if "cota.dbesystem.com" in u and "detail" in u:
-                return True
-            return (
-                u.startswith("javascript:")
-                or u == "#"
-                or u == "about:blank"
-                or "rid=unknown" in u
-            )
-
-
-        if url and not is_bad(url):
-            # good, real URL from the ingestor
-            link_html = (
-                f"<a href='{url}' target='_blank' "
-                "style='color:var(--accent-text);text-decoration:underline;'>Open</a>"
-            )
-        elif fallback_url:
-            # bad/missing link → fall back to the agency's main bid list
-            if "cota" in (agency or "").lower() and external_id:
-                label = f"Open list (find {external_id})"
-            else:
-                label = "Open list"
-            link_html = (
-                f"<a href='{fallback_url}' target='_blank' "
-                f"style='color:var(--accent-text);text-decoration:underline;'>{label}</a>"
-            )
-
-        else:
-            # nothing we can do
-            link_html = "<span class='muted'>—</span>"
-
-         # ✅ ADD THIS RIGHT HERE
-        # format date_added like "11/02/2025"
+        # date_added short
         if date_added:
             try:
                 if hasattr(date_added, "strftime"):
@@ -282,45 +241,76 @@ async def opportunities(request: Request):
         else:
             date_added_str = "—"
 
-                # NEW: vendor guide link (for now, only Columbus)
-            if agency == "City of Columbus":
-                    vendor_html = (
-                        "<button "
-                        "onclick=\"openVendorGuide('city-of-columbus')\" "
-                        "style=\"all:unset; cursor:pointer; color:var(--accent-text); text-decoration:underline;\">"
-                        "How to bid"
-                        "</button>"
-                    )
-            else:
-                    vendor_html = ""
-                    # NEW: vendor guide link (keep only for Columbus if you want that help link)
+        # fallback URL logic (you already have this dict higher up)
+        fallback_url = agency_fallback_urls.get(agency or "")
+
+        def is_bad(u: str) -> bool:
+            if not u:
+                return True
+            u = u.strip().lower()
+            if "cota.dbesystem.com" in u and "detail" in u:
+                return True
+            return (u.startswith("javascript:") or u == "#" or u == "about:blank")
+
+        if url and not is_bad(url):
+            link_html = (
+                f"<a href='{_esc_attr(url)}' target='_blank' "
+                "style='color:var(--accent-text);text-decoration:underline;'>Open</a>"
+            )
+        elif fallback_url:
+            label = (
+                f"Open list (find {_esc_attr(external_id)})"
+                if (agency or "").lower().find("cota") >= 0 and external_id
+                else "Open list"
+            )
+            link_html = (
+                f"<a href='{_esc_attr(fallback_url)}' target='_blank' "
+                f"style='color:var(--accent-text);text-decoration:underline;'>{label}</a>"
+            )
+        else:
+            link_html = "—"
+
+        # RFQ detail trigger: use data-* (no inline JS)
+        if external_id:
+            rfq_html = (
+                "<button class='rfq-btn' "
+                f"data-ext='{_esc_attr(external_id)}' "
+                f"data-agency='{_esc_attr(agency or '')}' "
+                "style=\"all:unset; cursor:pointer; color:var(--accent-text); "
+                "text-decoration:underline; font-weight:500;\">"
+                f"{_esc_attr(external_id)} &#8595;</button>"
+            )
+        else:
+            rfq_html = "—"
+
+        # vendor guide (keep for Columbus)
         vendor_html = ""
         if agency == "City of Columbus":
             vendor_html = (
-                "<button "
-                "onclick=\"openVendorGuide('city-of-columbus')\" "
+                "<button class='vendor-guide-btn' data-agency='city-of-columbus' "
                 "style=\"all:unset; cursor:pointer; color:var(--accent-text); text-decoration:underline;\">"
-                "How to bid"
-                "</button>"
+                "How to bid</button>"
             )
 
-        # ✅ Track & Upload button — always shown for every agency
+        # ✅ Track button: use data-* (no inline JS)
         track_btn_html = (
-            "<button onclick=\"trackAndOpenUploads('{ext}')\" "
+            "<button class='track-btn' "
+            f"data-opp-id='{opp_id}' "
+            f"data-ext='{_esc_attr(external_id or '')}' "
             "style='background:#2563eb;color:#fff;border:0;padding:6px 10px;"
-            "border-radius:6px;cursor:pointer;'>Track & Upload</button>"
-        ).replace("{ext}", external_id or "")
+            "border-radius:6px;cursor:pointer;'>Track</button>"
+        )
 
-        # build the row AFTER we've defined everything
+        # build row
         row_html = (
-            f"<tr data-external-id='{external_id or ''}' data-agency='{agency or ''}'>"
+            f"<tr data-opp-id='{opp_id}' data-external-id='{_esc_attr(external_id or '')}' data-agency='{_esc_attr(agency or '')}'>"
             f"<td class='w-140'><span style='font-weight:500;'>{rfq_html}</span></td>"
-            f"<td class='w-280'>{title}</td>"
-            f"<td class='w-160 muted'>{agency or ''}</td>"
+            f"<td class='w-280'>{_esc_attr(title or '')}</td>"
+            f"<td class='w-160 muted'>{_esc_attr(agency or '')}</td>"
             f"<td class='w-140 muted'>{date_added_str}</td>"
             f"<td class='w-140'>{due_str}</td>"
-            f"<td class='w-140 muted'>{category or ''}</td>"
-            f"<td><span class='pill'>{status or 'open'}</span></td>"
+            f"<td class='w-140 muted'>{_esc_attr(category or '')}</td>"
+            f"<td><span class='pill'>{_esc_attr(status or 'open')}</span></td>"
             f"<td class='w-120'>{link_html}</td>"
             f"<td class='w-120'>{vendor_html}</td>"
             f"<td class='w-140'>{track_btn_html}</td>"
@@ -328,6 +318,7 @@ async def opportunities(request: Request):
         )
 
         table_rows_html.append(row_html)
+
 
 
     # -------- filter form HTML --------
@@ -472,44 +463,48 @@ async def opportunities(request: Request):
     # NOTE: this is a plain triple-quoted string, not an f-string,
     # so we can safely use JS template literals (${...}) inside it.
     modal_js = """
-<!-- Track & Upload Drawer -->
+<!-- Track Drawer (no uploads here) -->
 <div id="bid-drawer" class="drawer hidden">
   <div class="drawer-header">
     <h3 id="drawer-title">Bid Tracker</h3>
     <button onclick="closeDrawer()" aria-label="Close">✕</button>
   </div>
+
   <div class="drawer-body">
-    <section id="upload-area">
-      <div class="card">
-        <label class="label">Upload RFP Files (PDF, DOCX, XLSX, ZIP)</label>
-
-        <form id="upload-form">
-          <input type="hidden" name="opportunity_id" id="opp-id">
-
-          <!-- Drag & Drop zone -->
-          <div id="dropzone" class="dz" aria-label="Drag and drop files here">
-            <div class="dz-inner">
-              <div class="dz-icon">⬆︎</div>
-              <div class="dz-title">Drag & drop files here</div>
-              <div class="dz-sub">or</div>
-              <button type="button" id="browse-btn" class="btn">Choose Files</button>
-              <input type="file" name="files" id="file-input" multiple hidden>
-            </div>
-          </div>
-
-          <div style="margin-top:10px;">
-            <button type="submit" class="btn">Upload</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card" style="margin-top:12px;">
-        <div class="row">
-          <h4 style="margin:0;">My Files</h4>
-          <button onclick="downloadZip()" class="btn-secondary">Download ZIP</button>
+    <section class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <div>
+          <div class="label-small">Solicitation</div>
+          <div id="drawer-solicitation" style="font-weight:600;"></div>
+          <input type="hidden" id="opp-id" />
         </div>
-        <ul id="file-list" class="file-list"></ul>
+        <div>
+          <a class="btn-secondary" href="/tracker/dashboard" target="_blank">Open My Dashboard →</a>
+        </div>
       </div>
+    </section>
+
+    <section class="card">
+      <label class="label">Status</label>
+      <select id="tracker-status" style="width:100%;">
+        <option value="prospecting">Prospecting</option>
+        <option value="deciding">Deciding</option>
+        <option value="drafting">Drafting</option>
+        <option value="submitted">Submitted</option>
+        <option value="won">Won</option>
+        <option value="lost">Lost</option>
+      </select>
+
+      <label class="label" style="margin-top:10px;">Notes</label>
+      <textarea id="tracker-notes" rows="4" placeholder="Add notes…"></textarea>
+
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button class="btn" id="save-tracker-btn">Save</button>
+        <button class="btn-secondary" onclick="window.open('/tracker/dashboard?focus='+document.getElementById('opp-id').value,'_blank')">
+          Manage Files in Dashboard
+        </button>
+      </div>
+      <div id="tracker-save-msg" class="muted" style="margin-top:8px;"></div>
     </section>
   </div>
 </div>
@@ -521,9 +516,67 @@ async def opportunities(request: Request):
     <div id="rfq-modal-content">Loading...</div>
   </div>
 </div>
+
+<script>
+async function api(path, init = {}) {
+  const res = await fetch(path, { credentials: 'include', ...init });
+  if (res.status === 401) {
+    const next = location.pathname + location.search;
+    const oppId = document.getElementById('opp-id')?.value || '';
+    const hash = oppId ? ('#openTracker:' + oppId) : '';
+    window.location.href = '/login?next=' + encodeURIComponent(next + hash);
+    throw new Error('Auth required');
+  }
+  return res;
+}
+
+async function openTrackerDrawer(oppId, extId) {
+  document.getElementById('opp-id').value = oppId;
+  document.getElementById('drawer-solicitation').textContent = extId || '(no ext id)';
+  document.getElementById('tracker-save-msg').textContent = '';
+
+  try {
+    // 1) ensure row exists (idempotent)
+    await api(`/tracker/${oppId}/track`, { method: 'POST' });
+
+    // 2) load existing values (now guaranteed to exist)
+    const res = await api(`/tracker/${oppId}`);
+    if (res.ok) {
+      const t = await res.json();
+      document.getElementById('tracker-status').value = t.status || 'prospecting';
+      document.getElementById('tracker-notes').value  = t.notes  || '';
+    }
+  } catch (_) { return; } // redirected if 401
+
+  document.getElementById('bid-drawer').classList.remove('hidden');
+}
+
+document.addEventListener('click', async (e) => {
+  const track = e.target.closest('.track-btn');
+  if (track) {
+    openTrackerDrawer(track.dataset.oppId, track.dataset.ext || '');
+    return;
+  }
+  if (e.target && e.target.id === 'save-tracker-btn') {
+    const oppId = document.getElementById('opp-id').value;
+    const payload = {
+      status: document.getElementById('tracker-status').value,
+      notes:  document.getElementById('tracker-notes').value
+    };
+    try {
+      const res = await api(`/tracker/${oppId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('tracker-save-msg').textContent =
+        res.ok ? 'Saved.' : 'Save failed.';
+    } catch (_) {}
+  }
+});
+</script>
+
 """
-
-
     # -------- final page HTML --------
     body_html = f"""
     <div style="display:flex; gap:18px; align-items:flex-start;">

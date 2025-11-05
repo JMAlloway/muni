@@ -5,10 +5,10 @@ from fastapi import Request
 from app.settings import settings
 
 SESSION_COOKIE_NAME = "muni_session"
+SESSION_SALT = "muni-session"
 
 def _serializer():
-    # SECRET_KEY comes from your .env / settings
-    return URLSafeSerializer(settings.SECRET_KEY, salt="muni-session")
+    return URLSafeSerializer(settings.SECRET_KEY, salt=SESSION_SALT)
 
 def create_session_token(email: str) -> str:
     return _serializer().dumps({"email": email})

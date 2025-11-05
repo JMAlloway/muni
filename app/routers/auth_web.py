@@ -8,6 +8,8 @@ import json
 from app.db import AsyncSessionLocal
 from app.security import hash_password, verify_password
 from app.session import create_session_token, get_current_user_email, SESSION_COOKIE_NAME
+from app.settings import settings
+
 from app.routers._layout import page_shell
 
 router = APIRouter(tags=["auth"])
@@ -71,13 +73,20 @@ async def signup_submit(email: str = Form(...), password: str = Form(...)):
         await session.commit()
 
     token = create_session_token(email_clean)
-    resp = RedirectResponse(url="/account", status_code=303)
+    redirect_to = next if (next and not next.startswith("/login")) else "/account"
+    resp = RedirectResponse(url=redirect_to, status_code=303)
+
+    is_prod = settings.ENV.lower() == "production"
     resp.set_cookie(
-        key=SESSION_COOKIE_NAME, value=token,
-        httponly=True, secure=False, samesite="lax", path="/",
-        max_age=60*60*24*30,
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=is_prod,
+        samesite="none" if is_prod else "lax",
+        path="/",
+        max_age=60 * 60 * 2  # 2 hours
     )
-    print("[DEBUG signup] cookie set for", email_clean)
+
     return resp
 
 # --- login/logout ----------------------------------------------------
@@ -142,17 +151,24 @@ async def login_submit(
           <a class="button-primary" href="/login">Try again →</a></section>
         """, title="Login failed", user_email=None), status_code=401)
 
-    # OK credentials → set cookie → redirect to next
+    # Set cookie and redirect
     token = create_session_token(email_clean)
     redirect_to = next if (next and not next.startswith("/login")) else "/account"
     resp = RedirectResponse(url=redirect_to, status_code=303)
+
+    is_prod = settings.ENV.lower() == "production"
     resp.set_cookie(
-        key=SESSION_COOKIE_NAME, value=token,
-        httponly=True, secure=False, samesite="lax", path="/",
-        max_age=60*60*24*30,
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=is_prod,
+        samesite="none" if is_prod else "lax",
+        path="/",
+        max_age=60 * 60 * 2  # 2 hours
     )
-    print("[DEBUG login] Set-Cookie and redirect →", redirect_to)
+
     return resp
+
 
 @router.get("/logout", response_class=HTMLResponse)
 async def logout():
