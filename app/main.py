@@ -1,4 +1,4 @@
-# app/main.py
+﻿# app/main.py
 import sys
 import asyncio
 import json
@@ -55,28 +55,47 @@ from app.core.scheduler import start_scheduler
 from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
 from app.auth.auth_utils import require_login
 from app.api._layout import page_shell
+from app.core.db_migrations import ensure_uploads_schema
+from app.api import dashboard_order as dashboard_order
 
 # -------------------------------------------------------------------
 # Log every request
 # -------------------------------------------------------------------
 @app.middleware("http")
 async def log_every_request(request: Request, call_next):
-    print(f"🛰  {request.method} {request.url.path}")
+    # ASCII-safe logs for Windows terminals
+    try:
+        print(f"[REQ] {request.method} {request.url.path}")
+    except Exception:
+        pass
     response = await call_next(request)
-    route = request.scope.get("route")
-    route_path = getattr(route, "path", None)
-    loc = response.headers.get("location")
-    if loc:
-        print(f"📤 {response.status_code} for {request.url.path} (route={route_path})  Location={loc}")
-    else:
-        print(f"📤 {response.status_code} for {request.url.path} (route={route_path})")
+    try:
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", None)
+        base = f"[RES] {response.status_code} for {request.url.path} (route={route_path})"
+        loc = response.headers.get("location")
+        if loc:
+            print(base + f" Location={loc}")
+        else:
+            print(base)
+    except Exception:
+        pass
     return response
+
+# -------------------------------------------------------------------
+# Routers
+# -------------------------------------------------------------------
+app.include_router(dashboard_order.router)
 
 # -------------------------------------------------------------------
 # HARD OVERRIDE: Real dashboard at /tracker/dashboard (wins precedence)
 # -------------------------------------------------------------------
 @app.get("/tracker/dashboard", include_in_schema=False)
 async def dashboard_override(request: Request):
+    # Delegate to the router's canonical implementation to ensure
+    # the dashboard includes the latest Upload Manager and UI.
+    from app.api.tracker_dashboard import tracker_dashboard as _dashboard
+    return await _dashboard(request)
     user_email = get_current_user_email(request)
 
     # --- not logged in ---
@@ -85,10 +104,10 @@ async def dashboard_override(request: Request):
         <section class="card">
           <h2 class="section-heading">Sign in required</h2>
           <p class="subtext">Please log in to see your dashboard.</p>
-          <a class="button-primary" href="/login?next=/tracker/dashboard">Sign in →</a>
+          <a class="button-primary" href="/login?next=/tracker/dashboard">Sign in â†’</a>
         </section>
         """
-        return HTMLResponse(page_shell(body, title="Muni Alerts – My Bids", user_email=None), status_code=200)
+        return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=None), status_code=200)
 
     # --- logged in ---
     sql = text("""
@@ -117,7 +136,7 @@ async def dashboard_override(request: Request):
     """)
 
     async with engine.begin() as conn:
-        # ✅ Correct call for TextClause
+        # âœ… Correct call for TextClause
         res = await conn.execute(sql, {"email": user_email})
         items = [dict(row) for row in res.mappings().all()]
 
@@ -149,8 +168,8 @@ async def dashboard_override(request: Request):
           <select id="sort-by">
             <option value="soonest">Soonest due</option>
             <option value="latest">Latest due</option>
-            <option value="agency">Agency A–Z</option>
-            <option value="title">Title A–Z</option>
+            <option value="agency">Agency Aâ€“Z</option>
+            <option value="title">Title Aâ€“Z</option>
           </select>
         </div>
       </div>
@@ -165,18 +184,18 @@ async def dashboard_override(request: Request):
           <h3 id="guide-title">How to bid</h3>
           <div id="guide-agency" class="muted"></div>
         </div>
-        <button class="icon-btn" onclick="TrackerGuide.close()">×</button>
+        <button class="icon-btn" onclick="TrackerGuide.close()">Ã—</button>
       </header>
-      <div id="guide-content" class="guide-content">Loading…</div>
+      <div id="guide-content" class="guide-content">Loadingâ€¦</div>
     </aside>
 
     <link rel="stylesheet" href="/static/dashboard.css">
     <link rel="stylesheet" href="/static/bid_tracker.css">
-    <script src="/static/vendor.js"></script>
-    <script src="/static/bid_tracker.js"></script>
-    <script src="/static/tracker_dashboard.js"></script>
+    <script src="/static/vendor.js?v=4"></script>
+    <script src="/static/bid_tracker.js?v=4"></script>
+    <script src="/static/tracker_dashboard.js?v=6"></script>
     """
-    return HTMLResponse(page_shell(body, title="Muni Alerts – My Bids", user_email=user_email), status_code=200)
+    return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=user_email), status_code=200)
 
 # -------------------------------------------------------------------
 # Routers (existing)
@@ -233,12 +252,14 @@ async def on_startup():
             await conn.run_sync(core_metadata.create_all)
         async with AsyncSessionLocal() as db:
             await create_admin_if_missing(db)
+        # Lightweight, idempotent schema fixes for local SQLite
+        await ensure_uploads_schema(engine)
     # Start scheduler in web only if explicitly enabled
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 
 # -------------------------------------------------------------------
-# Global 401 → login redirect
+# Global 401 â†’ login redirect
 # -------------------------------------------------------------------
 @app.exception_handler(HTTPException)
 async def handle_http_exceptions(request: Request, exc: HTTPException):
@@ -281,3 +302,5 @@ async def debug_session(request: Request):
         "type": type(auth_result).__name__,
         "is_redirect": isinstance(auth_result, RedirectResponse)
     }
+
+

@@ -1,0 +1,23 @@
+{
+  "Rules": [
+    {
+      "ID": "transition-to-standard-ia",
+      "Status": "Enabled",
+      "Filter": {"Prefix": ""},
+      "Transitions": [
+        { "Days": 30, "StorageClass": "STANDARD_IA" }
+      ]
+    },
+    {
+      "ID": "abort-multipart-uploads",
+      "Status": "Enabled",
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    },
+    {
+      "ID": "expire-noncurrent-versions",
+      "Status": "Disabled",
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 60 }
+    }
+  ]
+}
+

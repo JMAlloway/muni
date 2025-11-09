@@ -183,3 +183,23 @@ async def my_tracked(user=Depends(_require_user)):
         rows = res.fetchall()
 
     return [dict(r._mapping) for r in rows]
+
+
+@router.delete("/{opportunity_key}")
+async def delete_tracker(opportunity_key: str, user=Depends(_require_user)):
+    """
+    Delete the tracker row for this user/opportunity.
+    Safe to call; no-op if it doesn't exist.
+    """
+    oid = await _resolve_opportunity_id(opportunity_key)
+
+    async with engine.begin() as conn:
+        await conn.exec_driver_sql(
+            """
+            DELETE FROM user_bid_trackers
+            WHERE user_id = :uid AND opportunity_id = :oid
+            """,
+            {"uid": user["id"], "oid": oid},
+        )
+
+    return {"ok": True}

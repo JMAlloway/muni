@@ -1,10 +1,45 @@
-(function () {
+﻿(function () {
   const grid = document.getElementById("tracked-grid");
-  const items = JSON.parse(grid.getAttribute("data-items") || "[]");
+  let items = JSON.parse(grid.getAttribute("data-items") || "[]");
 
   const selStatus = document.getElementById("status-filter");
   const selAgency = document.getElementById("agency-filter");
   const selSort   = document.getElementById("sort-by");
+  const ORDER_KEY = 'dashboard_order_v1';
+  function loadOrder(){
+    try { return JSON.parse(localStorage.getItem(ORDER_KEY)||'[]'); } catch(_) { return []; }
+  }
+  function saveOrder(list){
+    try { localStorage.setItem(ORDER_KEY, JSON.stringify(list||[])); } catch(_) {}
+    try {
+      fetch('/dashboard/order', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: list||[] })
+      }).catch(()=>{});
+    } catch(_) {}
+  }
+  async function syncOrderFromServer(){
+    try {
+      const res = await fetch('/dashboard/order', { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && Array.isArray(data.order)) {
+        try { localStorage.setItem(ORDER_KEY, JSON.stringify(data.order)); } catch(_) {}
+      }
+    } catch(_) {}
+  }
+  function applyManualOrder(arr){
+    const order = loadOrder();
+    if (!order || !order.length) return arr;
+    const idx = new Map(order.map((id,i)=>[String(id), i]));
+    arr.sort((a,b)=> (idx.get(String(a.opportunity_id)) ?? 1e9) - (idx.get(String(b.opportunity_id)) ?? 1e9));
+    return arr;
+  }
+  const txtSearch = document.getElementById("search-filter");
+  const btnReset  = document.getElementById("reset-filters");
+  const summaryEl = document.getElementById("summary-count");
 
   function pct(n){ return Math.max(0, Math.min(100, Math.round(n))); }
   function computeProgress(it){
@@ -19,11 +54,26 @@
   function statusBadge(s){ return `<span class="status-badge">${(s||"prospecting")}</span>`; }
 
   function openUploads(it){
-    if (window.trackAndOpenUploads) window.trackAndOpenUploads(it.external_id);
-    else alert("Upload drawer not loaded.");
+    if (window.openUploadDrawer) return window.openUploadDrawer(it);
+    // legacy fallback if drawer not present (kept for safety)
+    const labels = Array.from(document.querySelectorAll('.label'));
+    const lbl = labels.find(el => /Upload files to a tracked solicitation/i.test(el.textContent||''));
+    const card = lbl ? lbl.closest('.card') : null;
+    const sel = document.getElementById('upload-target');
+    if (card && sel) {
+      card.style.display = '';
+      const oid = String(it.opportunity_id || '');
+      sel.value = oid;
+      try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch(_) {}
+      const dz = document.getElementById('dz');
+      if (dz && dz.scrollIntoView) dz.scrollIntoView({ behavior:'smooth', block:'start' });
+      return;
+    }
+    if (window.trackAndOpenUploads) return window.trackAndOpenUploads(it.opportunity_id);
+    alert("Upload manager not available.");
   }
 
-  // 🔗 Use your existing vendor guide loader
+  // ðŸ”— Use your existing vendor guide loader
   function mapAgencyToSlug(name){
     const n = (name||"").toLowerCase();
     if (n.includes("city of columbus")) return "city-of-columbus";
@@ -66,11 +116,84 @@
     }).then(()=>render());
   }
 
+  function removeTracker(it){
+    const sel = `.tracked-card[data-oid="${it.opportunity_id}"]`;
+    const el = document.querySelector(sel);
+    const finish = () => {
+      items = items.filter(x => x.opportunity_id !== it.opportunity_id);
+      if (el && el.parentNode) {
+        el.parentNode.removeChild(el);
+        if (!grid.children.length) {
+          grid.innerHTML = `<div class="muted">Nothing tracked yet. Go to <a href="/opportunities">Opportunities</a> and click "Track".</div>`;
+        }
+      } else {
+        render();
+      }
+    };
+    fetch(`/tracker/${it.opportunity_id}`, { method: "DELETE" })
+      .catch(()=>{})
+      .finally(()=>{
+        if (el) {
+          el.classList.add('removing');
+          setTimeout(finish, 220);
+        } else {
+          finish();
+        }
+        // Offer undo
+        try {
+          showUndo("Removed from dashboard.", async function(){
+            try {
+              if (it.external_id) {
+                await fetch(`/tracker/${it.external_id}/track`, { method: 'POST', credentials: 'include' });
+              }
+            } catch(_) {}
+            try { items.push(it); } catch(_) {}
+            render();
+          });
+        } catch(_) {}
+      });
+  }
+
+  function showUndo(message, onUndo){
+    const id = 'snackbar-undo';
+    let bar = document.getElementById(id);
+    if (bar) bar.remove();
+    bar = document.createElement('div');
+    bar.id = id;
+    bar.style.position = 'fixed';
+    bar.style.bottom = '16px';
+    bar.style.right = '16px';
+    bar.style.background = '#0f172a';
+    bar.style.color = '#fff';
+    bar.style.padding = '10px 12px';
+    bar.style.borderRadius = '10px';
+    bar.style.boxShadow = '0 6px 18px rgba(2,6,23,.25)';
+    bar.style.display = 'flex';
+    bar.style.gap = '12px';
+    bar.style.alignItems = 'center';
+    bar.style.zIndex = '10000';
+    const span = document.createElement('span');
+    span.textContent = message || 'Done';
+    const btn = document.createElement('button');
+    btn.textContent = 'Undo';
+    btn.style.background = '#22c55e';
+    btn.style.border = '0';
+    btn.style.color = '#0b1220';
+    btn.style.borderRadius = '8px';
+    btn.style.padding = '6px 10px';
+    btn.style.cursor = 'pointer';
+    btn.addEventListener('click', function(){ try { onUndo && onUndo(); } catch(_) {} bar.remove(); });
+    bar.appendChild(span); bar.appendChild(btn);
+    document.body.appendChild(bar);
+    setTimeout(()=>{ try { bar.remove(); } catch(_) {} }, 5000);
+  }
+
   function sortItems(arr){
     const mode = selSort.value;
     const byTitle=(a,b)=> (a.title||"").localeCompare(b.title||"");
     const byAgency=(a,b)=> (a.agency_name||"").localeCompare(b.agency_name||"");
     const toTime=v=> v?new Date(v).getTime():Infinity;
+    if (mode==="manual") return;
     if (mode==="latest") arr.sort((a,b)=>toTime(b.due_date)-toTime(a.due_date));
     else if (mode==="agency") arr.sort(byAgency);
     else if (mode==="title") arr.sort(byTitle);
@@ -80,24 +203,29 @@
   function matchesFilters(it){
     const f1 = selStatus.value ? (it.status||"").toLowerCase() === selStatus.value : true;
     const f2 = selAgency.value ? (it.agency_name||"") === selAgency.value : true;
-    return f1 && f2;
+    const q = (txtSearch && txtSearch.value || "").trim().toLowerCase();
+    const f3 = q ? ((it.title||"").toLowerCase().includes(q) || (it.external_id||"").toLowerCase().includes(q) || (it.agency_name||"").toLowerCase().includes(q)) : true;
+    return f1 && f2 && f3;
   }
 
   function render(){
     const view = items.filter(matchesFilters);
     sortItems(view);
+    if (selSort.value === 'manual') applyManualOrder(view);
     const out = view.map(it=>{
       const prog = computeProgress(it);
       const filesLabel = (it.file_count||0) === 1 ? "1 file" : `${it.file_count||0} files`;
+      const dueMs = it.due_date ? (new Date(it.due_date).getTime() - Date.now()) : null;
+      const dueSoon = (dueMs !== null) && (dueMs < 7*24*60*60*1000) && (dueMs >= 0);
       return `
-        <article class="tracked-card" data-oid="${it.opportunity_id}">
+        <article class="tracked-card" data-oid="${it.opportunity_id}" tabindex="0">
           <div class="top">
             <div>
               <div class="title">${it.title||"Untitled"}</div>
               <div class="meta">
-                <span>${it.external_id||"—"}</span><span>•</span>
-                <span>${it.agency_name||""}</span><span>•</span>
-                <span>Due: ${dueStr(it.due_date)}</span><span>•</span>
+                <span>${it.external_id||"-"}</span><span></span>
+                <span>${it.agency_name||""}</span><span></span>
+                <span>Due: ${dueStr(it.due_date)}</span>${dueSoon?`<span class="badge-soon">Due soon</span>`:''}
                 <span>${filesLabel}</span>
               </div>
             </div>
@@ -107,29 +235,222 @@
           <div class="progress"><div style="width:${pct(prog)}%; background:linear-gradient(90deg,#6366f1,#22d3ee)"></div></div>
 
           <ul class="card-list">
-            <li><span class="dot"></span>Type: ${it.category||"—"}</li>
+            <li><span class="dot"></span>Type: ${it.category||"-"}</li>
             <li><span class="dot"></span>Status: ${(it.status||"prospecting")}</li>
           </ul>
 
           <div class="actions">
-            <button class="btn" onclick='(${openUploads})((${JSON.stringify(it)}))'>Upload files</button>
-            <button class="btn-secondary" onclick='(${openGuide})((${JSON.stringify(it)}))'>How to bid</button>
+            <button class="btn" data-action="upload" data-oid="${it.opportunity_id}">Upload files</button>
+            <button class="btn-secondary" data-action="upload" data-oid="${it.opportunity_id}">View files</button>
+            <button class="btn-secondary" data-action="guide" data-oid="${it.opportunity_id}">How to bid</button>
             <a class="btn-secondary" href="${it.source_url || "#"}" target="_blank">Source</a>
-            <select onchange='(${updateStatus})((${JSON.stringify(it)}), this.value)'>
+            <select data-action="status" data-oid="${it.opportunity_id}">
               ${["prospecting","deciding","drafting","submitted","won","lost"].map(s=>`<option value="${s}" ${((it.status||"prospecting")===s?"selected":"")}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}
             </select>
+            <button class="btn-secondary" title="Remove from dashboard" data-action="remove" data-oid="${it.opportunity_id}">Remove</button>
           </div>
         </article>
       `;
     });
 
-    grid.innerHTML = out.length ? out.join("") : `<div class="muted">Nothing tracked yet. Go to <a href="/opportunities">Opportunities</a> and click “Track & Upload”.</div>`;
+    grid.innerHTML = out.length ? out.join("") : `<div class="muted">Nothing tracked yet. Go to <a href="/opportunities">Opportunities</a> and click "Track".</div>`;
   }
 
   selStatus.addEventListener("change", render);
   selAgency.addEventListener("change", render);
   selSort.addEventListener("change", render);
-  render();
+  // Wire live search + reset + summary if present
+  try {
+    if (txtSearch) txtSearch.addEventListener('input', render);
+    if (btnReset) btnReset.addEventListener('click', function(){
+      selStatus.value=''; selAgency.value=''; selSort.value='soonest'; if (txtSearch) txtSearch.value=''; render();
+    });
+    // augment render to update summary after initial run
+    const _render = render;
+    render = function(){
+      _render();
+      try {
+        if (summaryEl) {
+          const cards = Array.from(document.querySelectorAll('.tracked-card'));
+          const shown = cards.filter(c=> c.style.display !== 'none').length || cards.length;
+          const total = items.length;
+          const soon = items.filter(x=> x.due_date && (new Date(x.due_date).getTime() - Date.now()) < 7*24*60*60*1000).length;
+          summaryEl.textContent = `${shown}/${total} shown · ${soon} due soon`;
+          summaryEl.textContent = summaryEl.textContent.replace(/[^\x20-\x7E·]/g, "·");
+        }
+        // one-time highlight if arriving with ?focus=
+        if (!window.__didHighlight) {
+          const params = new URLSearchParams(location.search || '');
+          const focus = params.get('focus');
+          if (focus) {
+            const card = document.querySelector(`.tracked-card[data-oid="${focus}"]`);
+            if (card) {
+              card.classList.add('highlight');
+              try { card.scrollIntoView({ behavior:'smooth', block:'start' }); } catch(_) {}
+              setTimeout(()=> card.classList.remove('highlight'), 1800);
+            }
+            window.__didHighlight = true;
+          }
+        }
+      } catch(_){}
+    };
+  } catch(_){}
+
+  // Persist filters/search in localStorage
+  const FILTERS_KEY = 'dashboard_filters_v1';
+  function saveFilters(){
+    try {
+      const data = {
+        status: selStatus && selStatus.value || '',
+        agency: selAgency && selAgency.value || '',
+        sort: selSort && selSort.value || '',
+        q: txtSearch && txtSearch.value || ''
+      };
+      localStorage.setItem(FILTERS_KEY, JSON.stringify(data));
+    } catch(_) {}
+  }
+  function loadFilters(){
+    try {
+      const raw = localStorage.getItem(FILTERS_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (selStatus && data.status!=null) selStatus.value = data.status;
+      if (selAgency && data.agency!=null) selAgency.value = data.agency;
+      if (selSort && data.sort!=null) selSort.value = data.sort;
+      if (txtSearch && data.q!=null) txtSearch.value = data.q;
+    } catch(_) {}
+  }
+  try {
+    loadFilters();
+    ['change','input'].forEach(evt=>{
+      if (selStatus) selStatus.addEventListener(evt, saveFilters);
+      if (selAgency) selAgency.addEventListener(evt, saveFilters);
+      if (selSort) selSort.addEventListener(evt, saveFilters);
+      if (txtSearch) txtSearch.addEventListener(evt, saveFilters);
+    });
+  } catch(_) {}
+
+  // Keyboard reorder fallback: Shift/Alt + ArrowUp/ArrowDown moves card
+  grid.addEventListener('keydown', function(ev){
+    const card = ev.target && ev.target.closest && ev.target.closest('.tracked-card');
+    if (!card) return;
+    if (!(ev.key==='ArrowUp' || ev.key==='ArrowDown')) return;
+    if (!(ev.shiftKey || ev.altKey)) return; // require a modifier to avoid stealing navigation
+    ev.preventDefault();
+    const oid = card.getAttribute('data-oid');
+    const all = Array.from(grid.querySelectorAll('.tracked-card'));
+    const idx = all.indexOf(card);
+    if (idx < 0) return;
+    if (ev.key==='ArrowUp' && idx>0){ grid.insertBefore(card, all[idx-1]); }
+    if (ev.key==='ArrowDown' && idx<all.length-1){ grid.insertBefore(card, all[idx+1].nextSibling); }
+    const order = Array.from(grid.querySelectorAll('.tracked-card')).map(el=> el.getAttribute('data-oid'));
+    if (selSort && selSort.value !== 'manual') selSort.value = 'manual';
+    saveOrder(order);
+  });
+
+  // Populate Agencies filter dynamically from items if options look minimal
+  try {
+    if (selAgency && selAgency.options && selAgency.options.length <= 2) {
+      const set = new Set();
+      items.forEach(it => { const v = (it.agency_name||'').trim(); if (v) set.add(v); });
+      Array.from(set).sort().forEach(v => {
+        const opt = document.createElement('option'); opt.value = v; opt.textContent = v; selAgency.appendChild(opt);
+      });
+    }
+  } catch(_){}
+  // Event delegation for card actions
+  grid.addEventListener("click", function(e){
+    const btn = e.target.closest('[data-action]');
+    if (!btn || !grid.contains(btn)) return;
+    const action = btn.getAttribute('data-action');
+    const oid = btn.getAttribute('data-oid') || (btn.closest('.tracked-card') && btn.closest('.tracked-card').getAttribute('data-oid'));
+    if (!oid) return;
+    const it = items.find(x => String(x.opportunity_id) === String(oid));
+    if (!it) return;
+    if (action === 'remove') return removeTracker(it);
+    if (action === 'upload') return openUploads(it);
+    if (action === 'guide') return openGuide(it);
+  });
+
+  grid.addEventListener("change", function(e){
+    const sel = e.target.closest('select[data-action="status"]');
+    if (!sel || !grid.contains(sel)) return;
+    const oid = sel.getAttribute('data-oid');
+    const it = items.find(x => String(x.opportunity_id) === String(oid));
+    if (it) updateStatus(it, sel.value);
+  });
+  // Hide any legacy top upload block by default, if present
+  try {
+    const labels = Array.from(document.querySelectorAll('.label'));
+    const lbl = labels.find(el => /Upload files to a tracked solicitation/i.test(el.textContent||''));
+    const c = lbl ? lbl.closest('.card') : null;
+    if (c) c.style.display = 'none';
+  } catch(_) {}
+  // Initial render (sync order from server first)
+  (async function(){ await syncOrderFromServer(); render(); setupCardDnD(); })();
+
+  // Drag-and-drop by grabbing the entire card (not a grip)
+  function setupCardDnD(){
+    // Add manual option if missing
+    if (selSort && !Array.from(selSort.options).some(o=>o.value==='manual')){
+      const opt = document.createElement('option'); opt.value='manual'; opt.textContent='Manual (drag to sort)'; selSort.appendChild(opt);
+    }
+    // Mark cards draggable after each render
+    const markDraggable = () => {
+      Array.from(document.querySelectorAll('.tracked-card')).forEach(card=>{
+        card.setAttribute('draggable','true');
+      });
+    };
+    markDraggable();
+
+    let dndWired = false;
+    if (dndWired) return; // safety
+    dndWired = true;
+    let draggingId = null;
+    const isInteractive = (el) => !!el && !!el.closest('a,button,input,textarea,select,[contenteditable="true"]');
+    grid.addEventListener('dragstart', function(ev){
+      const card = ev.target.closest('.tracked-card');
+      if (!card) return;
+      if (isInteractive(ev.target)) { try { ev.preventDefault(); } catch(_) {} return; }
+      draggingId = card.getAttribute('data-oid');
+      card.classList.add('dragging');
+      try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', draggingId); } catch(_) {}
+    });
+    grid.addEventListener('dragend', function(ev){
+      const card=ev.target.closest('.tracked-card'); if(card) card.classList.remove('dragging');
+      draggingId=null;
+      Array.from(document.querySelectorAll('.drop-before, .drop-after')).forEach(el=>el.classList.remove('drop-before','drop-after'));
+      const order = Array.from(grid.querySelectorAll('.tracked-card')).map(el=> el.getAttribute('data-oid'));
+      saveOrder(order);
+    });
+    grid.addEventListener('dragover', function(ev){
+      if(!draggingId) return; ev.preventDefault();
+      const over=ev.target.closest('.tracked-card');
+      if(!over || over.getAttribute('data-oid')===draggingId) return;
+      const from = grid.querySelector(`.tracked-card[data-oid="${draggingId}"]`);
+      if(!from) return;
+      const r = over.getBoundingClientRect();
+      const vertical = (ev.clientY - r.top) < (r.height/2);
+      if (vertical) {
+        over.parentNode.insertBefore(from, over);
+      } else {
+        over.parentNode.insertBefore(from, over.nextSibling);
+      }
+      Array.from(document.querySelectorAll('.drop-before, .drop-after')).forEach(el=>el.classList.remove('drop-before','drop-after'));
+      over.classList.add(vertical ? 'drop-before' : 'drop-after');
+    });
+    grid.addEventListener('drop', function(ev){
+      if(!draggingId) return; ev.preventDefault();
+      Array.from(document.querySelectorAll('.drop-before, .drop-after')).forEach(el=>el.classList.remove('drop-before','drop-after'));
+      if (selSort && selSort.value !== 'manual') selSort.value = 'manual';
+      const order = Array.from(grid.querySelectorAll('.tracked-card')).map(el=> el.getAttribute('data-oid'));
+      saveOrder(order);
+    });
+
+    // Re-mark draggable after every render call
+    const _render = render;
+    render = function(){ _render(); markDraggable(); };
+  }
 
   // Drawer controller (used by vendor.js, too)
   window.TrackerGuide = {
@@ -146,3 +467,12 @@
     }
   };
 })();
+
+
+
+
+
+
+
+
+

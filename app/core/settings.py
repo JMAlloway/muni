@@ -77,6 +77,17 @@ class Settings(BaseSettings):
         extra="ignore",  # ignore any unrecognized vars instead of erroring
     )
 
+    # ------------------------------------------------------------------
+    # Storage (S3 / R2 / Local)
+    # ------------------------------------------------------------------
+    DOCS_BUCKET: Optional[str] = None
+    S3_ENDPOINT_URL: Optional[str] = None
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_REGION: str = "us-east-1"  # R2 accepts 'auto' as well
+    S3_ADDRESSING_STYLE: str = "virtual"  # or 'path'
+    LOCAL_UPLOAD_DIR: str = "uploads"
+
 
 # create global settings instance and normalize DB URL
 settings = Settings()

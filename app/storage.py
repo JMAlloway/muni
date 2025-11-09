@@ -1,18 +1,32 @@
 import os, mimetypes, uuid
 from typing import Optional, Tuple
+from app.core.settings import settings
 
-USE_S3 = bool(os.getenv("DOCS_BUCKET"))
-BUCKET  = os.getenv("DOCS_BUCKET", "")
-LOCAL_DIR = os.getenv("LOCAL_UPLOAD_DIR", "uploads")
+USE_S3 = bool(settings.DOCS_BUCKET)
+BUCKET  = settings.DOCS_BUCKET or ""
+LOCAL_DIR = settings.LOCAL_UPLOAD_DIR or "uploads"
+_s3 = None  # populated when USE_S3 is True
+
+def _build_s3_client():
+    import boto3
+    from botocore.config import Config
+    endpoint = settings.S3_ENDPOINT_URL  # e.g. https://<accountid>.r2.cloudflarestorage.com
+    aws_region = settings.AWS_REGION or "us-east-1"  # R2 accepts 'auto' or a region
+    access_key = settings.AWS_ACCESS_KEY_ID
+    secret_key = settings.AWS_SECRET_ACCESS_KEY
+    addressing = settings.S3_ADDRESSING_STYLE or "virtual"  # or 'path' if needed
+
+    return boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name=aws_region,
+        endpoint_url=endpoint,
+        config=Config(signature_version="s3v4", s3={"addressing_style": addressing}),
+    )
 
 if USE_S3:
-    import boto3
-    _s3 = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION", "us-east-1"),
-    )
+    _s3 = _build_s3_client()
 
 def _safe_filename(name: str) -> str:
     keep = "".join(c for c in name if c.isalnum() or c in (" ", ".", "_", "-", "(", ")"))

@@ -1,4 +1,4 @@
-# app/routers/opportunities.py
+﻿        # Track button: use data-* (no inline JS)
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -177,10 +177,9 @@ async def opportunities(request: Request):
             else:
                 next_due_str = str(next_due).split(" ")[0]
         except Exception:
-            next_due_str = "â€”"
+            next_due_str = "-"
     else:
-        next_due_str = "â€”"
-
+        next_due_str = "-"
     stats_html = f"""
 <div class="stats">
   <div class="item">
@@ -202,7 +201,7 @@ async def opportunities(request: Request):
     agency_fallback_urls = {
         "Central Ohio Transit Authority (COTA)": "https://cota.dbesystem.com/FrontEnd/proposalsearchpublic.asp",
         "City of Columbus": "https://vendors.columbus.gov/",
-        # add more as you run into them...
+        # Track button: use data-* (no inline JS)
     }
 
     # --- tiny helper for safe HTML attribute values ---
@@ -224,8 +223,8 @@ async def opportunities(request: Request):
 
     for opp_id, external_id, title, agency, due, url, status, category, date_added in rows:
         # format due date (human-friendly and color-coded)
-        due_str = "â€”"
-        due_class = "due-later"
+        # format due date (human-friendly and color-coded)
+        due_str = "-"
         if due:
             try:
                 # Normalize to datetime
@@ -239,7 +238,7 @@ async def opportunities(request: Request):
                 show_time = not (getattr(d, "hour", 0) == 0 and getattr(d, "minute", 0) == 0)
                 if show_time:
                     time_part = d.strftime("%I:%M %p").lstrip("0")
-                    due_str = f"{date_part} â€¢ {time_part}"
+                    due_str = f"{date_part} - {time_part}"
                 else:
                     due_str = date_part
 
@@ -265,17 +264,15 @@ async def opportunities(request: Request):
                 if hasattr(date_added, "strftime"):
                     date_added_str = date_added.strftime("%b %d")
                 else:
-                    # attempt ISO parse then format
+        # Track button: use data-* (no inline JS)
                     try:
                         da = dt.datetime.fromisoformat(str(date_added).split(".")[0].replace("Z", ""))
                         date_added_str = da.strftime("%b %d")
                     except Exception:
                         date_added_str = str(date_added).split(" ")[0]
             except Exception:
-                date_added_str = "â€”"
-        else:
-            date_added_str = "â€”"
-
+                date_added_str = "-"
+        
         # fallback URL logic (you already have this dict higher up)
         fallback_url = agency_fallback_urls.get(agency or "")
 
@@ -303,8 +300,7 @@ async def opportunities(request: Request):
                 f"style='color:var(--accent-text);text-decoration:underline;'>{label}</a>"
             )
         else:
-            link_html = "â€”"
-
+            link_html = "-"
         # RFQ detail trigger: use data-* (no inline JS)
         if external_id:
             rfq_html = (
@@ -316,8 +312,7 @@ async def opportunities(request: Request):
                 f"{_esc_attr(external_id)} &#8595;</button>"
             )
         else:
-            rfq_html = "â€”"
-
+            rfq_html = "-"
         # vendor guide (keep for Columbus)
         vendor_html = ""
         if agency == "City of Columbus":
@@ -327,7 +322,8 @@ async def opportunities(request: Request):
                 "How to bid</button>"
             )
 
-        # âœ... Track button: use data-* (no inline JS)
+        # Ã¢Å“... Track button: use data-* (no inline JS)
+        # Track button: use data-* (no inline JS)
         track_btn_html = (
             "<button class='track-btn' "
             f"data-opp-id='{opp_id}' "
@@ -335,7 +331,6 @@ async def opportunities(request: Request):
             "style='background:#2563eb;color:#fff;border:0;padding:6px 10px;"
             "border-radius:6px;cursor:pointer;'>Track</button>"
         )
-
         # build row
         row_html = (
             f"<tr data-opp-id='{opp_id}' data-external-id='{_esc_attr(external_id or '')}' data-agency='{_esc_attr(agency or '')}'>"
@@ -386,8 +381,8 @@ async def opportunities(request: Request):
     sort_options = [
         ("soonest_due", "Soonest due"),
         ("latest_due", "Latest due"),
-        ("agency_az", "Agency Aâ€“Z"),
-        ("title_az", "Title Aâ€“Z"),
+        ("agency_az", "Agency A-Z"),
+        ("title_az", "Title A-Z"),
     ]
     sort_options_html = []
     for val, label in sort_options:
@@ -513,8 +508,8 @@ async def opportunities(request: Request):
 <div id="bid-drawer" class="drawer hidden">
   <div class="drawer-header">
     <h3 id="drawer-title">Bid Tracker</h3>
-    <button onclick="closeDrawer()" aria-label="Close">âœ•</button>
-  </div>
+    <button onclick="closeDrawer()" aria-label="Close">Ã¢Å“â€¢</button>
+    <button onclick="closeDrawer()" aria-label="Close">&times;</button>
 
   <div class="drawer-body">
     <section class="card">
@@ -525,9 +520,8 @@ async def opportunities(request: Request):
           <input type="hidden" id="opp-id" />
         </div>
         <div>
-          <a class="btn-secondary" href="/tracker/dashboard" target="_blank">Open My Dashboard â†’</a>
-        </div>
-      </div>
+          <a class="btn-secondary" href="/tracker/dashboard" target="_blank">Open My Dashboard &rarr;</a>
+         
     </section>
 
     <section class="card">
@@ -542,7 +536,7 @@ async def opportunities(request: Request):
       </select>
 
       <label class="label" style="margin-top:10px;">Notes</label>
-      <textarea id="tracker-notes" rows="4" placeholder="Add notesâ€¦"></textarea>
+      <textarea id="tracker-notes" rows="4" placeholder="Add notes…"></textarea>
 
       <div style="margin-top:12px;display:flex;gap:8px;">
         <button class="btn" id="save-tracker-btn">Save</button>
@@ -559,7 +553,7 @@ async def opportunities(request: Request):
 <div id="rfq-modal-overlay" style="display:none;">
   <div id="rfq-modal-card">
     <button onclick="closeDetailModal()" id="rfq-close">&times;</button>
-    <div id="rfq-modal-content">Loading...</div>
+    <div id="rfq-modal-content">Loading…</div>
   </div>
 </div>
 
@@ -610,6 +604,7 @@ document.addEventListener('click', async (e) => {
   }
   const track = e.target.closest('.track-btn');
   if (track) {
+    // Open the original tracker sidebar so users can set status/notes first
     openTrackerDrawer(track.dataset.oppId, track.dataset.ext || '');
     return;
   }
@@ -694,9 +689,9 @@ document.addEventListener('click', async (e) => {
           <h2>How to bid</h2>
           <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
         </div>
-        <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">Ã—</button>
-      </div>
-      <div id="vendor-guide-content">Loadingâ€¦</div>
+        <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">Ãƒâ€”</button>
+        <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">&times;</button>
+      <div id="vendor-guide-content">Loading…</div>
     </div>
 
     {modal_js}
@@ -715,10 +710,17 @@ document.addEventListener('click', async (e) => {
     return HTMLResponse(
         page_shell(
             body_html,
-            title="Muni Alerts â€“ Opportunities",
+            title="Muni Alerts - Opportunities",
             user_email=user_email,
         )
     )
+
+
+
+
+
+
+
 
 
 
