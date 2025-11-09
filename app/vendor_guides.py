@@ -4,11 +4,11 @@ import re
 import textwrap
 from typing import Optional, Tuple
 
-import requests
+import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy import text as sql_text
 
-from app.db_core import engine
+from app.core.db_core import engine
 from app.ai.client import get_llm_client
 
 COLUMBUS_VENDOR_URL = (
@@ -44,7 +44,8 @@ def _extract_text_from_html(html: str) -> str:
 async def fetch_columbus_vendor_page() -> Tuple[str, str]:
     """Return (raw_html, extracted_text), falling back if blocked."""
     try:
-        resp = requests.get(COLUMBUS_VENDOR_URL, timeout=15)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(COLUMBUS_VENDOR_URL, headers={"Accept": "text/html,application/xhtml+xml"})
         if resp.status_code == 200 and resp.text:
             html = resp.text
             extracted = _extract_text_from_html(html)

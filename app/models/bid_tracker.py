@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.db_core import Base
+from app.domain.models import Base
 
 class UserBidTracker(Base):
     __tablename__ = "user_bid_trackers"

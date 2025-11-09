@@ -1,17 +1,5 @@
-# app/auth_utils.py
-from fastapi import Request, HTTPException
-from app.session import get_current_user_email
+"""Compatibility shim for authentication helpers."""
 
-async def require_login(request: Request) -> str:
-    # Keep for other routes if you want, but dashboard no longer relies on it
-    email = get_current_user_email(request)
-    if email:
-        return email
-    # 403 avoids your global 401 → login redirect loop
-    raise HTTPException(status_code=403, detail="Login required")
+from app.auth.auth_utils import require_api_user, require_login
 
-async def require_api_user(request: Request) -> str:
-    email = get_current_user_email(request)
-    if email:
-        return email
-    raise HTTPException(status_code=401, detail="Not authenticated")
+__all__ = ["require_api_user", "require_login"]

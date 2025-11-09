@@ -5,9 +5,10 @@ import json
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse, PlainTextResponse, HTMLResponse
+from app.core.settings import settings
+import os
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import text
-from app.routers import vendor_guides
 
 # -------------------------------------------------------------------
 # Windows event-loop quirk
@@ -23,36 +24,37 @@ app = FastAPI(title="Muni Alerts", version="0.3")
 # -------------------------------------------------------------------
 # Canonical host middleware (fixes cookie host mismatch)
 # -------------------------------------------------------------------
-CANONICAL_HOST = "127.0.0.1:8000"
+CANONICAL_HOST = os.getenv("PUBLIC_APP_HOST")
 
-class CanonicalHostMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        host = request.headers.get("host", "")
-        if host and host != CANONICAL_HOST:
-            target = f"{request.url.scheme}://{CANONICAL_HOST}{request.url.path}"
-            if request.url.query:
-                target += f"?{request.url.query}"
-            return RedirectResponse(target, status_code=308)
-        return await call_next(request)
+if CANONICAL_HOST:
+    class CanonicalHostMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            host = request.headers.get("host", "")
+            if host and host != CANONICAL_HOST:
+                target = f"{request.url.scheme}://{CANONICAL_HOST}{request.url.path}"
+                if request.url.query:
+                    target += f"?{request.url.query}"
+                return RedirectResponse(target, status_code=308)
+            return await call_next(request)
 
-app.add_middleware(CanonicalHostMiddleware)
+    app.add_middleware(CanonicalHostMiddleware)
 
 # -------------------------------------------------------------------
 # Static files
 # -------------------------------------------------------------------
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 
 # -------------------------------------------------------------------
 # Core imports (after app is defined)
 # -------------------------------------------------------------------
-from app.db import engine, AsyncSessionLocal
-from app.models import Base
-from app.models_core import metadata as core_metadata
+from app.core.db import engine, AsyncSessionLocal
+from app.domain.models import Base
+from app.core.models_core import metadata as core_metadata
 from app.auth import create_admin_if_missing
-from app.scheduler import start_scheduler
-from app.session import get_current_user_email, SESSION_COOKIE_NAME
-from app.auth_utils import require_login
-from app.routers._layout import page_shell
+from app.core.scheduler import start_scheduler
+from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
+from app.auth.auth_utils import require_login
+from app.api._layout import page_shell
 
 # -------------------------------------------------------------------
 # Log every request
@@ -179,7 +181,7 @@ async def dashboard_override(request: Request):
 # -------------------------------------------------------------------
 # Routers (existing)
 # -------------------------------------------------------------------
-from app.routers import (
+from app.api import (
     marketing,
     opportunities,
     preferences,
@@ -196,9 +198,9 @@ from app.routers import (
     debug_cookies,
     dev_auth,
 )
-from app.routers.bid_tracker import router as tracker_router
-from app.routers.uploads import router as uploads_router
-from app.routers.zip import router as zip_router
+from app.api.bid_tracker import router as tracker_router
+from app.api.uploads import router as uploads_router
+from app.api.zip import router as zip_router
 
 app.include_router(marketing.router)
 app.include_router(opportunities.router)
@@ -209,7 +211,6 @@ app.include_router(tracker_router)
 app.include_router(tracker_dashboard.router)
 app.include_router(uploads_router)
 app.include_router(zip_router)
-app.include_router(vendor_guides.router)
 app.include_router(opportunity_web.router)
 app.include_router(columbus_detail.router)
 app.include_router(cota_detail.router)
@@ -225,12 +226,16 @@ app.include_router(vendor_guides.router)
 # -------------------------------------------------------------------
 @app.on_event("startup")
 async def on_startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(core_metadata.create_all)
-    async with AsyncSessionLocal() as db:
-        await create_admin_if_missing(db)
-    start_scheduler()
+    # Only run DDL in environments that allow it (local/dev)
+    if settings.RUN_DDL_ON_START:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(core_metadata.create_all)
+        async with AsyncSessionLocal() as db:
+            await create_admin_if_missing(db)
+    # Start scheduler in web only if explicitly enabled
+    if settings.START_SCHEDULER_WEB:
+        start_scheduler()
 
 # -------------------------------------------------------------------
 # Global 401 → login redirect

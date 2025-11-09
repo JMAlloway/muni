@@ -1,10 +1,9 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from app.settings import settings
+"""Compatibility module exposing database session helpers.
 
-engine = create_async_engine(settings.DB_URL, echo=False, future=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+This wrapper keeps legacy imports like ``from app.db import get_session``
+functioning while the codebase migrates to :mod:`app.core.db`.
+"""
 
-async def get_session() -> AsyncSession:
-    async with AsyncSessionLocal() as s:
-        yield s
+from app.core.db import AsyncSessionLocal, engine, get_session
+
+__all__ = ["AsyncSessionLocal", "engine", "get_session"]

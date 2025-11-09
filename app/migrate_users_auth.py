@@ -2,7 +2,7 @@
 
 import asyncio
 from sqlalchemy import text
-from app.db import AsyncSessionLocal
+from app.core.db import AsyncSessionLocal
 
 async def migrate():
     async with AsyncSessionLocal() as session:

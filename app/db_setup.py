@@ -1,5 +1,5 @@
 from sqlalchemy import text
-from app.db_core import engine
+from app.core.db_core import engine
 
 async def ensure_user_preferences_table():
     create_sql = """

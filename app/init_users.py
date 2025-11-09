@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from sqlalchemy import text
-from app.db import AsyncSessionLocal
+from app.core.db import AsyncSessionLocal
 
 DDL_USERS = """
 CREATE TABLE IF NOT EXISTS users (

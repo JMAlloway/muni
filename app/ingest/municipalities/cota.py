@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 import aiohttp
+from aiohttp import ClientTimeout
+from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 
 from app.ingest.base import RawOpportunity
@@ -44,13 +46,38 @@ async def _read_text_with_fallback(resp: aiohttp.ClientResponse) -> str:
 
 
 async def _fetch(session: aiohttp.ClientSession, url: str) -> str:
-    resp = await session.get(url)
-    resp.raise_for_status()
-    return await _read_text_with_fallback(resp)
+    """GET with small retry/backoff and a browsery header.
+    Keeps things resilient against transient 5xx/403 blocks and odd encodings.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            resp = await session.get(
+                url,
+                headers={
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+                    ),
+                    "Accept-Language": "en-US,en;q=0.8",
+                },
+            )
+            resp.raise_for_status()
+            return await _read_text_with_fallback(resp)
+        except Exception as e:
+            last_exc = e
+            # jittered backoff: 0.2s, 0.6s, 1.4s
+            await asyncio.sleep(0.2 * (attempt + 1) ** 2)
+    # bubble last error after retries
+    if last_exc:
+        raise last_exc
+    return ""
 
 
 async def _fetch_html(url: str) -> str:
-    async with aiohttp.ClientSession() as session:
+    timeout = ClientTimeout(total=20)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         return await _fetch(session, url)
 
 
@@ -82,16 +109,21 @@ def _parse_due_datetime(raw_text: str) -> Optional[datetime]:
     if not cleaned:
         return None
 
-    for fmt in ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M %p"):
+    # common US formats seen on DBE/Transit portals
+    for fmt in (
+        "%m/%d/%Y %I:%M %p",
+        "%m/%d/%Y %H:%M %p",
+        "%m/%d/%Y %I:%M%p",
+        "%m/%d/%Y",
+    ):
         try:
-            return datetime.strptime(cleaned, fmt)
+            dt_naive = datetime.strptime(cleaned, fmt)
+            # Assume America/New_York when no tz is present; convert to UTC-aware
+            dt_local = dt_naive.replace(tzinfo=ZoneInfo("America/New_York"))
+            return dt_local.astimezone(timezone.utc)
         except ValueError:
             pass
-
-    try:
-        return datetime.strptime(cleaned, "%m/%d/%Y")
-    except ValueError:
-        return None
+    return None
 
 
 # ---------------------------------
@@ -106,6 +138,8 @@ def _extract_detail_description_dates_attachments(
 
     posted_date = None
     due_date = None
+    # naive pre-bid detection
+    prebid_date: Optional[datetime] = None
 
     for row in soup.find_all("tr"):
         cells = row.find_all(["td", "th"])
@@ -125,6 +159,11 @@ def _extract_detail_description_dates_attachments(
             if posted_candidate:
                 posted_date = posted_candidate
 
+        if "pre" in label and "bid" in label:
+            prebid_candidate = _parse_due_datetime(_clean_due_string(value_text))
+            if prebid_candidate:
+                prebid_date = prebid_candidate
+
     attachment_urls: List[str] = []
     for a in soup.find_all("a", href=True):
         href = a["href"]
@@ -133,7 +172,17 @@ def _extract_detail_description_dates_attachments(
             lower.endswith(ext)
             for ext in [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip"]
         ):
-            attachment_urls.append(_abs_url(href))
+            url = _abs_url(href)
+            if url not in attachment_urls:
+                attachment_urls.append(url)
+
+    # Extend description with a pre-bid hint if detected
+    if prebid_date and "pre-bid" not in description_text.lower():
+        try:
+            local_hint = prebid_date.astimezone(ZoneInfo("America/New_York")).strftime("%m/%d/%Y %I:%M %p")
+        except Exception:
+            local_hint = str(prebid_date)
+        description_text = (description_text + f" Pre-bid: {local_hint}").strip()
 
     return (description_text, posted_date, due_date, attachment_urls)
 
@@ -160,12 +209,17 @@ def _locate_opportunity_tiles(soup: BeautifulSoup) -> List[dict]:
     results: List[dict] = []
 
     tiles = soup.find_all("a", class_="RecordTile")
+    if not tiles:
+        # Fallback: any anchor with ViewDetail('RID') in href
+        for a in soup.find_all("a", href=True):
+            if "ViewDetail(" in a.get("href", ""):
+                tiles.append(a)
     for tile in tiles:
         href_val = tile.get("href", "")
         m = re.search(r"ViewDetail\('([^']+)'\)", href_val)
         record_id = m.group(1).strip() if m else None
 
-        desc_div = tile.find("div", class_="Description")
+        desc_div = tile.find("div", class_="Description") or tile.find_parent().find("div", class_="Description") if tile.find_parent() else None
         if not desc_div:
             continue
 
@@ -216,8 +270,10 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
 
     out: List[RawOpportunity] = []
 
-    async with aiohttp.ClientSession() as session:
+    timeout = ClientTimeout(total=20)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         for tile in tiles:
+            await asyncio.sleep(0.05)
             record_id = tile["record_id"]
             original_title = tile["title"]
             due_text_raw = tile["due_text"]
@@ -253,6 +309,9 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                 ) = await _fetch_detail_opportunity(session, detail_url)
 
             final_due = detail_due_dt or due_dt
+            # If still naive (older rows), assume local eastern and convert
+            if final_due and final_due.tzinfo is None:
+                final_due = final_due.replace(tzinfo=ZoneInfo("America/New_York")).astimezone(timezone.utc)
 
             summary_text = (
                 description_text
@@ -276,7 +335,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     summary=summary_text,
                     description=description_text,
                     due_date=final_due,
-                    posted_date=posted_dt,
+                    posted_date=posted_dt.astimezone(timezone.utc) if posted_dt and posted_dt.tzinfo else posted_dt,
                     prebid_date=None,
 
                     source="cota",

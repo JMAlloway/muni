@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 from sqlalchemy import text
 
-from app.db_core import engine
-from app.emailer import send_email
+from app.core.db_core import engine
+from app.core.emailer import send_email
 from app.ai.client import get_llm_client
 
 

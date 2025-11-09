@@ -53,3 +53,27 @@ pip install -r requirements.txt
 
 # run the app
 python -m app.main
+```
+
+---
+
+## 🗂️ Project layout
+
+```
+muni/
+├─ app/
+│  ├─ api/               # FastAPI routers
+│  ├─ auth/              # Authentication + session helpers
+│  ├─ core/              # Settings, database, scheduler
+│  ├─ domain/            # SQLAlchemy ORM models
+│  ├─ ingest/            # Scrapers and ingest runner
+│  ├─ web/               # Static assets and template samples
+│  └─ ...                # Remaining application modules (ai, data, etc.)
+├─ scripts/              # One-off CLI utilities (seed admin, digests, etc.)
+├─ migrations/
+│  └─ alembic.ini        # Alembic configuration placeholder
+├─ tests/                # Async ingestion smoke test
+└─ requirements.txt
+```
+
+All legacy helper scripts now live under `scripts/`; run them with `python scripts/<name>.py`.

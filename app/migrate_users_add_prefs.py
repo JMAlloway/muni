@@ -2,7 +2,7 @@ import asyncio
 import json
 from datetime import datetime
 from sqlalchemy import text
-from app.db import AsyncSessionLocal
+from app.core.db import AsyncSessionLocal
 
 ALTER_USERS_TABLES = [
     # Add digest_frequency if it doesn't exist

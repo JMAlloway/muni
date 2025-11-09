@@ -6,6 +6,8 @@ from datetime import datetime,timezone
 from typing import List, Optional, Tuple
 
 import aiohttp
+from aiohttp import ClientTimeout
+from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 
 from app.ingest.base import RawOpportunity
@@ -44,13 +46,34 @@ async def _read_text_with_fallback(resp: aiohttp.ClientResponse) -> str:
 
 
 async def _fetch(session: aiohttp.ClientSession, url: str) -> str:
-    resp = await session.get(url)
-    resp.raise_for_status()
-    return await _read_text_with_fallback(resp)
+    """GET with small retry/backoff and browsery headers for gob2g."""
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            resp = await session.get(
+                url,
+                headers={
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+                    ),
+                    "Accept-Language": "en-US,en;q=0.8",
+                },
+            )
+            resp.raise_for_status()
+            return await _read_text_with_fallback(resp)
+        except Exception as e:
+            last_exc = e
+            await asyncio.sleep(0.2 * (attempt + 1) ** 2)
+    if last_exc:
+        raise last_exc
+    return ""
 
 
 async def _fetch_html(url: str) -> str:
-    async with aiohttp.ClientSession() as session:
+    timeout = ClientTimeout(total=20)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         return await _fetch(session, url)
 
 
@@ -82,16 +105,14 @@ def _parse_due_datetime(raw_text: str) -> Optional[datetime]:
     if not cleaned:
         return None
 
-    for fmt in ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M %p"):
+    for fmt in ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M %p", "%m/%d/%Y %I:%M%p", "%m/%d/%Y"):
         try:
-            return datetime.strptime(cleaned, fmt)
+            dt_naive = datetime.strptime(cleaned, fmt)
+            dt_local = dt_naive.replace(tzinfo=ZoneInfo("America/New_York"))
+            return dt_local.astimezone(timezone.utc)
         except ValueError:
             pass
-
-    try:
-        return datetime.strptime(cleaned, "%m/%d/%Y")
-    except ValueError:
-        return None
+    return None
 
 
 # ---------------------------------
@@ -126,6 +147,7 @@ def _extract_detail_description_dates_attachments(
                 posted_date = posted_candidate
 
     attachment_urls: List[str] = []
+    seen = set()
     for a in soup.find_all("a", href=True):
         href = a["href"]
         lower = href.lower()
@@ -133,7 +155,10 @@ def _extract_detail_description_dates_attachments(
             lower.endswith(ext)
             for ext in [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip"]
         ):
-            attachment_urls.append(_abs_url(href))
+            url = _abs_url(href)
+            if url not in seen:
+                seen.add(url)
+                attachment_urls.append(url)
 
     return (description_text, posted_date, due_date, attachment_urls)
 
@@ -216,8 +241,10 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
 
     out: List[RawOpportunity] = []
 
-    async with aiohttp.ClientSession() as session:
+    timeout = ClientTimeout(total=20)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         for tile in tiles:
+            await asyncio.sleep(0.05)
             record_id = tile["record_id"]
             original_title = tile["title"]
             due_text_raw = tile["due_text"]
@@ -253,6 +280,8 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                 ) = await _fetch_detail_opportunity(session, detail_url)
 
             final_due = detail_due_dt or due_dt
+            if final_due and final_due.tzinfo is None:
+                final_due = final_due.replace(tzinfo=ZoneInfo("America/New_York")).astimezone(timezone.utc)
 
             summary_text = (
                 description_text

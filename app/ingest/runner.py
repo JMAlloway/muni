@@ -6,7 +6,6 @@ from typing import List, Set, Optional
 from sqlalchemy import text
 import asyncio
 from sqlalchemy import text
-from app.db_core import engine
 
 # --- AI imports ---------------------------------------------------------------
 from app.ai.classifier import classify_opportunity
@@ -48,7 +47,7 @@ from app.ingest.municipalities import dublin_city_schools
 from app.ingest.municipalities import minerva_park
 from app.ingest.municipalities import city_new_albany
 from app.ingest.municipalities import ohiobuys  # new
-from app.db_core import save_opportunities, engine
+from app.core.db_core import save_opportunities, engine
 
 
 # ------------------------------------------------------------------------------
@@ -136,7 +135,7 @@ async def _get_opportunity_columns(conn) -> Set[str]:
     return cols
 
 
-async def ai_enrich_opportunity(conn, external_id: str, agency_name: str):
+async def ai_enrich_opportunity(conn, external_id: str, agency_name: str) -> bool:
     """
     Enrich a newly inserted/updated opportunity with AI metadata.
     """
@@ -152,8 +151,7 @@ async def ai_enrich_opportunity(conn, external_id: str, agency_name: str):
     )
     row = res.mappings().first()
     if not row:
-        print(f"[AI] SKIP: no row for ext={external_id!r} agency={agency_name!r}")
-        return
+        return False
 
     # 👉 this is the field you said has the full description
     title = row.get("title") or ""
@@ -238,6 +236,8 @@ async def ai_enrich_opportunity(conn, external_id: str, agency_name: str):
                 "id": row["id"],
             },
         )
+
+    return True
 
 
 class RowAdapter:
@@ -387,10 +387,10 @@ async def run_ingestors_once() -> int:
             for r in batch:
                 ext_id = r.get("external_id") if isinstance(r, dict) else getattr(r, "external_id", "")
                 agency = r.get("agency_name") if isinstance(r, dict) else getattr(r, "agency_name", "")
+                updated = False
                 if ext_id and agency:
-                    # ✅ your original path: update by PK
-                    await ai_enrich_opportunity(conn, ext_id, agency)
-                else:
+                    updated = await ai_enrich_opportunity(conn, ext_id, agency)
+                if not updated:
                     # ✅ NEW: fallback so these rows don't stay NULL
                     title = r.get("title") if isinstance(r, dict) else getattr(r, "title", "")
                     desc = (
@@ -478,3 +478,4 @@ async def run_ingestors_once() -> int:
 if __name__ == "__main__":
     import asyncio
     asyncio.run(run_ingestors_once())
+

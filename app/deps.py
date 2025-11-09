@@ -1,4 +1,4 @@
-from app.db import get_session
+from app.core.db import get_session
 from app.auth import get_current_user, require_admin
 
 get_db = get_session

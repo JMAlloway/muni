@@ -1,8 +1,8 @@
 # app/init_db_core.py
 import asyncio
 from sqlalchemy import text
-from app.db_core import engine
-from app.models_core import metadata, opportunities
+from app.core.db_core import engine
+from app.core.models_core import metadata, opportunities
 
 async def init_db_core():
     """

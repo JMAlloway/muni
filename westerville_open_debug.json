@@ -3,28 +3,6 @@
   "message": "Success",
   "payload": {
     "projects": {
-      "204536": {
-        "ProjectID": "204536",
-        "PrivateProjectID": "ef816d213e727b56f1998f368c86ef1b",
-        "ReferenceID": "2025-206",
-        "ProjectStatusID": "2",
-        "ProjectSubStatusID": "1",
-        "ProjectVisibilityID": "1",
-        "ProjectName": "Millstone Creek Park Playground Replacement",
-        "DateClose": "2025-11-04 20:00:00",
-        "DepartmentID": "627"
-      },
-      "201465": {
-        "ProjectID": "201465",
-        "PrivateProjectID": "23266dde96248c01eaa1039466b0ca9e",
-        "ReferenceID": "2025-205",
-        "ProjectStatusID": "2",
-        "ProjectSubStatusID": "1",
-        "ProjectVisibilityID": "1",
-        "ProjectName": "Alkyre Run Wetland and Floodplain Restoration Project",
-        "DateClose": "2025-11-05 20:00:00",
-        "DepartmentID": "627"
-      },
       "204876": {
         "ProjectID": "204876",
         "PrivateProjectID": "e4b9e43ada081a279fa1465afb2fa421",
