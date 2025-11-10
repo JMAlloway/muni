@@ -93,20 +93,24 @@ CSRF_COOKIE_NAME = 'csrftoken'
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         token = request.cookies.get(CSRF_COOKIE_NAME)
-        # Only enforce on unsafe methods; allow auth endpoints without header
+        # Enforce on unsafe methods (POST/PUT/PATCH/DELETE)
         if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
-            if request.url.path in {'/login', '/signup'}:
-                response = await call_next(request)
-                # ensure cookie set even on auth pages
-                if not token:
-                    try:
-                        t = secrets.token_urlsafe(32)
-                        response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
-                    except Exception:
-                        pass
-                return response
+            ok = False
             hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
-            if not token or not hdr or hdr != token:
+            if token and hdr and hdr == token:
+                ok = True
+            else:
+                # If not provided via header, allow a form field named 'csrf_token'
+                try:
+                    ctype = request.headers.get('content-type', '')
+                    if ('application/x-www-form-urlencoded' in ctype) or ('multipart/form-data' in ctype):
+                        form = await request.form()
+                        field = form.get('csrf_token')
+                        if token and field and str(field) == str(token):
+                            ok = True
+                except Exception:
+                    ok = False
+            if not ok:
                 return PlainTextResponse('Forbidden (CSRF)', status_code=403)
         response = await call_next(request)
         try:
@@ -116,7 +120,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         except Exception:
             pass
         return response
-app.add_middleware(CSRFMiddleware)
+import importlib
+try:
+    _mod = importlib.import_module("starlette.middleware.csrf")
+    _StarletteCSRFMiddleware = getattr(_mod, "CSRFMiddleware")
+    app.add_middleware(_StarletteCSRFMiddleware, secret_key=settings.SECRET_KEY)
+except Exception:
+    app.add_middleware(CSRFMiddleware)
 
 # -------------------------------------------------------------------
 # Routers
@@ -126,7 +136,6 @@ app.include_router(dashboard_order.router)
 # -------------------------------------------------------------------
 # HARD OVERRIDE: Real dashboard at /tracker/dashboard (wins precedence)
 # -------------------------------------------------------------------
-@app.get("/tracker/dashboard", include_in_schema=False)
 @app.get("/tracker/dashboard", include_in_schema=False)
 async def dashboard_override(request: Request):
     from app.api.tracker_dashboard import tracker_dashboard as _dashboard
@@ -465,6 +474,8 @@ async def debug_session(request: Request, admin: bool = Depends(require_admin)):
         "type": type(auth_result).__name__,
         "is_redirect": isinstance(auth_result, RedirectResponse)
     }
+
+
 
 
 
