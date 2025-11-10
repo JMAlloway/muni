@@ -52,6 +52,7 @@ app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 from app.core.db import engine, AsyncSessionLocal
 from app.domain.models import Base
 from app.core.models_core import metadata as core_metadata
+from app.core.models_preferences import metadata as prefs_metadata
 from app.auth import create_admin_if_missing, require_admin
 from app.core.scheduler import start_scheduler
 from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
@@ -241,8 +242,22 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     except Exception:
                         pass
                 return response
+            # Accept either header or a form field named 'csrf_token'
+            ok = False
             hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
-            if not token or not hdr or hdr != token:
+            if token and hdr and hdr == token:
+                ok = True
+            else:
+                try:
+                    ctype = request.headers.get('content-type', '')
+                    if ('application/x-www-form-urlencoded' in ctype) or ('multipart/form-data' in ctype):
+                        form = await request.form()
+                        field = form.get('csrf_token')
+                        if token and field and str(field) == str(token):
+                            ok = True
+                except Exception:
+                    ok = False
+            if not ok:
                 return PlainTextResponse('Forbidden (CSRF)', status_code=403)
         response = await call_next(request)
         try:
@@ -422,6 +437,7 @@ async def on_startup():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await conn.run_sync(core_metadata.create_all)
+            await conn.run_sync(prefs_metadata.create_all)
         async with AsyncSessionLocal() as db:
             await create_admin_if_missing(db)
         # Lightweight, idempotent schema fixes for local SQLite

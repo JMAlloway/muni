@@ -270,6 +270,14 @@ def _render_form(
     </section>
 
     <section class="card" style="max-width:780px;">
+        <div class="mini-head">Application Variables</div>
+        <div class="mini-desc">
+            Save your organization details once (legal name, EIN, contacts, certifications) and reuse them when completing applications.
+        </div>
+        <a class="button-primary" href="/preferences/application">Manage Application Variables</a>
+    </section>
+
+    <section class="card" style="max-width:780px;">
         <div class="mini-head">What happens next?</div>
         <div class="mini-desc">
             • Your dashboard filters to the buyers you picked.<br/>
