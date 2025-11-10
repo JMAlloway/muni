@@ -1,6 +1,6 @@
-# app/session.py
+﻿# app/session.py
 
-from itsdangerous import URLSafeSerializer, BadSignature
+from itsdangerous import TimedSerializer, BadSignature
 from fastapi import Request
 import time
 
@@ -10,21 +10,17 @@ SESSION_COOKIE_NAME = "muni_session"
 SESSION_SALT = "muni-session"
 
 def _serializer():
-    return URLSafeSerializer(settings.SECRET_KEY, salt=SESSION_SALT)
+    return TimedSerializer(settings.SECRET_KEY, salt=SESSION_SALT)
 
 def create_session_token(email: str, ttl_minutes: int | None = None) -> str:
-    ttl = ttl_minutes if ttl_minutes is not None else settings.ACCESS_TOKEN_EXPIRES_MIN
-    exp = int(time.time()) + int(ttl) * 60
-    return _serializer().dumps({"email": email, "exp": exp})
+    # TimedSerializer enforces expiration at loads() time via max_age. We only store email.
+    return _serializer().dumps({"email": email})
 
-def parse_session_token(token: str | None) -> str | None:
+def parse_session_token(token: str | None, max_age: int = 7200) -> str | None:
     if not token:
         return None
     try:
-        data = _serializer().loads(token)
-        exp = data.get("exp")
-        if isinstance(exp, int) and exp < int(time.time()):
-            return None
+        data = _serializer().loads(token, max_age=max_age)
         return data.get("email")
     except BadSignature:
         return None
@@ -32,3 +28,4 @@ def parse_session_token(token: str | None) -> str | None:
 def get_current_user_email(request: Request) -> str | None:
     raw = request.cookies.get(SESSION_COOKIE_NAME)
     return parse_session_token(raw)
+

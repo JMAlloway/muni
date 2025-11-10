@@ -1,5 +1,5 @@
 ﻿(function () {
-  function getCSRF(){ try { return (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1] || null; } catch(_) { return null; } }
+  function getCSRF(){ try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || null; } catch(_) { return null; } }
 
   const grid = document.getElementById("tracked-grid");
   let items = JSON.parse(grid.getAttribute("data-items") || "[]");
@@ -469,6 +469,7 @@
     }
   };
 })();
+
 
 
 

@@ -139,7 +139,7 @@ async def tracker_dashboard(request: Request):
       <h3 style="margin:0; font-size:16px;">Upload Files</h3>
       <div id="upload-agency" class="muted" style="font-size:12px;"></div>
     </div>
-    <button class="icon-btn" onclick="(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1]||"";document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-drawer').setAttribute('aria-hidden','true'); document.getElementById('upload-drawer').style.right='-520px';})();">×</button>
+    <button class="icon-btn" onclick="(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-drawer').setAttribute('aria-hidden','true'); document.getElementById('upload-drawer').style.right='-520px';})();">×</button>
   </header>
   <div style="padding:14px; display:grid; gap:10px; overflow:auto;">
     <div>
@@ -175,7 +175,7 @@ async def tracker_dashboard(request: Request):
 </aside>
 
 <script>
-(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1]||"";
+(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
   var overlay = document.getElementById('upload-overlay');
   var drawer  = document.getElementById('upload-drawer');
   var dz = document.getElementById('dz-d');
@@ -242,7 +242,7 @@ async def tracker_dashboard(request: Request):
 <script src="/static/tracker_dashboard.js?v=10"></script>
 <script>
 // Inline: live search + summary layered on top of card rendering
-(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1]||"";
+(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
   var input = document.getElementById('search-filter');
   var summary = document.getElementById('summary-count');
   var resetBtn = document.getElementById('reset-filters');
@@ -272,6 +272,7 @@ async def tracker_dashboard(request: Request):
         .replace("__ITEMS_JSON_ESC__", items_json_escaped)
     )
     return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=user_email))
+
 
 
 

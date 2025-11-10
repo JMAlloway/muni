@@ -559,7 +559,7 @@ async def opportunities(request: Request):
 
 <script>
 async function api(path, init = {}) {
-  const token = (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1] || "";
+  const token = (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || "";
   const method = (init.method||"GET").toUpperCase();
   const headers = Object.assign({}, init.headers||{});
   if (method !== "GET") { headers["X-CSRF-Token"] = token; }
@@ -718,6 +718,7 @@ document.addEventListener('click', async (e) => {
             user_email=user_email,
         )
     )
+
 
 
 

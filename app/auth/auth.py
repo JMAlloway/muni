@@ -1,6 +1,6 @@
-from fastapi import Depends, HTTPException, status
+﻿from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.hash import pbkdf2_sha256
+from app.security import hash_password as _hash_password, verify_password as _verify_password
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import jwt
@@ -15,12 +15,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 async def create_admin_if_missing(db: AsyncSession):
     """Ensure a default admin user exists based on .env settings."""
-    res = await db.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
-    user = res.scalar_one_or_none()
-    if not user:
+    if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
+        return
         u = User(
             email=settings.ADMIN_EMAIL,
-            password_hash=pbkdf2_sha256.hash(settings.ADMIN_PASSWORD),
+            password_hash=_hash_password(settings.ADMIN_PASSWORD),
             is_admin=True,
         )
         db.add(u)
@@ -66,8 +65,10 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
 
 # Helpers for signup/login flows
 async def hash_password(pw: str) -> str:
-    return pbkdf2_sha256.hash(pw)
+    return _hash_password(pw)
 
 
 async def verify_password(pw: str, hashed: str) -> bool:
-    return pbkdf2_sha256.verify(pw, hashed)
+    return _verify_password(pw, hashed)
+
+

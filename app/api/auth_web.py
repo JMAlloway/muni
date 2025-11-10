@@ -1,4 +1,4 @@
-# app/routers/auth_web.py
+﻿# app/routers/auth_web.py
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
@@ -42,7 +42,7 @@ async def signup_form(request: Request, next: str = "/"):
       <h2 class="section-heading">Create your account</h2>
       <p class="subtext">Start a free account to track bids and get alerts.</p>
 
-      <form method="POST" action="/signup">
+      <form method="POST" action="/signup">\n        <input type="hidden" name="csrf_token" id="csrf_signup" value="">
         <input type="hidden" name="next" value="{next}">
         <div class="form-row">
           <div class="form-col">
@@ -63,8 +63,7 @@ async def signup_form(request: Request, next: str = "/"):
           <button class="button-primary" type="submit">Create account</button>
         </div>
         <div class="help-text">Already have an account? <a href="/login?next={next}">Sign in</a>.</div>
-      </form>
-    </section>
+      <script>(function(){{try{{var m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); if(m){{ var el=document.getElementById('csrf_signup'); if(el) el.value=m[1]; }} }}catch(_ ){{}}}})();</script>\n      </form>\n    </section>
     <script>
       (function() {{
         var btn=document.querySelector('.pw-toggle');
@@ -79,7 +78,7 @@ async def signup_form(request: Request, next: str = "/"):
       }})();
     </script>
     """
-    return HTMLResponse(page_shell(body_html, title="Sign up • Muni Alerts", user_email=user_email))
+    return HTMLResponse(page_shell(body_html, title="Sign up â€¢ Muni Alerts", user_email=user_email))
 
 
 @router.post("/signup", response_class=HTMLResponse)
@@ -136,7 +135,7 @@ async def login_form(request: Request, next: str = "/"):
       <h2 class="section-heading">Sign in</h2>
       <p class="subtext">Access your dashboard and alert settings.</p>
 
-      <form method="POST" action="/login">
+      <form method="POST" action="/login">\n        <input type="hidden" name="csrf_token" id="csrf_login" value="">
         <input type="hidden" name="next" value="{next}">
         <div class="form-row">
           <div class="form-col">
@@ -156,8 +155,7 @@ async def login_form(request: Request, next: str = "/"):
           <button class="button-primary" type="submit">Sign in</button>
         </div>
         <div class="help-text">No account yet? <a href="/signup?next={next}">Create one</a>.</div>
-      </form>
-    </section>
+      <script>(function(){{try{{var m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); if(m){{ var el=document.getElementById('csrf_login'); if(el) el.value=m[1]; }} }}catch(_ ){{}}}})();</script>\n      </form>\n    </section>
     <script>
       (function() {{
         var btn=document.querySelector('.pw-toggle');
@@ -172,7 +170,7 @@ async def login_form(request: Request, next: str = "/"):
       }})();
     </script>
     """
-    return HTMLResponse(page_shell(body_html, title="Login • Muni Alerts", user_email=user_email))
+    return HTMLResponse(page_shell(body_html, title="Login â€¢ Muni Alerts", user_email=user_email))
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -264,7 +262,7 @@ async def account_page(request: Request):
           <section class="card"><h2 class="section-heading">You're signed out</h2>
           <a class="button-primary" href="/login">Sign in</a></section>
                 """,
-                title="My Account • Muni Alerts",
+                title="My Account â€¢ Muni Alerts",
                 user_email=None,
             )
         )
@@ -275,7 +273,8 @@ async def account_page(request: Request):
       <p class="subtext">Signed in as <b>{user_email}</b>.</p>
       <a class="button-primary" href="/logout">Sign out</a></section>
             """,
-            title="My Account • Muni Alerts",
+            title="My Account â€¢ Muni Alerts",
             user_email=user_email,
         )
     )
+

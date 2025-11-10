@@ -6,10 +6,10 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse, PlainTextResponse, HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
 import secrets
 from app.core.settings import settings
 import os
-from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import text
 
 # -------------------------------------------------------------------
@@ -84,32 +84,165 @@ async def log_every_request(request: Request, call_next):
         pass
     return response
 
+
 # -------------------------------------------------------------------
-# CSRF protection (SameSite Lax + header check for unsafe methods)
+# CSRF protection (cookie 'csrftoken' + header 'X-CSRF-Token')
 # -------------------------------------------------------------------
-CSRF_COOKIE = "csrf_token"
+CSRF_COOKIE_NAME = 'csrftoken'
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        token = request.cookies.get(CSRF_COOKIE)
-        # For unsafe methods from browsers, require header to match cookie token
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-            # Allow login/signup without header (relies on SameSite=Lax)
-            if request.url.path in {"/login", "/signup"}:
-                return await call_next(request)
-            hdr = request.headers.get("x-csrf-token") or request.headers.get("X-CSRF-Token")
+        token = request.cookies.get(CSRF_COOKIE_NAME)
+        # Only enforce on unsafe methods; allow auth endpoints without header
+        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+            if request.url.path in {'/login', '/signup'}:
+                response = await call_next(request)
+                # ensure cookie set even on auth pages
+                if not token:
+                    try:
+                        t = secrets.token_urlsafe(32)
+                        response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
+                    except Exception:
+                        pass
+                return response
+            hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
             if not token or not hdr or hdr != token:
-                return PlainTextResponse("Forbidden (CSRF)", status_code=403)
+                return PlainTextResponse('Forbidden (CSRF)', status_code=403)
         response = await call_next(request)
-        # Ensure a CSRF cookie exists for subsequent requests
         try:
             if not token:
-                token = secrets.token_urlsafe(32)
-                response.set_cookie(CSRF_COOKIE, token, httponly=False, samesite="lax")
+                t = secrets.token_urlsafe(32)
+                response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
         except Exception:
             pass
         return response
+app.add_middleware(CSRFMiddleware)
 
+# -------------------------------------------------------------------
+# Routers
+# -------------------------------------------------------------------
+app.include_router(dashboard_order.router)
+
+# -------------------------------------------------------------------
+# HARD OVERRIDE: Real dashboard at /tracker/dashboard (wins precedence)
+# -------------------------------------------------------------------
+@app.get("/tracker/dashboard", include_in_schema=False)
+@app.get("/tracker/dashboard", include_in_schema=False)
+async def dashboard_override(request: Request):
+    from app.api.tracker_dashboard import tracker_dashboard as _dashboard
+    return await _dashboard(request)
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+import secrets
+from app.core.settings import settings
+import os
+from sqlalchemy import text
+
+# -------------------------------------------------------------------
+# Windows event-loop quirk
+# -------------------------------------------------------------------
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+# -------------------------------------------------------------------
+# FastAPI app setup
+# -------------------------------------------------------------------
+app = FastAPI(title="Muni Alerts", version="0.3")
+
+# -------------------------------------------------------------------
+# Canonical host middleware (fixes cookie host mismatch)
+# -------------------------------------------------------------------
+CANONICAL_HOST = os.getenv("PUBLIC_APP_HOST")
+
+if CANONICAL_HOST:
+    class CanonicalHostMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            host = request.headers.get("host", "")
+            if host and host != CANONICAL_HOST:
+                target = f"{request.url.scheme}://{CANONICAL_HOST}{request.url.path}"
+                if request.url.query:
+                    target += f"?{request.url.query}"
+                return RedirectResponse(target, status_code=308)
+            return await call_next(request)
+
+    app.add_middleware(CanonicalHostMiddleware)
+
+# -------------------------------------------------------------------
+# Static files
+# -------------------------------------------------------------------
+app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
+
+# -------------------------------------------------------------------
+# Core imports (after app is defined)
+# -------------------------------------------------------------------
+from app.core.db import engine, AsyncSessionLocal
+from app.domain.models import Base
+from app.core.models_core import metadata as core_metadata
+from app.auth import create_admin_if_missing, require_admin
+from app.core.scheduler import start_scheduler
+from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
+from app.auth.auth_utils import require_login
+from app.api._layout import page_shell
+from app.core.db_migrations import ensure_uploads_schema
+from app.api import dashboard_order as dashboard_order
+
+# -------------------------------------------------------------------
+# Log every request
+# -------------------------------------------------------------------
+@app.middleware("http")
+async def log_every_request(request: Request, call_next):
+    # ASCII-safe logs for Windows terminals
+    try:
+        print(f"[REQ] {request.method} {request.url.path}")
+    except Exception:
+        pass
+    response = await call_next(request)
+    try:
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", None)
+        base = f"[RES] {response.status_code} for {request.url.path} (route={route_path})"
+        loc = response.headers.get("location")
+        if loc:
+            print(base + f" Location={loc}")
+        else:
+            print(base)
+    except Exception:
+        pass
+    return response
+
+
+# -------------------------------------------------------------------
+# CSRF protection (cookie 'csrftoken' + header 'X-CSRF-Token')
+# -------------------------------------------------------------------
+CSRF_COOKIE_NAME = 'csrftoken'
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        token = request.cookies.get(CSRF_COOKIE_NAME)
+        # Only enforce on unsafe methods; allow auth endpoints without header
+        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+            if request.url.path in {'/login', '/signup'}:
+                response = await call_next(request)
+                # ensure cookie set even on auth pages
+                if not token:
+                    try:
+                        t = secrets.token_urlsafe(32)
+                        response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
+                    except Exception:
+                        pass
+                return response
+            hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
+            if not token or not hdr or hdr != token:
+                return PlainTextResponse('Forbidden (CSRF)', status_code=403)
+        response = await call_next(request)
+        try:
+            if not token:
+                t = secrets.token_urlsafe(32)
+                response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
+        except Exception:
+            pass
+        return response
 app.add_middleware(CSRFMiddleware)
 
 # -------------------------------------------------------------------
@@ -332,6 +465,9 @@ async def debug_session(request: Request, admin: bool = Depends(require_admin)):
         "type": type(auth_result).__name__,
         "is_redirect": isinstance(auth_result, RedirectResponse)
     }
+
+
+
 
 
 
