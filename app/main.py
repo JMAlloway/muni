@@ -10,7 +10,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import secrets
 from app.core.settings import settings
 import os
+import re
 from sqlalchemy import text
+from urllib.parse import parse_qs
 
 # -------------------------------------------------------------------
 # Windows event-loop quirk
@@ -86,48 +88,7 @@ async def log_every_request(request: Request, call_next):
     return response
 
 
-# -------------------------------------------------------------------
-# CSRF protection (cookie 'csrftoken' + header 'X-CSRF-Token')
-# -------------------------------------------------------------------
-CSRF_COOKIE_NAME = 'csrftoken'
-
-class CSRFMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        token = request.cookies.get(CSRF_COOKIE_NAME)
-        # Enforce on unsafe methods (POST/PUT/PATCH/DELETE)
-        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
-            ok = False
-            hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
-            if token and hdr and hdr == token:
-                ok = True
-            else:
-                # If not provided via header, allow a form field named 'csrf_token'
-                try:
-                    ctype = request.headers.get('content-type', '')
-                    if ('application/x-www-form-urlencoded' in ctype) or ('multipart/form-data' in ctype):
-                        form = await request.form()
-                        field = form.get('csrf_token')
-                        if token and field and str(field) == str(token):
-                            ok = True
-                except Exception:
-                    ok = False
-            if not ok:
-                return PlainTextResponse('Forbidden (CSRF)', status_code=403)
-        response = await call_next(request)
-        try:
-            if not token:
-                t = secrets.token_urlsafe(32)
-                response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
-        except Exception:
-            pass
-        return response
-import importlib
-try:
-    _mod = importlib.import_module("starlette.middleware.csrf")
-    _StarletteCSRFMiddleware = getattr(_mod, "CSRFMiddleware")
-    app.add_middleware(_StarletteCSRFMiddleware, secret_key=settings.SECRET_KEY)
-except Exception:
-    app.add_middleware(CSRFMiddleware)
+ # (CSRF middleware defined later; keeping a single implementation)
 
 # -------------------------------------------------------------------
 # Routers
@@ -242,21 +203,50 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     except Exception:
                         pass
                 return response
-            # Accept either header or a form field named 'csrf_token'
+            # Accept either header or a form field named 'csrf_token' without consuming stream for downstream
             ok = False
             hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
-            if token and hdr and hdr == token:
+            field = None
+            def _norm(s):
+                try:
+                    v = (s or '').strip()
+                    # strip leading/trailing quotes and backslashes (e.g., \"token\")
+                    v = re.sub(r'^[\\\"]+', '', v)
+                    v = re.sub(r'[\\\"]+$', '', v)
+                    return v
+                except Exception:
+                    return s
+            t_norm = _norm(token)
+            h_norm = _norm(hdr)
+            if t_norm and h_norm and h_norm == t_norm:
                 ok = True
             else:
                 try:
                     ctype = request.headers.get('content-type', '')
-                    if ('application/x-www-form-urlencoded' in ctype) or ('multipart/form-data' in ctype):
-                        form = await request.form()
-                        field = form.get('csrf_token')
-                        if token and field and str(field) == str(token):
+                    if 'application/x-www-form-urlencoded' in ctype:
+                        body = await request.body()
+                        try:
+                            # ensure downstream can still read
+                            request._body = body  # type: ignore[attr-defined]
+                        except Exception:
+                            pass
+                        data = parse_qs(body.decode(errors='ignore')) if body else {}
+                        field_vals = data.get('csrf_token') or []
+                        field = field_vals[0] if field_vals else None
+                        f_norm = _norm(field)
+                        if t_norm and f_norm and str(f_norm) == str(t_norm):
                             ok = True
+                    # For multipart, require header to avoid consuming stream
                 except Exception:
                     ok = False
+            # Debug one-liner to help diagnose mismatches (truncated tokens)
+            try:
+                c8 = (t_norm or '')[:8]
+                h8 = (h_norm or '')[:8]
+                f8 = (_norm(field) or '')[:8]
+                print(f"[CSRF] {request.method} {request.url.path} ok={ok} cookie={c8} hdr={h8} field={f8}")
+            except Exception:
+                pass
             if not ok:
                 return PlainTextResponse('Forbidden (CSRF)', status_code=403)
         response = await call_next(request)

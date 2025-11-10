@@ -97,6 +97,17 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
         color: var(--text-dim);
     }}
 
+    /* Site logo in header */
+    .brand-logo {{
+        max-height: 64px;
+        width: auto;
+        height: auto;
+        max-width: 360px;
+        display: block;
+        margin-bottom: 6px;
+        object-fit: contain;
+    }}
+
     nav.navlinks {{
         display:flex;
         flex-wrap:wrap;
@@ -431,6 +442,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 
 <header class="navbar">
     <div class="brand-block">
+        <img src="/static/logo.svg" alt="Site logo" class="brand-logo" />
         <div class="brand-name">EasyRFP</div>
         <div class="brand-tagline">Find local bids. Faster.</div>
     </div>

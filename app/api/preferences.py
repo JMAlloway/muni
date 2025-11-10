@@ -1,10 +1,13 @@
-# app/routers/preferences.py
+﻿# app/routers/preferences.py
 
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
 from typing import List
 import json
+import secrets
+import re
+from urllib.parse import parse_qs
 
 from app.core.db import AsyncSessionLocal
 from app.api._layout import page_shell
@@ -90,7 +93,7 @@ async def get_preferences(request: Request):
             </div>
 
             <button class="button-primary" type="submit">Save My Alerts</button>
-        </form>
+      </form>
     </section>
 
     <section class="card">
@@ -115,7 +118,7 @@ async def get_preferences(request: Request):
     </section>
     """
 
-    return HTMLResponse(page_shell(body_html, title="Muni Alerts – Preferences", user_email=user_email))
+    return HTMLResponse(page_shell(body_html, title="Muni Alerts â€“ Preferences", user_email=user_email))
 
 
 @router.post("/preferences", response_class=HTMLResponse)
@@ -155,7 +158,7 @@ async def post_preferences(
 
     body_html = f"""
     <section class="card">
-        <h2 class="section-heading">You're on the list ✅</h2>
+        <h2 class="section-heading">You're on the list âœ…</h2>
         <p class="subtext" style="margin-bottom:16px;">
             We'll send opportunities to <b>{email_clean}</b> at <b>{freq_clean}</b> frequency.
         </p>
@@ -165,7 +168,7 @@ async def post_preferences(
             <code class="chip">{agencies_label}</code>
         </div>
 
-        <a class="button-primary" href="/opportunities">See current bids →</a>
+        <a class="button-primary" href="/opportunities">See current bids â†’</a>
         <div class="muted" style="margin-top:12px;">
             Want to edit these later? <a class="cta-link" href="/signup">Create an account</a>
             to manage settings.
@@ -198,29 +201,48 @@ async def application_vars_form(request: Request):
 
     # Load any existing stored data
     data = {}
+    updated_label = ""
+    csrf_cookie = request.cookies.get("csrftoken") or secrets.token_urlsafe(32)
     async with AsyncSessionLocal() as session:
         res = await session.execute(
-            text("SELECT data FROM user_application_vars WHERE user_email = :email LIMIT 1"),
+            text("SELECT data, updated_at FROM user_application_vars WHERE user_email = :email LIMIT 1"),
             {"email": user_email},
         )
         row = res.fetchone()
-        if row and row[0]:
+        if row and row[0] is not None:
             try:
-                data = row[0]
+                val = row[0]
+                if isinstance(val, dict):
+                    data = val
+                elif isinstance(val, (str, bytes)):
+                    s = val.decode() if isinstance(val, bytes) else val
+                    data = json.loads(s) if s else {}
+                else:
+                    # Fallback: try JSON decoding of stringified value
+                    data = json.loads(str(val))
             except Exception:
                 data = {}
+        # updated_at label
+        try:
+            updated_raw = row[1] if row and len(row) > 1 else None
+            if updated_raw:
+                updated_label = str(updated_raw)
+        except Exception:
+            updated_label = ""
 
     def v(key, default=""):
         try:
             return (data or {}).get(key) or default
         except Exception:
             return default
+    def e(key):
+        return ''
 
     body_html = f"""
     <section class=\"card\">
       <h2 class=\"section-heading\">Application Variables</h2>
       <p class=\"subtext\">Save details commonly requested on forms.</p>
-      <form method=\"POST\" action=\"/preferences/application\">\n        <input type=\"hidden\" id=\"csrf_token\" name=\"csrf_token\" value=\"\">\n
+      <form method=\"POST\" action=\"/preferences/application\">\n        <input type=\"hidden\" id=\"csrf_token\" name=\"csrf_token\" value=\\"{csrf_cookie}\\">\n
         <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Legal Entity Name</label>\n            <input type=\"text\" name=\"legal_name\" value=\"{v('legal_name')}\" placeholder=\"Acme, LLC\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">DBA</label>\n            <input type=\"text\" name=\"dba\" value=\"{v('dba')}\" placeholder=\"Acme Services\" />\n          </div>\n        </div>
 
         <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">EIN / Tax ID</label>\n            <input type=\"text\" name=\"ein\" value=\"{v('ein')}\" placeholder=\"12-3456789\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">UEI / CAGE (optional)</label>\n            <input type=\"text\" name=\"uei\" value=\"{v('uei')}\" placeholder=\"UEI or CAGE Code\" />\n          </div>\n        </div>
@@ -243,7 +265,7 @@ async def application_vars_form(request: Request):
 
         <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Notes</label>\n            <input type=\"text\" name=\"notes\" value=\"{v('notes')}\" placeholder=\"Any special instructions or ids\" />\n          </div>\n        </div>
 
-        <div class=\"form-actions\">\n          <button class=\"button-primary\" type=\"submit\">Save</button>\n        </div>\n      </form>
+        <div class=\"form-actions\">\n          <button class=\"button-primary\" type=\"submit\">Save</button>\n          <span class=\"muted small\" style=\"margin-left:12px;\">Last saved: {updated_label or '-'}</span>\n        </div>\n      </form>
 
       <script>
         (function(){{
@@ -257,34 +279,16 @@ async def application_vars_form(request: Request):
       </script>
     </section>
     """
-    return HTMLResponse(page_shell(body_html, title="Application Variables", user_email=user_email))
+    resp = HTMLResponse(page_shell(body_html, title="Application Variables", user_email=user_email))
+    try:
+        resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax")
+    except Exception:
+        pass
+    return resp
 
 
 @router.post("/preferences/application", response_class=HTMLResponse)
-async def application_vars_save(
-    request: Request,
-    legal_name: str = Form(""),
-    dba: str = Form(""),
-    ein: str = Form(""),
-    uei: str = Form(""),
-    contact_name: str = Form(""),
-    contact_title: str = Form(""),
-    contact_email: str = Form(""),
-    contact_phone: str = Form(""),
-    website: str = Form(""),
-    years_in_business: str = Form(""),
-    business_type: str = Form(""),
-    state_incorp: str = Form(""),
-    address: str = Form(""),
-    mailing_address: str = Form(""),
-    certifications: str = Form(""),
-    codes: str = Form(""),
-    insurance: str = Form(""),
-    bonding: str = Form(""),
-    signatory: str = Form(""),
-    bank_ref: str = Form(""),
-    notes: str = Form(""),
-):
+async def application_vars_save(request: Request):
     user_email = get_current_user_email(request)
     if not user_email:
         body = """
@@ -292,46 +296,180 @@ async def application_vars_save(
         """
         return HTMLResponse(page_shell(body, title="Application Variables", user_email=None), status_code=403)
 
+    # Prefer raw body parse to avoid any body-consumption by middleware
+    ctype = request.headers.get('content-type', '')
+    raw = await request.body()
+    parsed = {}
+    try:
+        if 'application/x-www-form-urlencoded' in ctype and raw:
+            parsed = {k: v for k, v in parse_qs(raw.decode(errors='ignore')).items()}
+    except Exception:
+        parsed = {}
+    if not parsed:
+        try:
+            _form = await request.form()
+            parsed = {k: [_form.get(k)] for k in _form.keys()}
+        except Exception:
+            parsed = {}
+    # No debug prints in production
+    def g(name: str) -> str:
+        try:
+            val = parsed.get(name)
+            if isinstance(val, list):
+                return (val[0] or "").strip()
+            return (val or "").strip()
+        except Exception:
+            return ""
     payload = {
-        "legal_name": (legal_name or "").strip(),
-        "dba": (dba or "").strip(),
-        "ein": (ein or "").strip(),
-        "uei": (uei or "").strip(),
-        "contact_name": (contact_name or "").strip(),
-        "contact_title": (contact_title or "").strip(),
-        "contact_email": (contact_email or "").strip(),
-        "contact_phone": (contact_phone or "").strip(),
-        "website": (website or "").strip(),
-        "years_in_business": (years_in_business or "").strip(),
-        "business_type": (business_type or "").strip(),
-        "state_incorp": (state_incorp or "").strip(),
-        "address": (address or "").strip(),
-        "mailing_address": (mailing_address or "").strip(),
-        "certifications": (certifications or "").strip(),
-        "codes": (codes or "").strip(),
-        "insurance": (insurance or "").strip(),
-        "bonding": (bonding or "").strip(),
-        "signatory": (signatory or "").strip(),
-        "bank_ref": (bank_ref or "").strip(),
-        "notes": (notes or "").strip(),
+        "legal_name": g("legal_name"),
+        "dba": g("dba"),
+        "ein": g("ein"),
+        "uei": g("uei"),
+        "contact_name": g("contact_name"),
+        "contact_title": g("contact_title"),
+        "contact_email": g("contact_email"),
+        "contact_phone": g("contact_phone"),
+        "website": g("website"),
+        "years_in_business": g("years_in_business"),
+        "business_type": g("business_type"),
+        "state_incorp": g("state_incorp"),
+        "address": g("address"),
+        "mailing_address": g("mailing_address"),
+        "certifications": g("certifications"),
+        "codes": g("codes"),
+        "insurance": g("insurance"),
+        "bonding": g("bonding"),
+        "signatory": g("signatory"),
+        "bank_ref": g("bank_ref"),
+        "notes": g("notes"),
     }
 
     async with AsyncSessionLocal() as session:
-        await session.execute(
+        # Load current to avoid overwriting with blanks
+        current = {}
+        cur_res = await session.execute(
+            text("SELECT data FROM user_application_vars WHERE user_email = :email LIMIT 1"),
+            {"email": user_email},
+        )
+        cur_row = cur_res.fetchone()
+        if cur_row and cur_row[0] is not None:
+            try:
+                val = cur_row[0]
+                if isinstance(val, dict):
+                    current = val
+                elif isinstance(val, (str, bytes)):
+                    s = val.decode() if isinstance(val, bytes) else val
+                    current = json.loads(s) if s else {}
+            except Exception:
+                current = {}
+
+        # Merge: keep prior non-empty values when new are blank
+        merged = {}
+        for k in payload.keys():
+            nv = (payload.get(k) or "").strip()
+            pv = (current.get(k) if isinstance(current, dict) else None) or ""
+            merged[k] = nv if nv else pv
+
+        # Basic validation
+        errors: list[str] = []
+        # Require legal name and contact email after merge
+        if not (merged.get("legal_name") or "").strip():
+            errors.append("Legal entity name is required.")
+        email_val = (merged.get("contact_email") or "").strip()
+        if not email_val:
+            errors.append("Contact email is required.")
+        elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email_val):
+            errors.append("Contact email looks invalid.")
+        # Optional numeric: years_in_business
+        y = (merged.get("years_in_business") or "").strip()
+        if y:
+            if not y.isdigit():
+                errors.append("Years in business must be a whole number.")
+            else:
+                yi = int(y)
+                if yi < 0 or yi > 200:
+                    errors.append("Years in business must be between 0 and 200.")
+        # Optional EIN pattern
+        einv = (merged.get("ein") or "").strip()
+        if einv and not re.match(r"^\d{2}-?\d{7}$", einv):
+            errors.append("EIN should look like 12-3456789.")
+        # Optional website heuristic
+        web = (merged.get("website") or "").strip()
+        if web and not (web.startswith("http://") or web.startswith("https://") or "." in web):
+            errors.append("Website should be a full URL (https://...) or a domain.")
+
+        if errors:
+            # Render form with posted values and an error banner
+            def vv(key, default=""):
+                try:
+                    v = (payload.get(key) or "").strip()
+                    return v if v != "" else (current.get(key) if isinstance(current, dict) else default) or default
+                except Exception:
+                    return default
+            csrf_cookie = request.cookies.get("csrftoken") or secrets.token_urlsafe(32)
+            alert = "<div style='background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;padding:10px 12px;border-radius:8px;margin-bottom:12px;'><b>Please fix and resubmit:</b><ul style='margin:6px 0 0 18px;'>" + "".join(f"<li>{e}</li>" for e in errors) + "</ul></div>"
+            body_html = f"""
+    <section class=\"card\">\n      <h2 class=\"section-heading\">Application Variables</h2>\n      <p class=\"subtext\">These details are commonly requested across applications. Keep them up to date.</p>\n      {alert}\n      <form method=\"POST\" action=\"/preferences/application\">\n        <input type=\"hidden\" id=\"csrf_token\" name=\"csrf_token\" value=\\"{csrf_cookie}\\">\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Legal Entity Name</label>\n            <input type=\"text\" name=\"legal_name\" value=\"{vv('legal_name')}\" placeholder=\"Acme, LLC\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">DBA</label>\n            <input type=\"text\" name=\"dba\" value=\"{vv('dba')}\" placeholder=\"Acme Services\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">EIN / Tax ID</label>\n            <input type=\"text\" name=\"ein\" value=\"{vv('ein')}\" placeholder=\"12-3456789\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">UEI / CAGE (optional)</label>\n            <input type=\"text\" name=\"uei\" value=\"{vv('uei')}\" placeholder=\"UEI or CAGE Code\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Primary Contact Name</label>\n            <input type=\"text\" name=\"contact_name\" value=\"{vv('contact_name')}\" placeholder=\"Jane Smith\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Title</label>\n            <input type=\"text\" name=\"contact_title\" value=\"{vv('contact_title')}\" placeholder=\"Director\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Email</label>\n            <input type=\"email\" name=\"contact_email\" value=\"{vv('contact_email')}\" placeholder=\"you@company.com\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Phone</label>\n            <input type=\"text\" name=\"contact_phone\" value=\"{vv('contact_phone')}\" placeholder=\"(555) 555-5555\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Website</label>\n            <input type=\"text\" name=\"website\" value=\"{vv('website')}\" placeholder=\"https://example.com\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Years in Business</label>\n            <input type=\"number\" name=\"years_in_business\" value=\"{vv('years_in_business')}\" placeholder=\"10\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Business Type</label>\n            <input type=\"text\" name=\"business_type\" value=\"{vv('business_type')}\" placeholder=\"LLC / S-Corp / Sole Prop\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">State of Incorporation</label>\n            <input type=\"text\" name=\"state_incorp\" value=\"{vv('state_incorp')}\" placeholder=\"Ohio\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Physical Address</label>\n            <input type=\"text\" name=\"address\" value=\"{vv('address')}\" placeholder=\"123 Main St, City, ST 00000\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Mailing Address</label>\n            <input type=\"text\" name=\"mailing_address\" value=\"{vv('mailing_address')}\" placeholder=\"PO Box...\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Certifications</label>\n            <input type=\"text\" name=\"certifications\" value=\"{vv('certifications')}\" placeholder=\"MBE, WBE, DBE, EDGE\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">NAICS / NIGP Codes</label>\n            <input type=\"text\" name=\"codes\" value=\"{vv('codes')}\" placeholder=\"541611; 918-75\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Insurance Coverage Summary</label>\n            <input type=\"text\" name=\"insurance\" value=\"{vv('insurance')}\" placeholder=\"GL $1M, Auto $1M, WC Statutory\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Bonding Capacity</label>\n            <input type=\"text\" name=\"bonding\" value=\"{vv('bonding')}\" placeholder=\"$500k single / $1M aggregate\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Authorized Signatory</label>\n            <input type=\"text\" name=\"signatory\" value=\"{vv('signatory')}\" placeholder=\"Name, Title\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Bank Reference (optional)</label>\n            <input type=\"text\" name=\"bank_ref\" value=\"{vv('bank_ref')}\" placeholder=\"Bank, Contact, Phone\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Notes</label>\n            <input type=\"text\" name=\"notes\" value=\"{vv('notes')}\" placeholder=\"Any special instructions or ids\" />\n          </div>\n        </div>\n\n        <div class=\"form-actions\">\n          <button class=\"button-primary\" type=\"submit\">Save</button>\n          <span class=\"muted small\" style=\"margin-left:12px;\">Last saved: -</span>\n        </div>\n      </form>\n    </section>\n            """
+            resp = HTMLResponse(page_shell(body_html, title="Application Variables", user_email=user_email))
+            try:
+                resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax")
+            except Exception:
+                pass
+            return resp
+
+        params = {"email": user_email, "data": json.dumps(merged)}
+        # No debug prints in production
+        # Robust upsert compatible with SQLite: UPDATE first, then INSERT if needed
+        upd = await session.execute(
             text(
                 """
-                INSERT INTO user_application_vars (user_email, data)
-                VALUES (:email, :data)
-                ON CONFLICT(user_email) DO UPDATE SET
-                  data = excluded.data,
-                  updated_at = CURRENT_TIMESTAMP
+                UPDATE user_application_vars
+                SET data = :data, updated_at = CURRENT_TIMESTAMP
+                WHERE user_email = :email
                 """
             ),
-            {"email": user_email, "data": json.dumps(payload)},
+            params,
         )
+        if getattr(upd, "rowcount", 0) == 0:
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO user_application_vars (user_email, data)
+                    VALUES (:email, :data)
+                    """
+                ),
+                params,
+            )
         await session.commit()
 
-    body = """
-    <section class=\"card\">\n  <h2 class=\"section-heading\">Saved</h2>\n  <p class=\"subtext\">Your application variables have been saved.</p>\n  <a class=\"button-primary\" href=\"/preferences/application\">Go back</a>\n</section>
-    """
-    return HTMLResponse(page_shell(body, title="Application Variables", user_email=user_email))
+    # Redirect back to the form so the user sees their saved values and updated timestamp
+    return RedirectResponse(url="/preferences/application", status_code=303)
+
+
+# Lightweight API endpoint for AI/autofill integrations
+@router.get("/api/me/application_vars")
+async def get_my_application_vars(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        return {"ok": False, "error": "not_authenticated"}
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(
+            text("SELECT data FROM user_application_vars WHERE user_email = :email LIMIT 1"),
+            {"email": user_email},
+        )
+        row = res.fetchone()
+        out = {}
+        if row and row[0] is not None:
+            try:
+                out = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            except Exception:
+                out = {}
+    return {"ok": True, "data": out}
+
+
+
+
+
+
+
+
