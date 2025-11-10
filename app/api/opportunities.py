@@ -559,13 +559,17 @@ async def opportunities(request: Request):
 
 <script>
 async function api(path, init = {}) {
-  const res = await fetch(path, { credentials: 'include', ...init });
+  const token = (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1] || "";
+  const method = (init.method||"GET").toUpperCase();
+  const headers = Object.assign({}, init.headers||{});
+  if (method !== "GET") { headers["X-CSRF-Token"] = token; }
+  const res = await fetch(path, { credentials: "include", ...init, headers });
   if (res.status === 401) {
     const next = location.pathname + location.search;
-    const oppId = document.getElementById('opp-id')?.value || '';
-    const hash = oppId ? ('#openTracker:' + oppId) : '';
-    window.location.href = '/login?next=' + encodeURIComponent(next + hash);
-    throw new Error('Auth required');
+    const oppId = document.getElementById("opp-id")?.value || "";
+    const hash = oppId ? ("#openTracker:" + oppId) : "";
+    window.location.href = "/login?next=" + encodeURIComponent(next + hash);
+    throw new Error("Auth required");
   }
   return res;
 }

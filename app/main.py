@@ -2,9 +2,11 @@
 import sys
 import asyncio
 import json
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse, PlainTextResponse, HTMLResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+import secrets
 from app.core.settings import settings
 import os
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -50,7 +52,7 @@ app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 from app.core.db import engine, AsyncSessionLocal
 from app.domain.models import Base
 from app.core.models_core import metadata as core_metadata
-from app.auth import create_admin_if_missing
+from app.auth import create_admin_if_missing, require_admin
 from app.core.scheduler import start_scheduler
 from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
 from app.auth.auth_utils import require_login
@@ -81,6 +83,34 @@ async def log_every_request(request: Request, call_next):
     except Exception:
         pass
     return response
+
+# -------------------------------------------------------------------
+# CSRF protection (SameSite Lax + header check for unsafe methods)
+# -------------------------------------------------------------------
+CSRF_COOKIE = "csrf_token"
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        token = request.cookies.get(CSRF_COOKIE)
+        # For unsafe methods from browsers, require header to match cookie token
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            # Allow login/signup without header (relies on SameSite=Lax)
+            if request.url.path in {"/login", "/signup"}:
+                return await call_next(request)
+            hdr = request.headers.get("x-csrf-token") or request.headers.get("X-CSRF-Token")
+            if not token or not hdr or hdr != token:
+                return PlainTextResponse("Forbidden (CSRF)", status_code=403)
+        response = await call_next(request)
+        # Ensure a CSRF cookie exists for subsequent requests
+        try:
+            if not token:
+                token = secrets.token_urlsafe(32)
+                response.set_cookie(CSRF_COOKIE, token, httponly=False, samesite="lax")
+        except Exception:
+            pass
+        return response
+
+app.add_middleware(CSRFMiddleware)
 
 # -------------------------------------------------------------------
 # Routers
@@ -278,7 +308,7 @@ async def handle_http_exceptions(request: Request, exc: HTTPException):
 # /whoami + /debug/session
 # -------------------------------------------------------------------
 @app.get("/whoami", response_class=PlainTextResponse)
-def whoami(request: Request):
+def whoami(request: Request, admin: bool = Depends(require_admin)):
     raw = request.cookies.get(SESSION_COOKIE_NAME)
     email = get_current_user_email(request)
     snippet = (raw[:32] + "...") if raw else "None"
@@ -290,7 +320,7 @@ def whoami(request: Request):
     )
 
 @app.get("/debug/session")
-async def debug_session(request: Request):
+async def debug_session(request: Request, admin: bool = Depends(require_admin)):
     raw = request.cookies.get(SESSION_COOKIE_NAME)
     email = get_current_user_email(request)
     auth_result = await require_login(request)
@@ -302,5 +332,6 @@ async def debug_session(request: Request):
         "type": type(auth_result).__name__,
         "is_redirect": isinstance(auth_result, RedirectResponse)
     }
+
 
 

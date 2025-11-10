@@ -139,7 +139,7 @@ async def tracker_dashboard(request: Request):
       <h3 style="margin:0; font-size:16px;">Upload Files</h3>
       <div id="upload-agency" class="muted" style="font-size:12px;"></div>
     </div>
-    <button class="icon-btn" onclick="(function(){document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-drawer').setAttribute('aria-hidden','true'); document.getElementById('upload-drawer').style.right='-520px';})();">×</button>
+    <button class="icon-btn" onclick="(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1]||"";document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-drawer').setAttribute('aria-hidden','true'); document.getElementById('upload-drawer').style.right='-520px';})();">×</button>
   </header>
   <div style="padding:14px; display:grid; gap:10px; overflow:auto;">
     <div>
@@ -175,7 +175,7 @@ async def tracker_dashboard(request: Request):
 </aside>
 
 <script>
-(function(){
+(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1]||"";
   var overlay = document.getElementById('upload-overlay');
   var drawer  = document.getElementById('upload-drawer');
   var dz = document.getElementById('dz-d');
@@ -229,11 +229,11 @@ async def tracker_dashboard(request: Request):
   function renderQueue(){ queueList.innerHTML=''; if(!queued.length){ queueCount.textContent='0'; uploadBtn.disabled=true; return; } queueCount.textContent=String(queued.length); uploadBtn.disabled=false; for(var i=0;i<queued.length;i++){ var li=document.createElement('li'); li.style.display='flex'; li.style.justifyContent='space-between'; li.style.alignItems='center'; li.style.gap='8px'; li.style.padding='4px 0'; var left=document.createElement('span'); left.textContent=queued[i].name; var right=document.createElement('span'); right.className='muted'; right.textContent=Math.round((queued[i].size||0)/1024)+' KB'; var btn=document.createElement('button'); btn.type='button'; btn.setAttribute('data-remove-idx', String(i)); btn.textContent='×'; btn.className='icon-btn'; btn.title='Remove'; var wrap=document.createElement('span'); wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.gap='6px'; wrap.appendChild(right); wrap.appendChild(btn); li.appendChild(left); li.appendChild(wrap); queueList.appendChild(li);} }
   clearBtn.addEventListener('click', function(){ queued=[]; picker.value=''; renderQueue(); });
   queueList.addEventListener('click', function(e){ var b=e.target.closest('[data-remove-idx]'); if(!b) return; var idx=parseInt(b.getAttribute('data-remove-idx')); if(!isNaN(idx)){ queued.splice(idx,1); renderQueue(); } });
-  uploadBtn.addEventListener('click', async function(){ var oid=targetSel.value; if(!oid||!queued.length){ return; } var fd=new FormData(); fd.append('opportunity_id', oid); for(var i=0;i<queued.length;i++) fd.append('files', queued[i], queued[i].name); var res=await fetch('/uploads/add',{method:'POST', body:fd, credentials:'include'}); if(res.ok){ queued=[]; picker.value=''; renderQueue(); await loadFiles(); }});
+  uploadBtn.addEventListener('click', async function(){ var oid=targetSel.value; if(!oid||!queued.length){ return; } var fd=new FormData(); fd.append('opportunity_id', oid); for(var i=0;i<queued.length;i++) fd.append('files', queued[i], queued[i].name); var res=await fetch('/uploads/add',{method:'POST', body:fd, credentials:'include', headers:{'X-CSRF-Token': CSRF}}); if(res.ok){ queued=[]; picker.value=''; renderQueue(); await loadFiles(); }});
   targetSel.addEventListener('change', loadFiles);
-  fileList.addEventListener('click', async function(e){ var b=e.target.closest('[data-action]'); if(!b) return; var id=b.getAttribute('data-id'); if(!id) return; if(b.getAttribute('data-action')==='delete'){ try{ await fetch('/uploads/'+id, { method:'DELETE', credentials:'include' }); }catch(_){} await loadFiles(); return; } if(b.getAttribute('data-action')==='rename'){ var current=(b.closest('li').querySelector('span')||{}).textContent||''; var nn=prompt('Rename file', current); if(nn && nn.trim()){ try{ await fetch('/uploads/'+id, { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ filename: nn.trim() }) }); }catch(_){} await loadFiles(); } return; } });
+  fileList.addEventListener('click', async function(e){ var b=e.target.closest('[data-action]'); if(!b) return; var id=b.getAttribute('data-id'); if(!id) return; if(b.getAttribute('data-action')==='delete'){ try{ await fetch('/uploads/'+id, { method:'DELETE', credentials:'include', headers:{'X-CSRF-Token': CSRF} }); }catch(_){} await loadFiles(); return; } if(b.getAttribute('data-action')==='rename'){ var current=(b.closest('li').querySelector('span')||{}).textContent||''; var nn=prompt('Rename file', current); if(nn && nn.trim()){ try{ await fetch('/uploads/'+id, { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ filename: nn.trim() }) }); }catch(_){} await loadFiles(); } return; } });
 
-  window.openUploadDrawer = async function(obj){ var oid=(obj && obj.opportunity_id) ? obj.opportunity_id : obj; try{ await fetch('/tracker/'+oid+'/track',{method:'POST', credentials:'include'});}catch(_){} targetSel.value=String(oid||''); var agencyEl=document.getElementById('upload-agency'); if(agencyEl && obj && obj.agency_name) agencyEl.textContent=obj.agency_name; open(); loadFiles(); };
+  window.openUploadDrawer = async function(obj){ var oid=(obj && obj.opportunity_id) ? obj.opportunity_id : obj; try{ await fetch('/tracker/'+oid+'/track',{method:'POST', credentials:'include', headers:{'X-CSRF-Token': CSRF}});}catch(_){} targetSel.value=String(oid||''); var agencyEl=document.getElementById('upload-agency'); if(agencyEl && obj && obj.agency_name) agencyEl.textContent=obj.agency_name; open(); loadFiles(); };
 
   // Do not auto-open the upload drawer on page load.
 })();
@@ -242,7 +242,7 @@ async def tracker_dashboard(request: Request):
 <script src="/static/tracker_dashboard.js?v=10"></script>
 <script>
 // Inline: live search + summary layered on top of card rendering
-(function(){
+(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1]||"";
   var input = document.getElementById('search-filter');
   var summary = document.getElementById('summary-count');
   var resetBtn = document.getElementById('reset-filters');
@@ -272,6 +272,7 @@ async def tracker_dashboard(request: Request):
         .replace("__ITEMS_JSON_ESC__", items_json_escaped)
     )
     return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=user_email))
+
 
 
 

@@ -1,4 +1,6 @@
 ﻿(function () {
+  function getCSRF(){ try { return (document.cookie.match(/(?:^|; )csrf_token=([^;]+)/)||[])[1] || null; } catch(_) { return null; } }
+
   const grid = document.getElementById("tracked-grid");
   let items = JSON.parse(grid.getAttribute("data-items") || "[]");
 
@@ -15,7 +17,7 @@
       fetch('/dashboard/order', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': (getCSRF()||'') },
         body: JSON.stringify({ order: list||[] })
       }).catch(()=>{});
     } catch(_) {}
@@ -111,7 +113,7 @@
   function updateStatus(it, newStatus){
     fetch(`/tracker/${it.opportunity_id}`, {
       method:"PATCH",
-      headers:{ "Content-Type":"application/json" },
+      headers:{ "Content-Type":"application/json", "X-CSRF-Token": (getCSRF()||"") },
       body: JSON.stringify({ status:newStatus })
     }).then(()=>render());
   }
@@ -130,7 +132,7 @@
         render();
       }
     };
-    fetch(`/tracker/${it.opportunity_id}`, { method: "DELETE" })
+    fetch(`/tracker/${it.opportunity_id}`, { method: "DELETE", headers: { "X-CSRF-Token": (getCSRF()||"") } })
       .catch(()=>{})
       .finally(()=>{
         if (el) {
@@ -467,6 +469,10 @@
     }
   };
 })();
+
+
+
+
 
 
 

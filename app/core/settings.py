@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Bootstrap admin
     # ------------------------------------------------------------------
-    ADMIN_EMAIL: str = "admin@example.com"
-    ADMIN_PASSWORD: str = "changeme"
+    ADMIN_EMAIL: Optional[str] = None
+    ADMIN_PASSWORD: Optional[str] = None
 
     # ------------------------------------------------------------------
     # AI / LLM configuration
