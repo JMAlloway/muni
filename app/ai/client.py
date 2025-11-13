@@ -2,6 +2,8 @@
 import os
 import requests
 
+from app.core.settings import settings
+
 
 class OllamaGenerateClient:
     """
@@ -48,13 +50,19 @@ class OllamaGenerateClient:
 
 def get_llm_client():
     """
-    Build an Ollama client for the running local server we just confirmed.
+    Build an Ollama or OpenAI client, unless AI is disabled via settings.
     """
+    # 🔥 Global AI toggle: if disabled, return None so all callers fall back
+    if not getattr(settings, "AI_ENABLED", True):
+        print("[AI client] AI disabled via settings.AI_ENABLED")
+        return None
+
     provider = os.getenv("AI_PROVIDER", "").lower().strip()
 
     # if someone explicitly wants OpenAI, honor it
     if provider == "openai":
         from openai import OpenAI
+
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             print("[AI client] OPENAI selected but no key -> rule-based")
@@ -62,7 +70,7 @@ def get_llm_client():
         print("[AI client] Using OpenAI")
         return OpenAI(api_key=api_key)
 
-    # otherwise: we KNOW ollama is here
+    # otherwise: default to local Ollama
     base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     model = os.getenv("OLLAMA_MODEL", "gemma3:4b")  # we saw this in /api/tags
 

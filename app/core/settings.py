@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # AI / LLM configuration
     # ------------------------------------------------------------------
+    AI_ENABLED: bool = True
     ai_provider: Optional[str] = None          # e.g. "ollama" or "openai"
     ollama_model: str = "llama3"               # default local model name
     ollama_base_url: str = "http://localhost:11434"

@@ -1,0 +1,19 @@
+# Add this to _get_known_character_signatures():
+sigs["?"] = _bitmap_signature([
+    "*******",
+    "*      ",
+    "****** ",
+    "      *",
+    "      *",
+    "*     *",
+    " ***** ",
+])
+
+# Raw bitmap:
+*******
+*      
+****** 
+      *
+      *
+*     *
+ ***** 

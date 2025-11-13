@@ -152,11 +152,19 @@ async def opportunities(request: Request):
         rows = result.fetchall()
 
     # -------- stats card --------
+    agencies = []
+
     async with engine.begin() as conn:
         stats_result = await conn.execute(
             text(f"""
                 SELECT
-                    SUM(CASE WHEN (status IS NULL OR status = 'open') THEN 1 ELSE 0 END) AS open_count,
+                    SUM(
+                        CASE
+                            WHEN status IS NULL THEN 1
+                            WHEN LOWER(status) IN ('open', 'open for bidding') THEN 1
+                            ELSE 0
+                        END
+                    ) AS open_count,
                     COUNT(DISTINCT agency_name) AS agency_count,
                     MIN(due_date) AS next_due
                 FROM opportunities
@@ -165,6 +173,22 @@ async def opportunities(request: Request):
             sql_params,
         )
         stats_row = stats_result.first()
+
+        agencies_result = await conn.execute(
+            text(
+                """
+                SELECT DISTINCT agency_name
+                FROM opportunities
+                WHERE agency_name IS NOT NULL
+                  AND TRIM(agency_name) <> ''
+                ORDER BY agency_name
+                """
+            )
+        )
+        agencies = [row[0] for row in agencies_result.fetchall() if row[0]]
+
+    if not agencies:
+        agencies = AGENCIES
 
     open_count = stats_row[0] if stats_row else 0
     agency_count = stats_row[1] if stats_row else 0
@@ -188,7 +212,7 @@ async def opportunities(request: Request):
   </div>
   <div class="item">
     <div class="value">{agency_count}</div>
-    <div class="label">Municipalities</div>
+    <div class="label">Agencies</div>
   </div>
   <div class="item">
     <div class="value">{next_due_str}</div>
@@ -352,14 +376,13 @@ async def opportunities(request: Request):
 
 
     # -------- filter form HTML --------
-    agencies = AGENCIES
-
     agency_options_html = [
         f"<option value='' {'selected' if not agency_filter else ''}>All agencies</option>"
     ]
     for ag in agencies:
         sel = "selected" if ag == agency_filter else ""
-        agency_options_html.append(f"<option value='{ag}' {sel}>{ag}</option>")
+        safe_ag = _esc_attr(ag)
+        agency_options_html.append(f"<option value='{safe_ag}' {sel}>{safe_ag}</option>")
 
     due_options_display = [
         ("", "Any due date"),
@@ -398,10 +421,7 @@ async def opportunities(request: Request):
         <div class=\"form-col\">
         <label class=\"label-small\">Agency</label>
         <select name=\"agency\">
-            {''.join(
-                [f"<option value='' {'selected' if not agency_filter else ''}>All agencies</option>"] +
-                [f"<option value='{ag}' {'selected' if ag == agency_filter else ''}>{ag}</option>" for ag in AGENCIES]
-            )}
+            {''.join(agency_options_html)}
         </select>
         </div>
 
