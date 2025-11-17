@@ -126,7 +126,7 @@ async def tracker_dashboard(request: Request):
   <div id="guide-content" class="guide-content">Loading…</div>
 </aside>
 
-<link rel="stylesheet" href="/static/dashboard.css?v=3">
+<link rel="stylesheet" href="/static/dashboard.css?v=5">
 <link rel="stylesheet" href="/static/bid_tracker.css">
 
 
@@ -139,7 +139,7 @@ async def tracker_dashboard(request: Request):
       <h3 style="margin:0; font-size:16px;">Upload Files</h3>
       <div id="upload-agency" class="muted" style="font-size:12px;"></div>
     </div>
-    <button class="icon-btn" onclick="(function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-drawer').setAttribute('aria-hidden','true'); document.getElementById('upload-drawer').style.right='-520px';})();">×</button>
+    <button class="icon-btn" id="close-upload-d" type="button">×</button>
   </header>
   <div style="padding:14px; display:grid; gap:10px; overflow:auto;">
     <div>
@@ -178,6 +178,7 @@ async def tracker_dashboard(request: Request):
 (function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
   var overlay = document.getElementById('upload-overlay');
   var drawer  = document.getElementById('upload-drawer');
+  var closeBtn = document.getElementById('close-upload-d');
   var dz = document.getElementById('dz-d');
   var pickBtn = document.getElementById('pick-d');
   var picker = document.getElementById('picker-d');
@@ -194,6 +195,7 @@ async def tracker_dashboard(request: Request):
   function open(){ overlay.style.display='block'; drawer.setAttribute('aria-hidden','false'); drawer.style.right='0'; }
   function close(){ overlay.style.display='none'; drawer.setAttribute('aria-hidden','true'); drawer.style.right='-520px'; queued=[]; renderQueue(); }
   overlay.addEventListener('click', close);
+  if (closeBtn) closeBtn.addEventListener('click', close);
 
   function renderList(items){
     if(!items||!items.length){ fileList.innerHTML = "<li class='muted'>No files yet.</li>"; zipBtn.disabled=true; return; }
@@ -239,7 +241,7 @@ async def tracker_dashboard(request: Request):
 })();
 </script>
 <script src="/static/vendor.js?v=4"></script>
-<script src="/static/tracker_dashboard.js?v=10"></script>
+<script src="/static/tracker_dashboard.js?v=14"></script>
 <script>
 // Inline: live search + summary layered on top of card rendering
 (function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
@@ -256,7 +258,9 @@ async def tracker_dashboard(request: Request):
       card.style.display = ok ? '' : 'none';
       if (ok) shown++;
     }
-    if (summary){ summary.textContent = shown + '/' + cards.length + ' shown'; }
+    if (window.updateDashboardSummary) {
+      window.updateDashboardSummary();
+    } else if (summary){ summary.textContent = shown + '/' + cards.length + ' shown'; }
   }
   if (input){ input.addEventListener('input', update); }
   if (resetBtn){ resetBtn.addEventListener('click', function(){ if (input) input.value=''; update(); }); }
@@ -271,7 +275,7 @@ async def tracker_dashboard(request: Request):
         .replace("__ITEM_OPTIONS__", options_html)
         .replace("__ITEMS_JSON_ESC__", items_json_escaped)
     )
-    return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=user_email))
+    return HTMLResponse(page_shell(body, title="Muni Alerts My Bids", user_email=user_email))
 
 
 

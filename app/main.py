@@ -60,7 +60,7 @@ from app.core.scheduler import start_scheduler
 from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
 from app.auth.auth_utils import require_login
 from app.api._layout import page_shell
-from app.core.db_migrations import ensure_uploads_schema
+from app.core.db_migrations import ensure_onboarding_schema, ensure_uploads_schema
 from app.api import dashboard_order as dashboard_order
 
 # -------------------------------------------------------------------
@@ -284,7 +284,7 @@ async def dashboard_override(request: Request):
           <a class="button-primary" href="/login?next=/tracker/dashboard">Sign in â†’</a>
         </section>
         """
-        return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=None), status_code=200)
+        return HTMLResponse(page_shell(body, title="Muni Alerts My Bids", user_email=None), status_code=200)
 
     # --- logged in ---
     sql = text("""
@@ -345,8 +345,8 @@ async def dashboard_override(request: Request):
           <select id="sort-by">
             <option value="soonest">Soonest due</option>
             <option value="latest">Latest due</option>
-            <option value="agency">Agency Aâ€“Z</option>
-            <option value="title">Title Aâ€“Z</option>
+            <option value="agency">Agency</option>
+            <option value="title">Title</option>
           </select>
         </div>
       </div>
@@ -372,7 +372,7 @@ async def dashboard_override(request: Request):
     <script src="/static/bid_tracker.js?v=4"></script>
     <script src="/static/tracker_dashboard.js?v=6"></script>
     """
-    return HTMLResponse(page_shell(body, title="Muni Alerts â€“ My Bids", user_email=user_email), status_code=200)
+    return HTMLResponse(page_shell(body, title="Muni Alerts My Bids", user_email=user_email), status_code=200)
 
 # -------------------------------------------------------------------
 # Routers (existing)
@@ -393,6 +393,7 @@ from app.api import (
     tracker_dashboard,
     debug_cookies,
     dev_auth,
+    welcome,
 )
 from app.api.bid_tracker import router as tracker_router
 from app.api.uploads import router as uploads_router
@@ -402,6 +403,7 @@ app.include_router(marketing.router)
 app.include_router(opportunities.router)
 app.include_router(preferences.router)
 app.include_router(onboarding.router)
+app.include_router(welcome.router)
 app.include_router(auth_web.router)
 app.include_router(tracker_router)
 app.include_router(tracker_dashboard.router)
@@ -432,6 +434,7 @@ async def on_startup():
             await create_admin_if_missing(db)
         # Lightweight, idempotent schema fixes for local SQLite
         await ensure_uploads_schema(engine)
+        await ensure_onboarding_schema(engine)
     # Start scheduler in web only if explicitly enabled
     if settings.START_SCHEDULER_WEB:
         start_scheduler()

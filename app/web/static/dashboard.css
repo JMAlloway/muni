@@ -43,9 +43,10 @@
 .progress > div { height:100%; width:0%; transition:width .25s ease; }
 
 .actions { display:flex; gap:8px; flex-wrap:wrap; }
-.actions .btn, .actions .btn-secondary { padding:8px 10px; border-radius:10px; cursor:pointer; border:0; }
+.actions .btn, .actions .btn-secondary { padding:8px 10px; border-radius:10px; cursor:pointer; border:0; font-size:14px; font-weight:500; line-height:1.2; }
 .actions .btn { background:#2563eb; color:#fff; }
 .actions .btn-secondary { background:#f1f5f9; color:#0f172a; }
+.actions a.btn-secondary { text-decoration:none; display:inline-block; font: inherit; line-height:1.2; }
 
 /* Due soon badge */
 .badge-soon {

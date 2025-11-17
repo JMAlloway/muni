@@ -98,7 +98,7 @@ async def opportunities(request: Request):
 
     # optional status-only filter
     if status_filter == "open":
-        where_clauses.append("(status IS NULL OR status = 'open')")
+        where_clauses.append("(status IS NULL OR TRIM(LOWER(status)) LIKE 'open%')")
 
     where_sql = " AND ".join(where_clauses)
 
@@ -158,13 +158,7 @@ async def opportunities(request: Request):
         stats_result = await conn.execute(
             text(f"""
                 SELECT
-                    SUM(
-                        CASE
-                            WHEN status IS NULL THEN 1
-                            WHEN LOWER(status) IN ('open', 'open for bidding') THEN 1
-                            ELSE 0
-                        END
-                    ) AS open_count,
+                    COUNT(*) AS result_count,
                     COUNT(DISTINCT agency_name) AS agency_count,
                     MIN(due_date) AS next_due
                 FROM opportunities
@@ -241,6 +235,12 @@ async def opportunities(request: Request):
             .replace('"', "&quot;")
             .replace("'", "&#39;")
         )
+
+    def _norm_status(val: str) -> str:
+        txt = (val or "").strip()
+        if "open for bidding" in txt.lower():
+            return "Open"
+        return txt or "Open"
 
     # -------- build HTML table rows --------
     table_rows_html = []
@@ -363,10 +363,8 @@ async def opportunities(request: Request):
             f"<td class='w-160 muted'>{_esc_attr(agency or '')}</td>"
             f"<td class='w-140 muted'>{date_added_str}</td>"
             f"<td class='w-140'><span class='due-badge {due_class}'>{due_str}</span></td>"
-            f"<td class='w-140 muted'>{_esc_attr(category or '')}</td>"
-            f"<td><span class='pill'>{_esc_attr(status or 'open')}</span></td>"
+            f"<td><span class='pill'>{_esc_attr(_norm_status(status))}</span></td>"
             f"<td class='w-120'>{link_html}</td>"
-            f"<td class='w-120'>{vendor_html}</td>"
             f"<td class='w-140'>{track_btn_html}</td>"
             "</tr>"
         )
@@ -416,48 +414,73 @@ async def opportunities(request: Request):
     chips_html = ""
 
     body_filter_html = f"""
-    <form method=\"GET\" action=\"/opportunities\" style=\"margin-bottom:16px;\">
-    <div class=\"form-row\">
-        <div class=\"form-col\">
-        <label class=\"label-small\">Agency</label>
-        <select name=\"agency\">
-            {''.join(agency_options_html)}
-        </select>
+    <section class="card" style="margin-bottom:12px;">
+      <style>
+        .filter-grid input[type="text"],
+        .filter-grid select {{
+          padding:10px 12px;
+          border:1px solid #e5e7eb;
+          border-radius:10px;
+          font-size:14px;
+          height:40px;
+        }}
+        .filter-grid label.label-small {{ margin-bottom:4px; }}
+        .filter-grid .checkbox-row {{
+          display:flex; align-items:center; gap:8px; font-size:14px; padding:10px 0;
+        }}
+        .filter-grid .checkbox-row input {{ width:16px; height:16px; accent-color: var(--accent-bg); }}
+        .filter-grid .actions {{ display:flex; gap:10px; align-items:center; }}
+        .filter-grid .actions .button-primary {{ padding:10px 16px; border-radius:10px; }}
+      </style>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
+        <div>
+          <h3 class="section-heading" style="font-size:18px;margin:0;">Filter</h3>
+          <div class="subtext" style="margin:4px 0 0 0;">Narrow the feed by agency, keyword, due date, and status.</div>
         </div>
+        <a href="/opportunities?agency=" style="font-size:12px;color:var(--accent-text);text-decoration:underline;white-space:nowrap;">Reset / Show all</a>
+      </div>
+      <form method="GET" action="/opportunities">
+        <div class="filter-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:end;">
+          <div class="form-col">
+            <label class="label-small">Agency</label>
+            <select name="agency">
+              {''.join(agency_options_html)}
+            </select>
+          </div>
 
-        <div class=\"form-col\">
-        <label class=\"label-small\">Search title</label>
-        <input type=\"text\" name=\"search\" value=\"{search_filter}\" placeholder=\"road, IT managed services...\" />
-        </div>
+          <div class="form-col">
+            <label class="label-small">Search title</label>
+            <input type="text" name="search" value="{search_filter}" placeholder="road, IT managed services..." />
+          </div>
 
-        <div class=\"form-col\">
-        <label class=\"label-small\">Due within</label>
-        <select name=\"due_within\">
-            {''.join([f"<option value='{val}' {'selected' if ((val=='' and due_within is None) or (val and due_within is not None and val==str(due_within))) else ''}>{label}</option>" for val,label in [('', 'Any due date'), ('7','Next 7 days'), ('30','Next 30 days'), ('90','Next 90 days')]])}
-        </select>
-        </div>
+          <div class="form-col">
+            <label class="label-small">Due within</label>
+            <select name="due_within">
+              {''.join([f"<option value='{val}' {'selected' if ((val=='' and due_within is None) or (val and due_within is not None and val==str(due_within))) else ''}>{label}</option>" for val,label in [('', 'Any due date'), ('7','Next 7 days'), ('30','Next 30 days'), ('90','Next 90 days')]])}
+            </select>
+          </div>
 
-        <div class=\"form-col\">
-        <label class=\"label-small\">Status</label>
-        <label style=\"display:flex;align-items:center;gap:8px;\"><input type=\"checkbox\" name=\"status\" value=\"open\" {'checked' if status_filter=='open' else ''}/> Open only</label>
-        </div>
+          <div class="form-col">
+            <label class="label-small">Status</label>
+            <label class="checkbox-row"><input type="checkbox" name="status" value="open" {'checked' if status_filter=='open' else ''}/> Open only</label>
+          </div>
 
-        <div class=\"form-col\">
-        <label class=\"label-small\">Sort by</label>
-        <select name=\"sort_by\">
-            {''.join([f"<option value='{v}' {'selected' if sort_by==v else ''}>{l}</option>" for v,l in [('soonest_due','Soonest due'),('latest_due','Latest due'),('agency_az','Agency A-Z'),('title_az','Title A-Z')]])}
-        </select>
-        </div>
+          <div class="form-col">
+            <label class="label-small">Sort by</label>
+            <select name="sort_by">
+              {''.join([f"<option value='{v}' {'selected' if sort_by==v else ''}>{l}</option>" for v,l in [('soonest_due','Soonest due'),('latest_due','Latest due'),('agency_az','Agency A-Z'),('title_az','Title A-Z')]])}
+            </select>
+          </div>
 
-        <div class=\"form-col\" style=\"align-self:flex-end;\">
-        <button class=\"button-primary\" type=\"submit\">Filter ?</button>
-        <div style=\"margin-top:8px;\">
-            <a href=\"/opportunities?agency=\" style=\"font-size:12px;color:var(--accent-text);text-decoration:underline;\">Reset / Show all bids</a>
+          <div class="form-col" style="align-self:flex-end;">
+            <div class="actions">
+              <button class="button-primary" type="submit">Apply filters</button>
+            </div>
+          </div>
         </div>
-        </div>
-    </div>
-    </form>
-    {chips_html}
+      </form>
+      {chips_html}
+    </section>
     """
 
     # -------- pagination links --------
@@ -528,20 +551,20 @@ async def opportunities(request: Request):
 <div id="bid-drawer" class="drawer hidden">
   <div class="drawer-header">
     <h3 id="drawer-title">Bid Tracker</h3>
-    <button onclick="closeDrawer()" aria-label="Close">Ã¢Å“â€¢</button>
-    <button onclick="closeDrawer()" aria-label="Close">&times;</button>
-
+    <button class="btn-secondary" style="padding:6px 10px;border-radius:8px;" onclick="closeDrawer()" aria-label="Close">&times;</button>
+  </div>
   <div class="drawer-body">
     <section class="card">
-      <div class="row" style="justify-content:space-between;align-items:center;">
-        <div>
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px;">
+        <div style="max-width:65%;">
           <div class="label-small">Solicitation</div>
-          <div id="drawer-solicitation" style="font-weight:600;"></div>
+          <div id="drawer-solicitation" style="font-weight:600;word-break:break-word;"></div>
           <input type="hidden" id="opp-id" />
         </div>
-        <div>
+        <div style="flex-shrink:0;">
           <a class="btn-secondary" href="/tracker/dashboard" target="_blank">Open My Dashboard &rarr;</a>
-         
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -556,9 +579,9 @@ async def opportunities(request: Request):
       </select>
 
       <label class="label" style="margin-top:10px;">Notes</label>
-      <textarea id="tracker-notes" rows="4" placeholder="Add notes…"></textarea>
+      <textarea id="tracker-notes" rows="4" placeholder="Add notes."></textarea>
 
-      <div style="margin-top:12px;display:flex;gap:8px;">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn" id="save-tracker-btn">Save</button>
         <button class="btn-secondary" onclick="window.open('/tracker/dashboard?focus='+document.getElementById('opp-id').value,'_blank')">
           Manage Files in Dashboard
@@ -568,7 +591,6 @@ async def opportunities(request: Request):
     </section>
   </div>
 </div>
-
 <!-- Modal overlay for RFQ / solicitation detail -->
 <div id="rfq-modal-overlay" style="display:none;">
   <div id="rfq-modal-card">
@@ -676,16 +698,14 @@ document.addEventListener('click', async (e) => {
                             <th class="w-160">Agency</th>
                             <th class="w-140">Date Added</th>
                             <th class="w-140">Due Date</th>
-                            <th class="w-140">Type</th>
                             <th class="w-80">Status</th>
                             <th class="w-120">Source Link</th>
-                            <th class="w-120">How to Bid</th>
                             <th class="w-140">Track</th>
                         </tr>
                         </thead>
 
                     <tbody>
-                        {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='10' class='muted'>No results found.</td></tr>"
+                        {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='8' class='muted'>No results found.</td></tr>"
 }
                     </tbody>
                 </table>

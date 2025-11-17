@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from app.core.db_core import engine
 from app.auth.session import get_current_user_email  # uses session cookie
+from app.services import record_milestone
 
 router = APIRouter(prefix="/tracker", tags=["tracker"])
 
@@ -80,7 +81,7 @@ async def track_opportunity(opportunity_key: str, user=Depends(_require_user)):
     oid = await _resolve_opportunity_id(opportunity_key)
 
     async with engine.begin() as conn:
-        await conn.exec_driver_sql(
+        result = await conn.exec_driver_sql(
             """
             INSERT INTO user_bid_trackers (user_id, opportunity_id)
             VALUES (:uid, :oid)
@@ -89,7 +90,9 @@ async def track_opportunity(opportunity_key: str, user=Depends(_require_user)):
             {"uid": user["id"], "oid": oid}
         )
 
-    return {"ok": True}
+    first_time = await record_milestone(user["email"], "tracked_first", {"opportunity_id": oid})
+
+    return {"ok": True, "first_time": first_time}
 
 
 @router.get("/{opportunity_key}")

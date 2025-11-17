@@ -12,6 +12,10 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)
+    primary_interest: Mapped[str] = mapped_column(String, default="everything")
+    onboarding_step: Mapped[str] = mapped_column(String, default="signup")
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    first_tracked_at: Mapped[dt.datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 
 class Opportunity(Base):
     __tablename__ = "opportunity"

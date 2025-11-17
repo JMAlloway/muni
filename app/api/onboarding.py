@@ -1,11 +1,13 @@
 # app/routers/onboarding.py
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
 from app.core.db_core import engine
 from app.api._layout import page_shell
 from app.auth.auth_utils import require_login
+from app.auth.session import get_current_user_email
+from app.services import mark_onboarding_completed, record_milestone
 import json
 from typing import List, Optional
 
@@ -36,6 +38,7 @@ INDUSTRIES_LIST = [
 ]
 
 FREQUENCIES_LIST = ["daily", "weekly", "none"]
+ONBOARDING_STEPS = {"signup", "browsing", "tracked_first", "completed"}
 
 
 async def _load_existing_prefs(user_email: str):
@@ -593,3 +596,35 @@ async def onboarding_post(
         ),
         status_code=400,
     )
+
+@router.post("/api/onboarding/milestone")
+async def api_onboarding_milestone(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    step = (payload.get('step') or '').strip().lower()
+    if step not in ONBOARDING_STEPS:
+        raise HTTPException(status_code=400, detail="Invalid step")
+
+    metadata = payload.get('metadata')
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    advanced = await record_milestone(user_email, step, metadata)
+    return {'ok': True, 'advanced': advanced}
+
+
+@router.post("/api/onboarding/dismiss")
+async def api_onboarding_dismiss(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    await mark_onboarding_completed(user_email, {"source": "user-dismiss"})
+    return {'ok': True}

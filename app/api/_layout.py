@@ -6,9 +6,9 @@ def _nav_links_html(user_email: Optional[str]) -> str:
     if user_email:
         return """
         <a href="/">Overview</a>
+        <a href="/welcome">Welcome</a>
         <a href="/opportunities">Open Opportunities</a>
         <a href="/tracker/dashboard">My Dashboard</a>
-        <a href="/onboarding">Preferences</a>
         <a href="/account">My Account</a>
         <a href="/logout">Logout</a>
         """
@@ -99,10 +99,10 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 
     /* Site logo in header */
     .brand-logo {{
-        max-height: 64px;
+        max-height: 90px;
         width: auto;
         height: auto;
-        max-width: 360px;
+        max-width: 420px;
         display: block;
         margin-bottom: 6px;
         object-fit: contain;

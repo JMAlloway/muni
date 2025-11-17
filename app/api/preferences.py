@@ -1,6 +1,6 @@
 ﻿# app/routers/preferences.py
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
 from typing import List
@@ -12,6 +12,7 @@ from urllib.parse import parse_qs
 from app.core.db import AsyncSessionLocal
 from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
+from app.services import mark_onboarding_completed
 
 router = APIRouter(tags=["preferences"])
 
@@ -118,7 +119,7 @@ async def get_preferences(request: Request):
     </section>
     """
 
-    return HTMLResponse(page_shell(body_html, title="Muni Alerts â€“ Preferences", user_email=user_email))
+    return HTMLResponse(page_shell(body_html, title="Muni Alerts Preferences", user_email=user_email))
 
 
 @router.post("/preferences", response_class=HTMLResponse)
@@ -186,6 +187,70 @@ async def post_preferences(
     return HTMLResponse(page_shell(body_html, title="Alerts Saved", user_email=user_email))
 
 
+@router.post("/preferences/quick-setup")
+async def quick_preferences(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    agencies_raw = payload.get("agencies") or []
+    if not isinstance(agencies_raw, list):
+        raise HTTPException(status_code=400, detail="Agencies must be a list")
+    agencies_clean = [str(a).strip() for a in agencies_raw if str(a).strip()]
+
+    frequency = (payload.get("frequency") or "weekly").strip().lower()
+    if frequency not in ("daily", "weekly", "none"):
+        frequency = "weekly"
+
+    agencies_json = json.dumps(agencies_clean)
+
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            text(
+                """
+                INSERT INTO user_preferences (user_email, agencies, keywords, frequency, created_at, updated_at)
+                VALUES (:email, :agencies, '[]', :frequency, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_email) DO UPDATE SET
+                    agencies   = :agencies,
+                    frequency  = :frequency,
+                    updated_at = CURRENT_TIMESTAMP
+                """
+            ),
+            {
+                "email": user_email,
+                "agencies": agencies_json,
+                "frequency": frequency,
+            },
+        )
+
+        await session.execute(
+            text(
+                """
+                INSERT INTO users (email, digest_frequency, agency_filter, created_at)
+                VALUES (:email, :freq, :agencies, CURRENT_TIMESTAMP)
+                ON CONFLICT(email) DO UPDATE SET
+                    digest_frequency = :freq,
+                    agency_filter    = :agencies
+                """
+            ),
+            {
+                "email": user_email,
+                "freq": frequency,
+                "agencies": agencies_json,
+            },
+        )
+
+        await session.commit()
+
+    await mark_onboarding_completed(user_email, {"source": "quick-setup"})
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------------
 # Application Variables (per-user JSON profile)
 # ---------------------------------------------------------------------
@@ -238,6 +303,8 @@ async def application_vars_form(request: Request):
     def e(key):
         return ''
 
+    cache_headers = {"Cache-Control": "no-store, no-cache, must-revalidate, private"}
+
     body_html = f"""
     <section class=\"card\">
       <h2 class=\"section-heading\">Application Variables</h2>
@@ -279,7 +346,10 @@ async def application_vars_form(request: Request):
       </script>
     </section>
     """
-    resp = HTMLResponse(page_shell(body_html, title="Application Variables", user_email=user_email))
+    resp = HTMLResponse(
+        page_shell(body_html, title="Application Variables", user_email=user_email),
+        headers=cache_headers,
+    )
     try:
         resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax")
     except Exception:
@@ -290,11 +360,16 @@ async def application_vars_form(request: Request):
 @router.post("/preferences/application", response_class=HTMLResponse)
 async def application_vars_save(request: Request):
     user_email = get_current_user_email(request)
+    cache_headers = {"Cache-Control": "no-store, no-cache, must-revalidate, private"}
     if not user_email:
         body = """
         <section class=\"card\">\n  <h2 class=\"section-heading\">Sign in required</h2>\n  <p class=\"subtext\">Please log in and resubmit.</p>\n  <a class=\"button-primary\" href=\"/login?next=/preferences/application\">Sign in</a>\n</section>
         """
-        return HTMLResponse(page_shell(body, title="Application Variables", user_email=None), status_code=403)
+        return HTMLResponse(
+            page_shell(body, title="Application Variables", user_email=None),
+            status_code=403,
+            headers=cache_headers,
+        )
 
     # Prefer raw body parse to avoid any body-consumption by middleware
     ctype = request.headers.get('content-type', '')
@@ -410,7 +485,11 @@ async def application_vars_save(request: Request):
             alert = "<div style='background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;padding:10px 12px;border-radius:8px;margin-bottom:12px;'><b>Please fix and resubmit:</b><ul style='margin:6px 0 0 18px;'>" + "".join(f"<li>{e}</li>" for e in errors) + "</ul></div>"
             body_html = f"""
     <section class=\"card\">\n      <h2 class=\"section-heading\">Application Variables</h2>\n      <p class=\"subtext\">These details are commonly requested across applications. Keep them up to date.</p>\n      {alert}\n      <form method=\"POST\" action=\"/preferences/application\">\n        <input type=\"hidden\" id=\"csrf_token\" name=\"csrf_token\" value=\\"{csrf_cookie}\\">\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Legal Entity Name</label>\n            <input type=\"text\" name=\"legal_name\" value=\"{vv('legal_name')}\" placeholder=\"Acme, LLC\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">DBA</label>\n            <input type=\"text\" name=\"dba\" value=\"{vv('dba')}\" placeholder=\"Acme Services\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">EIN / Tax ID</label>\n            <input type=\"text\" name=\"ein\" value=\"{vv('ein')}\" placeholder=\"12-3456789\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">UEI / CAGE (optional)</label>\n            <input type=\"text\" name=\"uei\" value=\"{vv('uei')}\" placeholder=\"UEI or CAGE Code\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Primary Contact Name</label>\n            <input type=\"text\" name=\"contact_name\" value=\"{vv('contact_name')}\" placeholder=\"Jane Smith\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Title</label>\n            <input type=\"text\" name=\"contact_title\" value=\"{vv('contact_title')}\" placeholder=\"Director\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Email</label>\n            <input type=\"email\" name=\"contact_email\" value=\"{vv('contact_email')}\" placeholder=\"you@company.com\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Phone</label>\n            <input type=\"text\" name=\"contact_phone\" value=\"{vv('contact_phone')}\" placeholder=\"(555) 555-5555\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Website</label>\n            <input type=\"text\" name=\"website\" value=\"{vv('website')}\" placeholder=\"https://example.com\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Years in Business</label>\n            <input type=\"number\" name=\"years_in_business\" value=\"{vv('years_in_business')}\" placeholder=\"10\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Business Type</label>\n            <input type=\"text\" name=\"business_type\" value=\"{vv('business_type')}\" placeholder=\"LLC / S-Corp / Sole Prop\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">State of Incorporation</label>\n            <input type=\"text\" name=\"state_incorp\" value=\"{vv('state_incorp')}\" placeholder=\"Ohio\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Physical Address</label>\n            <input type=\"text\" name=\"address\" value=\"{vv('address')}\" placeholder=\"123 Main St, City, ST 00000\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Mailing Address</label>\n            <input type=\"text\" name=\"mailing_address\" value=\"{vv('mailing_address')}\" placeholder=\"PO Box...\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Certifications</label>\n            <input type=\"text\" name=\"certifications\" value=\"{vv('certifications')}\" placeholder=\"MBE, WBE, DBE, EDGE\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">NAICS / NIGP Codes</label>\n            <input type=\"text\" name=\"codes\" value=\"{vv('codes')}\" placeholder=\"541611; 918-75\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Insurance Coverage Summary</label>\n            <input type=\"text\" name=\"insurance\" value=\"{vv('insurance')}\" placeholder=\"GL $1M, Auto $1M, WC Statutory\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Bonding Capacity</label>\n            <input type=\"text\" name=\"bonding\" value=\"{vv('bonding')}\" placeholder=\"$500k single / $1M aggregate\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Authorized Signatory</label>\n            <input type=\"text\" name=\"signatory\" value=\"{vv('signatory')}\" placeholder=\"Name, Title\" />\n          </div>\n          <div class=\"form-col\">\n            <label class=\"label-small\">Bank Reference (optional)</label>\n            <input type=\"text\" name=\"bank_ref\" value=\"{vv('bank_ref')}\" placeholder=\"Bank, Contact, Phone\" />\n          </div>\n        </div>\n\n        <div class=\"form-row\">\n          <div class=\"form-col\">\n            <label class=\"label-small\">Notes</label>\n            <input type=\"text\" name=\"notes\" value=\"{vv('notes')}\" placeholder=\"Any special instructions or ids\" />\n          </div>\n        </div>\n\n        <div class=\"form-actions\">\n          <button class=\"button-primary\" type=\"submit\">Save</button>\n          <span class=\"muted small\" style=\"margin-left:12px;\">Last saved: -</span>\n        </div>\n      </form>\n    </section>\n            """
-            resp = HTMLResponse(page_shell(body_html, title="Application Variables", user_email=user_email))
+            resp = HTMLResponse(
+                page_shell(body_html, title="Application Variables", user_email=user_email),
+                status_code=400,
+                headers=cache_headers,
+            )
             try:
                 resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax")
             except Exception:

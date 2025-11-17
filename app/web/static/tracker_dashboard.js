@@ -111,11 +111,29 @@
   }
 
   function updateStatus(it, newStatus){
+    const prev = it.status;
+    it.status = newStatus;
+    // Update card immediately so badge/text reflect new status without a full reload
+    try {
+      const card = document.querySelector(`.tracked-card[data-oid="${it.opportunity_id}"]`);
+      if (card) {
+        const badge = card.querySelector('.status-badge');
+        if (badge) badge.textContent = newStatus || 'prospecting';
+        const statusLine = Array.from(card.querySelectorAll('.card-list li')).find(li => /Status:/i.test(li.textContent||''));
+        if (statusLine) statusLine.innerHTML = `<span class="dot"></span>Status: ${(newStatus||'prospecting')}`;
+      }
+    } catch(_) {}
+    render();
     fetch(`/tracker/${it.opportunity_id}`, {
       method:"PATCH",
       headers:{ "Content-Type":"application/json", "X-CSRF-Token": (getCSRF()||"") },
       body: JSON.stringify({ status:newStatus })
-    }).then(()=>render());
+    }).then(res=>{
+      if (!res.ok) throw new Error('update failed');
+    }).catch(()=>{
+      it.status = prev;
+      render();
+    });
   }
 
   function removeTracker(it){
@@ -128,6 +146,7 @@
         if (!grid.children.length) {
           grid.innerHTML = `<div class="muted">Nothing tracked yet. Go to <a href="/opportunities">Opportunities</a> and click "Track".</div>`;
         }
+        updateSummary();
       } else {
         render();
       }
@@ -210,6 +229,19 @@
     return f1 && f2 && f3;
   }
 
+  function updateSummary(view){
+    try {
+      if (!summaryEl) return;
+      const filtered = Array.isArray(view) ? view : items.filter(matchesFilters);
+      const shown = filtered.length;
+      const total = items.length;
+      const soon = filtered.filter(x=> x.due_date && (new Date(x.due_date).getTime() - Date.now()) < 7*24*60*60*1000).length;
+      summaryEl.textContent = `${shown}/${total} shown · ${soon} due soon`;
+      summaryEl.textContent = summaryEl.textContent.replace(/[^\x20-\x7E·]/g, "·");
+    } catch(_) {}
+  }
+  window.updateDashboardSummary = updateSummary;
+
   function render(){
     const view = items.filter(matchesFilters);
     sortItems(view);
@@ -256,6 +288,7 @@
     });
 
     grid.innerHTML = out.length ? out.join("") : `<div class="muted">Nothing tracked yet. Go to <a href="/opportunities">Opportunities</a> and click "Track".</div>`;
+    updateSummary(view);
   }
 
   selStatus.addEventListener("change", render);
@@ -272,14 +305,7 @@
     render = function(){
       _render();
       try {
-        if (summaryEl) {
-          const cards = Array.from(document.querySelectorAll('.tracked-card'));
-          const shown = cards.filter(c=> c.style.display !== 'none').length || cards.length;
-          const total = items.length;
-          const soon = items.filter(x=> x.due_date && (new Date(x.due_date).getTime() - Date.now()) < 7*24*60*60*1000).length;
-          summaryEl.textContent = `${shown}/${total} shown · ${soon} due soon`;
-          summaryEl.textContent = summaryEl.textContent.replace(/[^\x20-\x7E·]/g, "·");
-        }
+        updateSummary();
         // one-time highlight if arriving with ?focus=
         if (!window.__didHighlight) {
           const params = new URLSearchParams(location.search || '');
