@@ -1,175 +1,1392 @@
-# app/ai/auto_tags.py
-from typing import List, Dict, Any, Optional
-from .taxonomy import BASE_CATEGORIES
-import json
+"""
+Deterministic specialty tagging (no LLM).
+
+We map specialty buckets to curated keyword/phrase lists, match with
+word/phrase boundaries, score by hit count, and return the top tags.
+"""
+
+from typing import Dict, List, Tuple
 import re
 
-# simple keyword → tag mapping (expand as you see real data)
-_DEFAULT_EXTRA_TAGS = {
-    "ev charging": "ev_charging",
-    "electric vehicle": "ev_charging",
-    "stormwater": "stormwater",
-    "janitorial": "janitorial",
-    "roof": "roofing",
-    "roofing": "roofing",
-    "hvac": "hvac",
-    "bus rapid transit": "transit",
-    "brt": "transit",
-    "rfp": "rfp",
-    "rfq": "rfq",
-    "cng": "cng_powered",
+# --------------------------------------------------------------------------- #
+# Canonical specialty keywords                                                #
+# --------------------------------------------------------------------------- #
+
+SPECIALTY_KEYWORDS: Dict[str, List[str]] = {
+    # =========================
+    # GENERAL / BUILDING TRADES
+    # =========================
+    "general_construction": [
+        "general contractor",
+        "gc",
+        "general construction",
+        "new construction",
+        "maintenance facility",
+        "prefab building",
+        "prefab shed",
+        "shed with porch",
+        "fence",
+        "building renovation",
+        "interior renovation",
+        "tenant improvement",
+        "ti work",
+        "design build",
+        "design-build",
+        "design build contractor",
+        "construction services",
+        "construction management",
+        "cm at risk",
+        "preconstruction services",
+        "demolition",
+        "demo work",
+        "selective demolition",
+        "structural steel",
+        "steel erection",
+        "metal building",
+        "tilt-up",
+        "concrete foundation",
+        "footings",
+        "slab on grade",
+        "cmu walls",
+        "masonry",
+        "block wall",
+        "framing",
+        "wood framing",
+        "metal stud framing",
+        "rough carpentry",
+        "finish carpentry",
+        "millwork",
+        "casework",
+        "punch list",
+        "general trades",
+    ],
+    # ==============
+    # HVAC / MECHANICAL
+    # ==============
+    "hvac_mechanical": [
+        "hvac",
+        "mechanical work",
+        "mechanical maintenance",
+        "mechanical repair",
+        "mechanical contractor",
+        "heating",
+        "ventilation",
+        "air conditioning",
+        "mechanical systems",
+        "mechanical upgrades",
+        "hvac maintenance",
+        "hvac service",
+        "boiler",
+        "chiller",
+        "cooling tower",
+        "air cooled chiller",
+        "water cooled chiller",
+        "rooftop unit",
+        "rtu",
+        "vav box",
+        "variable air volume",
+        "air handler",
+        "ahu",
+        "fan coil unit",
+        "fcu",
+        "heat pump",
+        "vrf system",
+        "vrv system",
+        "split system",
+        "mini split",
+        "packaged unit",
+        "makeup air unit",
+        "mua unit",
+        "exhaust fan",
+        "fume hood",
+        "ductwork",
+        "air distribution",
+        "hydronic piping",
+        "chilled water",
+        "hot water heating",
+        "steam piping",
+        "steam trap",
+        "controls upgrade",
+        "building automation",
+        "bms",
+        "ddc controls",
+        "energy management system",
+        "hvac replacement",
+        "hvac upgrade",
+        "hvac retrofit",
+        "telehandler training",
+    ],
+    # =========
+    # PLUMBING
+    # =========
+    "plumbing": [
+        "plumbing",
+        "plumbing repair",
+        "plumbing maintenance",
+        "plumbing contractor",
+        "water service",
+        "domestic water",
+        "potable water",
+        "water line",
+        "water main",
+        "well repair",
+        "sewer line",
+        "sanitary sewer",
+        "sanitary piping",
+        "flush valve",
+        "delany valve",
+        "storm sewer",
+        "stormwater piping",
+        "storm drain",
+        "floor drain",
+        "trench drain",
+        "grease trap",
+        "grease interceptor",
+        "backflow preventer",
+        "backflow device",
+        "rpz",
+        "domestic hot water",
+        "dhw",
+        "water heater",
+        "tankless water heater",
+        "restroom renovation",
+        "bathroom renovation",
+        "toilet fixtures",
+        "sinks",
+        "lavatories",
+        "urinals",
+        "showers",
+        "hose bibb",
+        "plumbing fixtures",
+        "pipe replacement",
+        "pipe re-routing",
+        "lift station",
+        "septic tank",
+        "force main",
+        "water treatment operations",
+    ],
+    # ==========
+    # ELECTRICAL
+    # ==========
+    "electrical": [
+        "electrical",
+        "electrical maintenance",
+        "electrical repair",
+        "electrical contractor",
+        "electrical work",
+        "power distribution",
+        "traffic signal",
+        "its equipment",
+        "panelboard",
+        "panel board",
+        "switchgear",
+        "switch gear",
+        "switchboard",
+        "transformer",
+        "motor control center",
+        "mcc",
+        "feeder",
+        "branch circuit",
+        "conduit",
+        "raceway",
+        "wire",
+        "lighting",
+        "light fixtures",
+        "led upgrade",
+        "lighting retrofit",
+        "occupancy sensor",
+        "photocell",
+        "generator",
+        "standby power",
+        "emergency generator",
+        "ups system",
+        "uninterruptible power supply",
+        "grounding",
+        "bonding",
+        "electrical service upgrade",
+        "service entrance",
+        "metering",
+        "arc flash",
+        "short circuit study",
+        "fault current",
+        "fire pump controller",
+    ],
+    # ==============================
+    # LOW VOLTAGE / IT / NETWORKING
+    # ==============================
+    "low_voltage_it": [
+        "low voltage",
+        "low-voltage",
+        "low voltage wiring",
+        "cabling project",
+        "it services",
+        "information technology",
+        "electronic health record",
+        "ehr integration",
+        "network cabling",
+        "structured cabling",
+        "structured wiring",
+        "cat5",
+        "cat5e",
+        "cat6",
+        "cat6a",
+        "fiber optic",
+        "fiber optics",
+        "fiber backbone",
+        "data cabling",
+        "server room",
+        "data center",
+        "network closet",
+        "idf",
+        "mdf",
+        "patch panel",
+        "wifi",
+        "wireless network",
+        "access points",
+        "network switch",
+        "router",
+        "firewall",
+        "lan",
+        "wan",
+        "vpn",
+        "voip",
+        "telephone system",
+        "phone system",
+        "ip phones",
+        "it infrastructure",
+        "it support",
+        "managed services",
+        "help desk",
+        "audio-visual",
+        "a/v",
+    ],
+    # ===============================
+    # SECURITY / ACCESS CONTROL / CCTV
+    # ===============================
+    "security_cctv_access": [
+        "security system",
+        "security systems",
+        "security upgrade",
+        "access control",
+        "card access",
+        "badge access",
+        "door controller",
+        "electric strike",
+        "mag lock",
+        "magnetic lock",
+        "intrusion alarm",
+        "burglar alarm",
+        "security cameras",
+        "cctv",
+        "video surveillance",
+        "video management system",
+        "vms",
+        "nvr",
+        "dvr",
+        "panic button",
+        "duress alarm",
+        "security monitoring",
+        "security integration",
+        "sallyport gate",
+    ],
+    # =================
+    # FIRE PROTECTION
+    # =================
+    "fire_protection": [
+        "fire protection",
+        "fire sprinkler",
+        "sprinkler system",
+        "wet sprinkler",
+        "dry sprinkler",
+        "pre-action system",
+        "clean agent system",
+        "fire pump",
+        "standpipe",
+        "fire alarm",
+        "fire alarm system",
+        "fire alarm panel",
+        "mass notification",
+        "horn strobe",
+        "smoke detector",
+        "heat detector",
+        "aspirating smoke detector",
+        "fire suppression",
+        "kitchen hood suppression",
+        "ansul system",
+    ],
+    # ========
+    # ROOFING
+    # ========
+    "roofing": [
+        "roof replacement",
+        "reroof",
+        "re-roof",
+        "roof repair",
+        "roofing contractor",
+        "roof overlay",
+        "roof coating",
+        "asphalt shingle",
+        "shingle roof",
+        "metal roof",
+        "standing seam",
+        "epdm roof",
+        "tpo roof",
+        "pvc roof",
+        "built-up roof",
+        "modified bitumen",
+        "roof insulation",
+        "tapered insulation",
+        "roof drains",
+        "parapet",
+        "flashing",
+        "roof curb",
+        "skylight",
+        "roof hatch",
+    ],
+    # =======================
+    # PAVING / CONCRETE / SITE
+    # =======================
+    "paving_concrete_sitework": [
+        "site work",
+        "sitework",
+        "site grading",
+        "earthwork",
+        "excavation",
+        "mass excavation",
+        "trenching",
+        "backfill",
+        "compaction",
+        "asphalt paving",
+        "parking lot",
+        "mill and fill",
+        "resurfacing",
+        "repave",
+        "repaving",
+        "overlay",
+        "chip seal",
+        "sealcoating",
+        "seal coating",
+        "pavement marking",
+        "line striping",
+        "striping",
+        "channelizer",
+        "concrete paving",
+        "sidewalk",
+        "curb and gutter",
+        "curb ramp",
+        "ada ramp",
+        "driveway",
+        "approach",
+        "concrete slab",
+        "concrete curb",
+        "retaining wall",
+        "site utilities",
+        "storm sewer",
+        "stormwater management",
+        "detention basin",
+        "retention pond",
+        "culvert",
+        "swale",
+        "erosion control",
+        "silt fence",
+        "riprap",
+    ],
+    # =================
+    # LANDSCAPING / SITE
+    # =================
+    "landscaping_grounds": [
+        "landscaping",
+        "landscape",
+        "landscape services",
+        "landscape maintenance",
+        "grounds",
+        "grounds services",
+        "grounds maintenance",
+        "groundskeeping",
+        "mowing",
+        "lawn",
+        "lawn care",
+        "lawn maintenance",
+        "fertilization",
+        "weed control",
+        "mulch",
+        "mulching",
+        "planting beds",
+        "tree planting",
+        "tree trimming",
+        "tree removal",
+        "shrubs",
+        "perennials",
+        "annuals",
+        "irrigation system",
+        "sprinkler system",
+        "drip irrigation",
+        "landscape lighting",
+        "athletic field maintenance",
+        "turf management",
+    ],
+    # ===========
+    # SNOW & ICE
+    # ===========
+    "snow_ice": [
+        "snow removal",
+        "snow plowing",
+        "snow plow",
+        "salting",
+        "deicing",
+        "de-icing",
+        "ice melt",
+        "snow and ice control",
+        "winter maintenance",
+        "sidewalk snow removal",
+        "parking lot snow removal",
+    ],
+    # ===================
+    # ID / CARDS / BADGING
+    # ===================
+    "id_cards_badging": [
+        "employee card",
+        "employee cards",
+        "essential employee card",
+        "id card",
+        "identification card",
+        "badge",
+        "id badge",
+        "name badge",
+        "access card",
+        "smartcard",
+        "smart card",
+        "smartcard reader",
+        "card printer",
+        "card stock",
+        "playing card",
+        "playing cards",
+        "bingo cards",
+    ],
+    # =================
+    # JANITORIAL / CLEANING
+    # =================
+    "janitorial_cleaning": [
+        "janitorial services",
+        "custodial services",
+        "cleaning services",
+        "building cleaning",
+        "office cleaning",
+        "school cleaning",
+        "floor waxing",
+        "floor refinishing",
+        "strip and wax",
+        "carpet cleaning",
+        "window cleaning",
+        "high dusting",
+        "restroom cleaning",
+        "sanitization",
+        "disinfection",
+        "day porter",
+        "night cleaning",
+        "trash removal",
+        "janitorial supplies",
+    ],
+    # ===================
+    # WASTE / RECYCLING
+    # ===================
+    "waste_recycling": [
+        "solid waste",
+        "trash collection",
+        "waste collection",
+        "garbage collection",
+        "refuse",
+        "dumpster service",
+        "roll-off containers",
+        "front-load containers",
+        "landfill disposal",
+        "recycling services",
+        "single stream recycling",
+        "paper recycling",
+        "cardboard recycling",
+        "yard waste",
+        "composting",
+        "hazardous waste",
+        "universal waste",
+        "e-waste",
+    ],
+    # ==================
+    # PAINTING / COATINGS
+    # ==================
+    "painting_coatings": [
+        "painting",
+        "repainting",
+        "interior painting",
+        "exterior painting",
+        "coatings",
+        "epoxy floor coating",
+        "traffic coating",
+        "wall covering",
+        "wallcovering",
+        "staining",
+        "sealant",
+        "caulking",
+        "joint sealant",
+    ],
+    # =========================
+    # WINDOWS / DOORS / GLAZING
+    # =========================
+    "windows_doors_glazing": [
+        "window replacement",
+        "new windows",
+        "storefront glazing",
+        "curtain wall",
+        "glass replacement",
+        "aluminum storefront",
+        "doors and hardware",
+        "hollow metal doors",
+        "wood doors",
+        "interior doors",
+        "exterior doors",
+        "door hardware",
+        "lockset",
+        "panic hardware",
+        "exit device",
+        "automatic door operator",
+        "overhead door",
+        "garage door",
+        "rolling door",
+        "roll up door",
+        "coiling door",
+        "door repair",
+        "door service",
+        "polycarbonate window",
+    ],
+    # ==================
+    # FLOORING / CARPET
+    # ==================
+    "flooring_carpeting": [
+        "flooring",
+        "floor replacement",
+        "carpet tile",
+        "broadloom carpet",
+        "vinyl tile",
+        "lvt",
+        "vct",
+        "rubber flooring",
+        "wood flooring",
+        "hardwood floor",
+        "sports flooring",
+        "resilient flooring",
+        "ceramic tile",
+        "porcelain tile",
+        "terrazzo",
+        "floor leveling",
+        "floor prep",
+        "paver",
+        "paver install",
+    ],
+    # ====================
+    # ELEVATORS / LIFTS
+    # ====================
+    "elevators_lifts": [
+        "elevator maintenance",
+        "elevator modernization",
+        "elevator replacement",
+        "elevator service",
+        "lift",
+        "wheelchair lift",
+        "vertical platform lift",
+        "dumbwaiter",
+        "escalator",
+        "boom lift",
+    ],
+    # ==========================
+    # PLAYGROUNDS / RECREATION
+    # ==========================
+    "playgrounds_recreation": [
+        "playground equipment",
+        "playground installation",
+        "play structure",
+        "swings",
+        "slides",
+        "splash pad",
+        "spray park",
+        "athletic field construction",
+        "ball field",
+        "soccer field",
+        "baseball field",
+        "running track",
+        "tennis court",
+        "basketball court",
+        "pickleball court",
+        "recreation equipment",
+        "bleachers",
+        "grandstands",
+        "scoreboard",
+    ],
+    # ==================
+    # FOOD SERVICE / CAFETERIA
+    # ==================
+    "food_service": [
+        "food service",
+        "cafeteria services",
+        "vending services",
+        "concession services",
+        "catering",
+        "meal service",
+        "school lunch",
+        "kitchen equipment",
+        "commercial kitchen equipment",
+        "dishwasher",
+        "walk-in cooler",
+        "walk-in freezer",
+        "reach-in cooler",
+        "kitchen hood",
+        "food service management",
+        "food processor",
+        "hobart",
+        "freezer repair",
+        "freezer",
+    ],
+    # ==================
+    # FLEET / VEHICLES
+    # ==================
+    "fleet_vehicles": [
+        "vehicle purchase",
+        "fleet vehicles",
+        "fleet",
+        "police vehicles",
+        "fire apparatus",
+        "ambulance",
+        "dump truck",
+        "snow plow truck",
+        "pickup truck",
+        "truck",
+        "van",
+        "cargo van",
+        "passenger van",
+        "bus",
+        "transit bus",
+        "school bus",
+        "suv",
+        "sport utility",
+        "vehicle upfitting",
+        "upfit",
+        "lights and sirens",
+        "radio installation",
+        "vehicle maintenance",
+        "fleet maintenance",
+        "oil change",
+        "brake service",
+        "tire replacement",
+        "towing services",
+        "fuel cards",
+        "cargo trailer",
+        "enclosed trailer",
+        "utility cart",
+        "turf cart",
+        "abandoned vehicle",
+    ],
+    # ======================
+    # TRANSPORTATION SERVICES
+    # ======================
+    "transportation_services": [
+        "student transportation",
+        "school transportation",
+        "special needs transportation",
+        "paratransit",
+        "shuttle service",
+        "dial-a-ride",
+        "non-emergency medical transportation",
+        "nemt",
+        "taxi voucher",
+        "ride share",
+        "medical transport",
+    ],
+    # ==================================
+    # PROFESSIONAL SERVICES - ENGINEERING
+    # ==================================
+    "professional_engineering": [
+        "engineering services",
+        "civil engineering",
+        "structural engineering",
+        "mechanical engineering",
+        "electrical engineering",
+        "traffic engineering",
+        "transportation engineering",
+        "environmental engineering",
+        "geotechnical engineering",
+        "surveying",
+        "land surveying",
+        "construction inspection",
+        "resident project representative",
+        "rpr services",
+        "construction observation",
+        "plan review",
+        "stormwater design",
+        "utility design",
+    ],
+    # ===================================
+    # PROFESSIONAL SERVICES - ARCHITECTURE
+    # ===================================
+    "professional_architecture": [
+        "architectural services",
+        "architecture",
+        "architect",
+        "space planning",
+        "interior design",
+        "building design",
+        "feasibility study",
+        "master planning",
+        "concept design",
+        "schematic design",
+        "construction documents",
+        "bidding and negotiation",
+        "construction administration",
+    ],
+    # ==================================
+    # PROFESSIONAL SERVICES - FINANCIAL / LEGAL
+    # ==================================
+    "professional_financial_legal": [
+        "financial advisory",
+        "financial consultant",
+        "audit services",
+        "external audit",
+        "cafr audit",
+        "single audit",
+        "actuarial services",
+        "investment advisory",
+        "treasury management",
+        "banking services",
+        "payroll services",
+        "tax consulting",
+        "legal services",
+        "bond counsel",
+        "labor counsel",
+        "prosecutor services",
+        "public defender",
+    ],
+    # ================================
+    # CONSULTING / TRAINING / GENERAL
+    # ================================
+    "consulting_training": [
+        "consulting services",
+        "management consulting",
+        "organizational consulting",
+        "strategic planning",
+        "facilitation",
+        "training services",
+        "staff training",
+        "training program",
+        "training course",
+        "professional development",
+        "workshops",
+        "workshop",
+        "webinars",
+        "coaching",
+        "change management",
+        "policy development",
+        "procedure development",
+        "certification",
+        "instruction",
+        "project management support",
+        "technical support services",
+        "public education",
+    ],
+    # ===================
+    # SOFTWARE / SAAS / IT
+    # ===================
+    "software_saas": [
+        "software",
+        "saas",
+        "software license",
+        "software renewal",
+        "license renewal",
+        "subscription",
+        "subscription renewal",
+        "maintenance renewal",
+        "support renewal",
+        "saas renewal",
+        "cloud software",
+        "cloud solution",
+        "software-as-a-service",
+        "software as a service",
+        "license agreement",
+        "software maintenance",
+        "software support",
+        "maintenance and support",
+        "erp system",
+        "accounting software",
+        "student information system",
+        "sis",
+        "learning management system",
+        "lms",
+        "document management",
+        "records management",
+        "workflow software",
+        "ticketing system",
+        "service desk software",
+        "crm",
+        "customer relationship management",
+        "gis",
+        "geographic information system",
+        "cad software",
+        "electronic title",
+    ],
+    # ==================
+    # HARDWARE / EQUIPMENT
+    # ==================
+    "hardware_equipment": [
+        "it hardware",
+        "computer hardware",
+        "desktops",
+        "laptops",
+        "laptop purchase",
+        "tablets",
+        "chromebooks",
+        "servers",
+        "storage array",
+        "network equipment",
+        "switches",
+        "routers",
+        "firewalls",
+        "printers",
+        "copiers",
+        "mfp",
+        "multifunction printer",
+        "scanners",
+        "scanner",
+        "av equipment",
+        "audio visual",
+        "projectors",
+        "interactive displays",
+        "digital signage",
+        "headset",
+        "aviation headset",
+        "bose headset",
+        "disc drive",
+        "hard drive",
+        "digital scanner",
+        "black light",
+    ],
+    # =================
+    # PRINTING / SIGNAGE
+    # =================
+    "printing_signage": [
+        "printing services",
+        "print services",
+        "offset printing",
+        "digital printing",
+        "envelopes",
+        "letterhead",
+        "forms printing",
+        "business cards",
+        "brochures",
+        "flyers",
+        "posters",
+        "banners",
+        "signage",
+        "sign fabrication",
+        "wayfinding signs",
+        "traffic signs",
+        "vehicle graphics",
+        "vehicle wraps",
+        "award pins",
+        "service award pins",
+    ],
+    # ==================
+    # FURNITURE / CASEWORK
+    # ==================
+    "furniture_casework": [
+        "furniture",
+        "office furniture",
+        "school furniture",
+        "classroom furniture",
+        "chairs",
+        "desks",
+        "tables",
+        "workstations",
+        "systems furniture",
+        "cubicles",
+        "movable walls",
+        "casework",
+        "built-in casework",
+        "lab casework",
+        "wood casework",
+        "metal casework",
+        "shelving",
+        "storage cabinets",
+        "lockers",
+    ],
+    # =========================
+    # ENVIRONMENTAL / ABATEMENT
+    # =========================
+    "environmental_abatement": [
+        "environmental services",
+        "environmental consulting",
+        "phase i esa",
+        "phase ii esa",
+        "brownfield",
+        "remediation",
+        "soil remediation",
+        "groundwater remediation",
+        "hazardous materials",
+        "hazmat",
+        "asbestos abatement",
+        "asbestos removal",
+        "lead abatement",
+        "lead paint removal",
+        "mold remediation",
+        "indoor air quality",
+        "iaq assessment",
+        "industrial hygiene",
+        "environmental testing",
+        "organic materials management",
+        "organic waste",
+        "composting plan",
+    ],
+    # ==================
+    # LAB / MEDICAL / EMS
+    # ==================
+    "lab_medical_ems": [
+        "laboratory equipment",
+        "lab supplies",
+        "lab instruments",
+        "microscopes",
+        "centrifuge",
+        "spectrophotometer",
+        "medical supplies",
+        "medical equipment",
+        "hospital equipment",
+        "ems supplies",
+        "ambulance equipment",
+        "defibrillator",
+        "aed",
+        "first aid supplies",
+        "pharmaceuticals",
+        "telehealth",
+        "medical transport",
+        "pediatric bundle",
+        "projection system",
+    ],
+    # =======================
+    # PARKS / TRAILS / NATURAL
+    # =======================
+    "parks_trails": [
+        "park improvements",
+        "park construction",
+        "trail construction",
+        "multi-use trail",
+        "bike path",
+        "greenway",
+        "boardwalk",
+        "boat ramp",
+        "dock",
+        "fishing pier",
+        "shelter house",
+        "pavilion",
+        "picnic shelter",
+        "restroom building",
+        "campground",
+        "camping facilities",
+        "natural area restoration",
+        "habitat restoration",
+        "stream restoration",
+        "wetland mitigation",
+    ],
 }
 
 
-def _rule_tags_from_text(text: str) -> List[str]:
-    text_l = (text or "").lower()
-    tags: List[str] = []
+# append extended specialty buckets
+SPECIALTY_KEYWORDS.update(
+    {
+        "id_cards_badging": [
+            "employee card",
+            "id card",
+            "identification card",
+            "badge",
+            "id badge",
+            "name badge",
+            "access card",
+            "smartcard",
+            "smart card",
+            "smartcard reader",
+            "card printer",
+            "card stock",
+            "playing card",
+            "playing cards",
+            "bingo cards",
+        ],
+        "behavioral_health_services": [
+            "problem gambling",
+            "gambling treatment",
+            "substance use treatment",
+            "telehealth services",
+            "behavioral health",
+            "mental health services",
+            "psychologist",
+            "therapy",
+            "counseling",
+            "trauma-focused",
+            "tf-cbt",
+            "cognitive behavioral therapy",
+            "psychological first aid",
+            "pfa training",
+            "crisis intervention",
+        ],
+        "education_training_services": [
+            "education program",
+            "curriculum development",
+            "lesson plans",
+            "educational materials",
+            "soil education",
+            "nutrition education",
+            "recipe development",
+            "professional training",
+            "technical training",
+            "workforce training",
+            "workforce solutions",
+            "workforce development plan",
+            "job training",
+            "academy pro",
+            "training for engineers",
+            "engine repair training",
+            "telehandler training",
+            "personal responsibility education",
+        ],
+        "recreation_entertainment_supplies": [
+            "recreation supplies",
+            "rec supplies",
+            "games",
+            "board games",
+            "card games",
+            "bingo",
+            "bingo accessories",
+            "art supplies",
+            "craft supplies",
+            "markers",
+            "paint",
+            "canvas",
+            "photography props",
+            "photo props",
+            "game console",
+            "xbox",
+            "playstation",
+            "nintendo",
+            "video game systems",
+            "wheelchair swing",
+            "accessible swing",
+            "playground swing",
+            "bleachers",
+            "bleacher",
+            "mascot costume",
+            "mobile workout trailer",
+            "fitness trailer",
+        ],
+        "printing_mailing_services": [
+            "mailing packets",
+            "tax mailing",
+            "tax packets",
+            "printing and mail services",
+            "state printing",
+            "disaster recovery printing",
+            "mail house",
+            "mail presort",
+            "brochure distribution",
+            "flyer distribution",
+            "notification forms",
+            "form printing",
+            "envelope printing",
+        ],
+        "legal_regulatory_experts": [
+            "expert witness",
+            "revenue requirements expert",
+            "rate of return expert",
+            "cost of service expert",
+            "regulatory expert",
+            "regulatory proceedings",
+            "rate case",
+            "public utilities commission",
+            "legal representation",
+            "legal services for parents",
+            "high-quality legal representation",
+            "indigent defense",
+        ],
+        "appraisal_services": [
+            "appraisal services",
+            "real estate appraisal",
+            "property appraisal",
+            "forest tract appraisal",
+            "valuation services",
+            "valuation report",
+            "market value study",
+            "legacy program tracts",
+        ],
+        "medical_lab_supplies": [
+            "renal products",
+            "dialyzers",
+            "dialysis disposables",
+            "bloodlines",
+            "ultrasound machines",
+            "diagnostic ultrasound",
+            "3d ultrasound",
+            "gas chromatograph",
+            "calibration mixture",
+            "lab cylinders",
+            "dna collection kits",
+            "buccal swab kits",
+            "forensic kits",
+            "laboratory supplies",
+            "lab instruments",
+        ],
+        "ups_power_battery_services": [
+            "ups maintenance",
+            "ups service",
+            "uninterruptible power supply service",
+            "battery maintenance",
+            "battery replacement",
+            "vrla batteries",
+            "string replacements",
+            "power backup service",
+            "power conditioning",
+        ],
+        "greenhouse_agricultural": [
+            "greenhouse items",
+            "greenhouse supplies",
+            "soil education",
+            "soil health",
+            "seedlings",
+            "plant trays",
+            "potting soil",
+            "organic materials management",
+            "composting plan",
+            "organic waste",
+        "material management plan",
+        "agricultural education",
+        "greenhouse",
+    ],
+    "law_enforcement_gear": [
+        "riot helmets",
+        "premier crown",
+        "tactical gloves",
+        "mechanix wear",
+        "5.11 abr",
+        "tactical pants",
+        "ballistic vest",
+        "body armor",
+        "salomon quest",
+        "tactical boots",
+        "camera poles",
+        "tactical electronics",
+        "22 lr ammo",
+        "22lr ammunition",
+        "range shed",
+        "poly armor",
+        "powder coat paint",
+        "duty gear",
+        "law enforcement gear",
+        "reflective vest",
+        "high visibility vest",
+        "eotech",
+        "magnifier",
+    ],
+    "property_records_management_software": [
+        "property tax relief screening",
+        "tax relief system",
+        "property tracking system",
+        "land management system",
+        "parcel tracking",
+        "public records request management",
+        "records request platform",
+        "offender management system",
+        "offender tracking",
+        "audit assignment tracking",
+        "case tracking application",
+        "audit assignment",
+    ],
+    "child_family_social_services": [
+        "child care recruitment",
+        "childcare recruitment",
+        "child care mentorship",
+        "childcare mentorship",
+        "family services program",
+        "parent education",
+        "personal responsibility education",
+        "pregnancy prevention",
+        "youth education program",
+        "mentorship program",
+        "ohbaby",
+        "ohbaby kit",
+    ],
+        "religious_services": [
+            "protestant religious services",
+            "catholic religious services",
+            "islamic religious services",
+            "chaplain services",
+            "worship services",
+            "faith-based services",
+            "prison ministry",
+        ],
+        "laundry_linen_services": [
+            "linen services",
+            "linen and laundry",
+            "laundry services",
+            "linen rental",
+            "uniform cleaning",
+            "uniform dry cleaning",
+            "laundry and repair",
+            "laundry and alteration",
+        ],
+        "event_venue_av_services": [
+            "event venue",
+            "conference venue",
+            "summit venue",
+            "staging and audio-visual",
+            "event staging",
+            "conference av",
+            "event production",
+            "two days in may conference",
+            "human trafficking summit",
+            "conference services",
+        ],
+        "pest_control_services": [
+            "pest control services",
+            "exterminator services",
+            "insect control",
+            "rodent control",
+            "mosquito control",
+            "mosquito light poles",
+            "insect light traps",
+        ],
+    "industrial_shop_equipment": [
+        "hydraulic shear",
+        "metal shear",
+        "plasma table",
+        "plasma consumables",
+        "grinder",
+        "cylinder end grinder",
+        "tool carrier",
+        "hydraulic attachments",
+        "shop equipment",
+        "welding equipment",
+        "fabrication equipment",
+        "pipe scope",
+        "depth finder",
+        "jack and bore",
+        "jacking and boring",
+    ],
+    "software_dev_it_tools": [
+        "bluebeam",
+        "brandfolder",
+        "smartsheet",
+        "service desk plus",
+        "servicedesk plus",
+        "manageengine",
+        "sharegate",
+        "neoload",
+        "triscentis",
+        "erwin data modeler",
+        "telerik devcraft",
+        "ftk",
+        "forensic toolkit",
+        "sql data catalog",
+        "service now",
+        "servicenow",
+        "eventbrite pro",
+        "autocad",
+        "adobe licenses",
+        "design software",
+        "developer tools",
+        "identityserver",
+        "commvault",
+        "duende",
+        "sftp licenses",
+        "falcon sandbox",
+    ],
+    "public_safety_communications": [
+        "nextgen911",
+        "next gen 911",
+        "911 platform",
+        "public safety answering point",
+        "psap",
+        "emergency communications",
+        "dispatch software",
+        "911 cloud-based platform",
+        "portable radio",
+    ],
+    }
+)
 
-    # from taxonomy: if text contains keywords of a category, add that category
-    for cat, kws in BASE_CATEGORIES.items():
-        for kw in kws:
-            if kw in text_l:
-                tags.append(cat)
-                break  # don't add same category multiple times
 
-    # from extra tag map
-    for kw, tag in _DEFAULT_EXTRA_TAGS.items():
-        if kw in text_l:
-            tags.append(tag)
+# --------------------------------------------------------------------------- #
+# Helpers                                                                    #
+# --------------------------------------------------------------------------- #
 
-    # dedupe but keep order
-    seen = set()
-    clean = []
-    for t in tags:
-        if t not in seen:
-            seen.add(t)
-            clean.append(t)
-    return clean
-
-
-def _strip_code_fences(s: str) -> str:
+def _build_phrase_regex(phrase: str) -> re.Pattern:
     """
-    Handle outputs like:
-    ```json
-    ["a","b"]
-    ```
-    or
-    ``` 
-    ["a","b"]
-    ```
+    Compile a case-insensitive regex that respects word-ish boundaries.
+    Single words get a suffix wildcard to match stems (striping/striped/etc.).
     """
-    if not s:
-        return s
-
-    s = s.strip()
-
-    # remove leading/trailing ```...```
-    if s.startswith("```"):
-        # drop first line
-        s = s.lstrip("`")
-        # sometimes it's ```json or ```JSON
-        s = re.sub(r"^(json|JSON)\s*", "", s)
-    # remove trailing ```
-    s = s.replace("```", "").strip()
-    return s
+    text = phrase.lower()
+    if " " not in text and len(text) >= 4:
+        escaped = re.escape(text)
+        return re.compile(rf"(?:^|[^a-z0-9]){escaped}\w*(?:$|[^a-z0-9])", re.IGNORECASE)
+    escaped = re.escape(text)
+    return re.compile(rf"(?:^|[^a-z0-9]){escaped}(?:$|[^a-z0-9])", re.IGNORECASE)
 
 
-def _normalize_tag(t: str) -> str:
-    t = t.strip().strip('"').strip("'")
-    t = t.lower()
-    # replace spaces / dashes with underscore
-    t = re.sub(r"[ \-]+", "_", t)
-    return t
+_SPECIALTY_PATTERNS: Dict[str, List[Tuple[re.Pattern, str]]] = {}
+for specialty, phrases in SPECIALTY_KEYWORDS.items():
+    compiled: List[Tuple[re.Pattern, str]] = []
+    for p in phrases:
+        compiled.append((_build_phrase_regex(p), p))
+    _SPECIALTY_PATTERNS[specialty] = compiled
 
 
-def _llm_tags_to_list(raw: str) -> List[str]:
+def _score_specialties(blob: str) -> List[Tuple[str, int, List[str]]]:
     """
-    Take whatever Ollama/OpenAI gave us and try really hard to make a list of strings.
+    Return list of (specialty_key, hit_count, matched_phrases).
     """
-    if not raw:
+    if not blob:
         return []
+    scores: List[Tuple[str, int, List[str]]] = []
+    for key, patterns in _SPECIALTY_PATTERNS.items():
+        matches: List[str] = []
+        count = 0
+        for regex, phrase in patterns:
+            if regex.search(blob):
+                count += 1
+                matches.append(phrase)
+        if count:
+            scores.append((key, count, matches))
+    # sort by hit count desc, then by length of first phrase (more specific), then alpha
+    scores.sort(key=lambda x: (-x[1], -len(x[2][0]) if x[2] else 0, x[0]))
+    return scores
 
-    raw = _strip_code_fences(raw)
 
-    # try JSON first
-    if raw.startswith("[") and raw.endswith("]"):
-        try:
-            data = json.loads(raw)
-            if isinstance(data, list):
-                return [_normalize_tag(x) for x in data if isinstance(x, str) and x.strip()]
-        except Exception:
-            pass
-
-    # some models return: construction, roadway, paving
-    parts = [p for p in re.split(r"[,\n]", raw) if p.strip()]
-    parts = [_normalize_tag(p) for p in parts]
-    return parts
-
+# --------------------------------------------------------------------------- #
+# Main entry                                                                 #
+# --------------------------------------------------------------------------- #
 
 def auto_tags_from_blob(
     title: str = "",
     description: str = "",
     full_text: str = "",
-    llm_client=None,
+    llm_client=None,  # ignored; kept for backward compatibility
     max_tags: int = 6,
 ) -> List[str]:
     """
-    Generate suggested tags for an opportunity.
+    Deterministically generate specialty tags from text.
+
+    We preserve the function signature so ingestion calls remain unchanged.
     """
     blob = (full_text or "").strip() or (description or "").strip() or (title or "").strip()
+    blob = blob.lower()
     if not blob:
         return []
 
-    # rule-based first
-    base_tags = _rule_tags_from_text(blob)
+    scored = _score_specialties(blob)
+    tags: List[str] = []
+    for key, _, _ in scored:
+        if key not in tags:
+            tags.append(key)
+        if len(tags) >= max_tags:
+            break
 
-    # no LLM? return the rule-based slice
-    if llm_client is None:
-        return base_tags[:max_tags]
-
-    # LLM enhancement
-    try:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You extract 3-6 SHORT tags from municipal RFP/RFQ texts. "
-                    "Return ONLY a JSON array of strings, all lowercase, snake_case if multiword. "
-                    "Examples: [\"construction\", \"roadway\", \"stormwater\"]"
-                ),
-            },
-            {
-                "role": "user",
-                "content": blob[:3500],
-            },
-        ]
-        raw = llm_client.chat(messages, temperature=0)
-        llm_tags = _llm_tags_to_list(raw)
-
-        # merge rule-based and llm
-        merged = base_tags + llm_tags
-    except Exception as e:
-        print(f"[AI auto_tags] LLM error: {e}")
-        merged = base_tags
-
-    # final cleanup / dedupe / filter junk
-    seen = set()
-    final: List[str] = []
-    for t in merged:
-        if not t:
-            continue
-        if t.startswith("```"):  # extra safety
-            continue
-        if t in ("json", "data", "text"):
-            continue
-
-        # --- NEW: normalize LLM typos / variants ---
-        if t in ("cnv_powered", "cng_power", "cng_powerd"):
-            t = "cng_powered"
-
-        if t not in seen:
-            seen.add(t)
-            final.append(t)
-
-    return final[:max_tags]
-
+    return tags

@@ -43,21 +43,28 @@ async def opportunities(request: Request):
     sort_by = query_params.get("sort_by", "soonest_due").strip()
     status_filter = query_params.get("status", "").strip().lower()
 
+    # -------- saved preferences (agencies, keywords) --------
+    pref_agencies = []
+    pref_keywords = []
+    async with engine.begin() as conn:
+        pref_res = await conn.execute(
+            text("SELECT agencies, keywords FROM user_preferences WHERE user_email = :email"),
+            {"email": user_email},
+        )
+        pref_row = pref_res.first()
+    if pref_row:
+        try:
+            pref_agencies = json.loads(pref_row[0] or "[]") if len(pref_row) > 0 else []
+        except Exception:
+            pref_agencies = []
+        try:
+            pref_keywords = json.loads(pref_row[1] or "[]") if len(pref_row) > 1 else []
+        except Exception:
+            pref_keywords = []
+
     # fallback to saved preference if no agency specified in URL
-    if not agency_param_present and not agency_filter:
-        async with engine.begin() as conn:
-            pref_res = await conn.execute(
-                text("SELECT agencies FROM user_preferences WHERE user_email = :email"),
-                {"email": user_email},
-            )
-            pref_row = pref_res.first()
-        if pref_row and pref_row[0]:
-            try:
-                saved_agencies = json.loads(pref_row[0])
-                if isinstance(saved_agencies, list) and saved_agencies:
-                    agency_filter = saved_agencies[0]
-            except Exception:
-                pass
+    if not agency_param_present and not agency_filter and pref_agencies:
+        agency_filter = pref_agencies[0]
 
     # normalize due_within
     allowed_due_windows = {"7", "30", "90"}
@@ -99,6 +106,19 @@ async def opportunities(request: Request):
     # optional status-only filter
     if status_filter == "open":
         where_clauses.append("(status IS NULL OR TRIM(LOWER(status)) LIKE 'open%')")
+
+    # specialties / tags filter
+    tags_raw = query_params.get("tags", "")
+    tags_filter = [t.strip().lower() for t in tags_raw.split(",") if t.strip()]
+    if (not tags_filter) and pref_keywords:
+        tags_filter = [str(t).strip().lower() for t in pref_keywords if str(t).strip()]
+    if tags_filter:
+        tag_clauses = []
+        for idx, tval in enumerate(tags_filter):
+            key = f"tag_{idx}"
+            sql_params[key] = f"%{tval}%"
+            tag_clauses.append(f"LOWER(COALESCE(ai_tags_json, '')) LIKE :{key}")
+        where_clauses.append("(" + " OR ".join(tag_clauses) + ")")
 
     where_sql = " AND ".join(where_clauses)
 
@@ -410,37 +430,55 @@ async def opportunities(request: Request):
         sel = "selected" if sort_by == val else ""
         sort_options_html.append(f"<option value='{val}' {sel}>{label}</option>")
 
-    # placeholder until chips are implemented
+    # specialties input & chips
+    tags_value = ",".join(tags_filter)
     chips_html = ""
+    if tags_filter:
+        chips = "".join([f"<span class='chip'>{_esc_attr(t)}</span>" for t in tags_filter])
+        chips_html = f"""
+        <div class="filter-chips">
+          <span>Specialties:</span>
+          {chips}
+          <a href="/opportunities?agency=" class="chip-clear">Clear</a>
+        </div>
+        """
 
     body_filter_html = f"""
-    <section class="card" style="margin-bottom:12px;">
+    <section class="card filter-card" style="padding:18px 18px 14px;">
       <style>
-        .filter-grid input[type="text"],
-        .filter-grid select {{
-          padding:10px 12px;
-          border:1px solid #e5e7eb;
-          border-radius:10px;
-          font-size:14px;
-          height:40px;
+        .filter-card .filter-head {{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }}
+        .filter-card .filter-head h3 {{ margin:0; font-size:17px; }}
+        .filter-card .filter-head .subtext {{ margin-top:2px; color:#64748b; font-size:13px; }}
+        .filter-card .reset-link {{ font-size:12px; color:#2563eb; text-decoration:none; }}
+        .filter-card .reset-link:hover {{ text-decoration:underline; }}
+        .filter-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; align-items:end; }}
+        @media (min-width: 980px) {{
+          .filter-grid {{ grid-template-columns: repeat(4, minmax(220px, 1fr)); }}
         }}
-        .filter-grid label.label-small {{ margin-bottom:4px; }}
-        .filter-grid .checkbox-row {{
-          display:flex; align-items:center; gap:8px; font-size:14px; padding:10px 0;
+        .span-2 {{ grid-column: span 2; min-width:220px; }}
+        .filter-grid input[type="text"], .filter-grid select {{
+          padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; font-size:14px; height:40px; width:100%;
         }}
-        .filter-grid .checkbox-row input {{ width:16px; height:16px; accent-color: var(--accent-bg); }}
-        .filter-grid .actions {{ display:flex; gap:10px; align-items:center; }}
-        .filter-grid .actions .button-primary {{ padding:10px 16px; border-radius:10px; }}
+        .filter-grid label.label-small {{ margin-bottom:4px; display:block; color:#0f172a; }}
+        .filter-grid .checkbox-row {{ display:flex; align-items:center; gap:8px; font-size:14px; padding:6px 0; color:#0f172a; }}
+        .filter-grid .checkbox-row input {{ width:16px; height:16px; accent-color:#2563eb; }}
+        .filter-chips {{ margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:#0f172a; }}
+        .filter-chips .chip {{ background:#eef2ff; color:#4338ca; padding:6px 8px; border-radius:999px; font-weight:600; }}
+        .filter-chips .chip-clear {{ font-size:12px; color:#2563eb; text-decoration:none; }}
+        .filter-chips .chip-clear:hover {{ text-decoration:underline; }}
+        .filter-card .muted {{ color:#94a3b8; font-size:12px; margin-top:2px; }}
       </style>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
+
+      <div class="filter-head">
         <div>
-          <h3 class="section-heading" style="font-size:18px;margin:0;">Filter</h3>
-          <div class="subtext" style="margin:4px 0 0 0;">Narrow the feed by agency, keyword, due date, and status.</div>
+          <h3 class="section-heading">Filters</h3>
+          <div class="subtext">Blend your saved specialties with quick tweaks.</div>
         </div>
-        <a href="/opportunities?agency=" style="font-size:12px;color:var(--accent-text);text-decoration:underline;white-space:nowrap;">Reset / Show all</a>
+        <a href="/opportunities?agency=" class="reset-link">Reset</a>
       </div>
+
       <form method="GET" action="/opportunities">
-        <div class="filter-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:end;">
+        <div class="filter-grid">
           <div class="form-col">
             <label class="label-small">Agency</label>
             <select name="agency">
@@ -450,7 +488,12 @@ async def opportunities(request: Request):
 
           <div class="form-col">
             <label class="label-small">Search title</label>
-            <input type="text" name="search" value="{search_filter}" placeholder="road, IT managed services..." />
+            <input type="text" name="search" value="{search_filter}" placeholder="road, managed services, HVAC..." />
+          </div>
+
+          <div class="form-col">
+            <label class="label-small">Specialties</label>
+            <input type="text" name="tags" value="{tags_value}" placeholder="hvac, paving, it" />
           </div>
 
           <div class="form-col">
@@ -472,10 +515,8 @@ async def opportunities(request: Request):
             </select>
           </div>
 
-          <div class="form-col" style="align-self:flex-end;">
-            <div class="actions">
-              <button class="button-primary" type="submit">Apply filters</button>
-            </div>
+          <div class="form-col" style="max-width:220px;">
+            <button class="button-primary" type="submit" style="width:100%;">Apply</button>
           </div>
         </div>
       </form>
@@ -490,6 +531,8 @@ async def opportunities(request: Request):
             parts.append(f"agency={agency_filter.replace(' ', '+')}")
         if search_filter:
             parts.append(f"search={search_filter.replace(' ', '+')}")
+        if tags_filter:
+            parts.append(f"tags={'+'.join(tags_filter)}")
         if due_within is not None:
             parts.append(f"due_within={due_within}")
         if sort_by:

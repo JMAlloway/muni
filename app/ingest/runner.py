@@ -156,8 +156,10 @@ async def ai_enrich_opportunity(conn, external_id: str, agency_name: str) -> boo
     # 👉 this is the field you said has the full description
     title = row.get("title") or ""
     agency = row.get("agency_name") or ""
-    desc = row.get("description") or ""
+    summary = row.get("summary") or ""
+    desc = summary or row.get("description") or ""
     full_text = row.get("full_text") or ""
+    combined_blob = " ".join([p for p in (full_text, desc, summary, title) if p])
 
     # prefer the longest/most detailed text we have
     blob = full_text or desc or title
@@ -186,9 +188,22 @@ async def ai_enrich_opportunity(conn, external_id: str, agency_name: str) -> boo
         ai_tags = auto_tags_from_blob(
             title=title,
             description=desc,
-            full_text=full_text,
+            full_text=combined_blob,
             llm_client=LLM_CLIENT,
         ) or []
+        # fallback: if still empty and we have a summary, try summary-only to squeeze matches
+        if not ai_tags and summary:
+            ai_tags = auto_tags_from_blob(
+                title=title,
+                description=summary,
+                full_text=summary,
+                llm_client=LLM_CLIENT,
+            ) or []
+
+    # If we found strong specialty tags, let them override an empty/other category.
+    if ai_tags and (not cat or cat == "other"):
+        cat = ai_tags[0]
+        conf = 0.9
 
     print(
         f"[AI] title={title[:120]!r} | agency={agency!r} | ext={external_id!r} "
@@ -283,25 +298,25 @@ async def run_ingestors_once() -> int:
 
     sources = [
          #mock_ingestor.fetch,
-         #city_columbus.fetch,
-         #city_grove_city.fetch,
-         #city_gahanna.fetch,
-         #city_marysville.fetch,
-         #city_whitehall.fetch,
-         #city_worthington.fetch,
-         #city_grandview_heights.fetch,
-         #swaco.fetch,
-         #cota.fetch,
-         #franklin_county.fetch,
-         #city_westerville.fetch,
-         #columbus_metropolitan_library.fetch,
-         #cmha.fetch,
-         #metro_parks.fetch,
-         #columbus_airports.fetch,
-         #morpc.fetch,
-         #dublin_city_schools.fetch,
-         #minerva_park.fetch,
-         #city_new_albany.fetch,
+         city_columbus.fetch,
+         city_grove_city.fetch,
+         city_gahanna.fetch,
+         city_marysville.fetch,
+         city_whitehall.fetch,
+         city_worthington.fetch,
+         city_grandview_heights.fetch,
+         swaco.fetch,
+         cota.fetch,
+         franklin_county.fetch,
+         city_westerville.fetch,
+         columbus_metropolitan_library.fetch,
+         cmha.fetch,
+         metro_parks.fetch,
+         columbus_airports.fetch,
+         morpc.fetch,
+         dublin_city_schools.fetch,
+         minerva_park.fetch,
+         city_new_albany.fetch,
          ohiobuys.fetch,
     ]
 
@@ -393,12 +408,19 @@ async def run_ingestors_once() -> int:
                 if not updated:
                     # ✅ NEW: fallback so these rows don't stay NULL
                     title = r.get("title") if isinstance(r, dict) else getattr(r, "title", "")
+                    summary = r.get("summary") if isinstance(r, dict) else getattr(r, "summary", "")
                     desc = (
                         (r.get("full_text") if isinstance(r, dict) else getattr(r, "full_text", ""))
-                        or (r.get("summary") if isinstance(r, dict) else getattr(r, "summary", ""))
+                        or summary
                         or (r.get("description") if isinstance(r, dict) else getattr(r, "description", ""))
                         or title
                     )
+                    combined_blob = " ".join([p for p in (
+                        r.get("full_text") if isinstance(r, dict) else getattr(r, "full_text", ""),
+                        summary,
+                        desc,
+                        title,
+                    ) if p])
                     hash_body = r.get("hash_body") if isinstance(r, dict) else getattr(r, "hash_body", "")
                     blob = desc or title
 
@@ -424,9 +446,21 @@ async def run_ingestors_once() -> int:
                         ai_tags = auto_tags_from_blob(
                             title=title or "",
                             description=desc or "",
-                            full_text=blob or "",
+                            full_text=combined_blob or "",
                             llm_client=LLM_CLIENT,
                         ) or []
+                        if not ai_tags and summary:
+                            ai_tags = auto_tags_from_blob(
+                                title=title or "",
+                                description=summary or "",
+                                full_text=summary or "",
+                                llm_client=LLM_CLIENT,
+                            ) or []
+
+                    # Use specialty tags to set category when we otherwise have "other"/none.
+                    if ai_tags and (not cat or cat == "other"):
+                        cat = ai_tags[0]
+                        conf = 0.9
 
                     # baseline update (what you had)
                     await conn.execute(
