@@ -151,10 +151,10 @@ async def home(request: Request):
             <div><span class="pill">Delaware County</span></div>
         </div>
         <div class="logo-row" style="margin-top:10px;">
-            <img class="logo" alt="Columbus" src="/static/logos/columbus.svg" onerror="this.style.display='none'">
-            <img class="logo" alt="COTA" src="/static/logos/cota.svg" onerror="this.style.display='none'">
-            <img class="logo" alt="SWACO" src="/static/logos/swaco.svg" onerror="this.style.display='none'">
-            <img class="logo" alt="CRAA" src="/static/logos/craa.svg" onerror="this.style.display='none'">
+            <img class="logo" alt="Columbus" src="/static/columbus.png" onerror="this.style.display='none'">
+            <img class="logo" alt="Agency" src="/static/logo.png" onerror="this.style.display='none'">
+            <img class="logo" alt="Agency" src="/static/logo.png" onerror="this.style.display='none'">
+            <img class="logo" alt="Agency" src="/static/logo.png" onerror="this.style.display='none'">
         </div>
     </section>
     """

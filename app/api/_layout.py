@@ -442,7 +442,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 
 <header class="navbar">
     <div class="brand-block">
-        <img src="/static/logo.svg" alt="Site logo" class="brand-logo" />
+        <img src="static/logo.png" alt="Site logo" class="brand-logo" />
         <div class="brand-name">EasyRFP</div>
         <div class="brand-tagline">Find local bids. Faster.</div>
     </div>
