@@ -13,6 +13,7 @@ from app.core.settings import settings
 from app.core.db_core import engine, save_opportunities
 from app.core.db import AsyncSessionLocal  # legacy ORM session factory for users table
 from app.core.emailer import send_email
+from app.core.sms import send_sms
 from app.ingest.runner import run_ingestors_once
 
 
@@ -50,7 +51,7 @@ def build_digest_html(
         "<div style='font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;"
         "max-width:600px;margin:0 auto;padding:16px 20px;color:#1a1a1a;'>"
         f"<h2 style='margin:0 0 12px;font-size:20px;font-weight:600;'>"
-        f"Muni Alerts – {total_count} New / Updated Opportunities"
+        f"EasyRFP - {total_count} New / Updated Opportunities"
         "</h2>"
         "<p style='margin:0 0 24px;font-size:14px;line-height:1.4;color:#444;'>"
         "Bids and RFPs sourced from participating municipalities in Central Ohio."
@@ -78,7 +79,7 @@ def build_digest_html(
     parts.append(
         "<hr style='border:none;border-top:1px solid #ddd;margin:24px 0;'>"
         "<p style='margin:0;font-size:12px;line-height:1.4;color:#777;'>"
-        "You’re receiving this because you're subscribed to Muni Alerts. "
+        "You're receiving this because you're subscribed to EasyRFP. "
         "Preferences (frequency, agencies, etc.) coming soon.<br>"
         "<span style='color:#bbb;'>Prototype build • not for redistribution</span>"
         "</p>"
@@ -160,7 +161,11 @@ async def _send_digest_to_matching_users(
         text("""
             SELECT email,
                    digest_frequency,
-                   agency_filter
+                   agency_filter,
+                   tier,
+                   sms_phone,
+                   sms_opt_in,
+                   sms_phone_verified
             FROM users
             WHERE is_active = 1
         """)
@@ -174,7 +179,15 @@ async def _send_digest_to_matching_users(
     await asyncio.sleep(2.0)
 
     for row in users:
-        email, freq, agency_filter_json = row
+        (
+            email,
+            freq,
+            agency_filter_json,
+            tier,
+            sms_phone,
+            sms_opt_in,
+            sms_phone_verified,
+        ) = row
         if (freq or "").strip().lower() != target_frequency:
             continue
 
@@ -259,18 +272,18 @@ async def _send_digest_to_matching_users(
             "<div style='font-family:Arial,sans-serif;color:#111;font-size:15px;line-height:1.5;"
             "background-color:#ffffff;padding:24px;max-width:640px;margin:auto;'>"
             f"<h2 style='margin:0 0 8px;font-size:20px;font-weight:600;'>"
-            f"Muni Alerts — {total_opps_count} New / Updated Opportunities</h2>"
+            f"EasyRFP - {total_opps_count} New / Updated Opportunities</h2>"
             f"<p style='margin:0 0 24px;color:#4b5563;'>Bids and RFPs from {window_text}.</p>"
             + "".join(agency_sections_html) +
             "<hr style='border:none;border-top:1px solid #ddd;margin:24px 0;'>"
             "<p style='font-size:12px;color:#888;'>"
-            "You’re receiving this because you’re subscribed to Muni Alerts. "
+            "You're receiving this because you're subscribed to EasyRFP. "
             "To change preferences, update your account settings."
             "</p>"
             "</div>"
         )
 
-        subject = f"Muni Alerts — {total_opps_count} New / Updated Opportunities"
+        subject = f"EasyRFP - {total_opps_count} New / Updated Opportunities"
 
         try:
             await asyncio.to_thread(send_email, email, subject, html_body)
@@ -278,6 +291,24 @@ async def _send_digest_to_matching_users(
             total_sent += 1
         except Exception as e:
             print(f"[digest:{target_frequency}] ERROR sending to {email}: {e}")
+
+        # Optional SMS nudge for premium, opted-in, verified users
+        premium_tiers = {"starter", "professional", "enterprise"}
+        phone = (sms_phone or "").strip()
+        if (
+            phone
+            and sms_opt_in
+            and sms_phone_verified
+            and (tier or "").lower() in premium_tiers
+        ):
+            sms_body = (
+                f"{total_opps_count} new/updated bids in {window_text}. "
+                f"See your feed: {APP_BASE_URL}/opportunities"
+            )
+            try:
+                await asyncio.to_thread(send_sms, phone, sms_body)
+            except Exception as exc:
+                print(f"[digest:{target_frequency}] SMS failed for {email}: {exc}")
 
         await asyncio.sleep(2.0)
 

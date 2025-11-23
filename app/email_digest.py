@@ -34,7 +34,7 @@ async def build_digest_html(conn, llm_client=None) -> str:
 
     html = [
         "<html><body style='font-family:Arial,sans-serif;'>",
-        "<h1 style='margin-bottom:16px;'>Muni Alerts – New Opportunities</h1>",
+        "<h1 style='margin-bottom:16px;'>EasyRFP - New Opportunities</h1>",
     ]
 
     for agency, items in grouped.items():
@@ -95,7 +95,7 @@ async def send_digest(to_email: str):
     llm_client = get_llm_client()
     async with engine.begin() as conn:
         html = await build_digest_html(conn, llm_client=llm_client)
-    subject = "Muni Alerts – New Opportunities"
+    subject = "EasyRFP - New Opportunities"
     send_email(to_email, subject, html)
     print(f"✅ Digest sent to {to_email}")
 

@@ -83,6 +83,31 @@ async def get_preferences(request: Request):
                 </div>
             </div>
 
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="label-small">Mobile for SMS alerts</label>
+                    <input type="text" name="sms_phone" placeholder="(555) 555-5555" />
+                    <label class="label-small" style="font-weight:400;margin-top:6px;">
+                        <input type="checkbox" name="sms_opt_in" value="1" /> Send me SMS alerts (due soon + digest)
+                    </label>
+                    <div class="muted" style="margin-top:4px;">
+                        SMS available on paid plans; carrier rates may apply.
+                    </div>
+                </div>
+                <div class="form-col">
+                    <label class="label-small">Plan</label>
+                    <select name="tier">
+                        <option value="free">Free</option>
+                        <option value="starter">Starter</option>
+                        <option value="professional">Professional</option>
+                        <option value="enterprise">Enterprise</option>
+                    </select>
+                    <div class="muted" style="margin-top:4px;">
+                        SMS alerts require Starter, Professional, or Enterprise.
+                    </div>
+                </div>
+            </div>
+
             <div style="margin-bottom:24px;">
                 <label class="label-small">Which agencies matter to you?</label>
                 <div class="agency-grid">
@@ -119,7 +144,7 @@ async def get_preferences(request: Request):
     </section>
     """
 
-    return HTMLResponse(page_shell(body_html, title="Muni Alerts Preferences", user_email=user_email))
+    return HTMLResponse(page_shell(body_html, title="EasyRFP Preferences", user_email=user_email))
 
 
 @router.post("/preferences", response_class=HTMLResponse)
@@ -128,6 +153,9 @@ async def post_preferences(
     email: str = Form(...),
     frequency: str = Form(...),
     agency: List[str] = Form([]),
+    sms_phone: str = Form(""),
+    sms_opt_in: str = Form(""),
+    tier: str = Form("free"),
 ):
     user_email = get_current_user_email(request)
 
@@ -136,21 +164,37 @@ async def post_preferences(
     if freq_clean not in ("daily", "weekly", "none"):
         freq_clean = "daily"
 
+    tier_clean = tier.strip().lower()
+    if tier_clean not in ("free", "starter", "professional", "enterprise"):
+        tier_clean = "free"
+
+    phone_clean = sms_phone.strip()
+    opt_in_flag = sms_opt_in.strip() != ""
+    phone_verified = 1 if (opt_in_flag and phone_clean) else 0
+
     agencies_json = json.dumps(agency)
 
     async with AsyncSessionLocal() as session:
         await session.execute(
             text("""
-                INSERT INTO users (email, digest_frequency, agency_filter, created_at)
-                VALUES (:email, :freq, :agencies, CURRENT_TIMESTAMP)
+                INSERT INTO users (email, digest_frequency, agency_filter, created_at, sms_phone, sms_opt_in, sms_phone_verified, tier)
+                VALUES (:email, :freq, :agencies, CURRENT_TIMESTAMP, :sms_phone, :sms_opt_in, :sms_verified, :tier)
                 ON CONFLICT(email) DO UPDATE SET
                     digest_frequency = excluded.digest_frequency,
-                    agency_filter = excluded.agency_filter
+                    agency_filter = excluded.agency_filter,
+                    sms_phone = excluded.sms_phone,
+                    sms_opt_in = excluded.sms_opt_in,
+                    sms_phone_verified = excluded.sms_phone_verified,
+                    tier = excluded.tier
             """),
             {
                 "email": email_clean,
                 "freq": freq_clean,
                 "agencies": agencies_json,
+                "sms_phone": phone_clean,
+                "sms_opt_in": 1 if opt_in_flag else 0,
+                "sms_verified": phone_verified,
+                "tier": tier_clean,
             },
         )
         await session.commit()
@@ -159,7 +203,7 @@ async def post_preferences(
 
     body_html = f"""
     <section class="card">
-        <h2 class="section-heading">You're on the list âœ…</h2>
+        <h2 class="section-heading">You're on the list.</h2>
         <p class="subtext" style="margin-bottom:16px;">
             We'll send opportunities to <b>{email_clean}</b> at <b>{freq_clean}</b> frequency.
         </p>
@@ -169,7 +213,7 @@ async def post_preferences(
             <code class="chip">{agencies_label}</code>
         </div>
 
-        <a class="button-primary" href="/opportunities">See current bids â†’</a>
+        <a class="button-primary" href="/opportunities">See current bids</a>
         <div class="muted" style="margin-top:12px;">
             Want to edit these later? <a class="cta-link" href="/signup">Create an account</a>
             to manage settings.

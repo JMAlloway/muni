@@ -448,7 +448,7 @@ async def onboarding_get(request: Request):
     return HTMLResponse(
         page_shell(
             html_body,
-            title="Onboarding – Muni Alerts",
+            title="Onboarding - EasyRFP",
             user_email=user_email,
         )
     )
@@ -574,7 +574,7 @@ async def onboarding_post(
         return HTMLResponse(
             page_shell(
                 success_body,
-                title="Preferences Saved – Muni Alerts",
+                title="Preferences Saved - EasyRFP",
                 user_email=user_email,
             )
         )
@@ -591,7 +591,7 @@ async def onboarding_post(
     return HTMLResponse(
         page_shell(
             html_body,
-            title="Onboarding – Muni Alerts",
+            title="Onboarding - EasyRFP",
             user_email=user_email,
         ),
         status_code=400,

@@ -11,11 +11,18 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    tier: Mapped[str] = mapped_column(String, default="free")  # free, starter, professional, enterprise
+    team_id: Mapped[str | None] = mapped_column(String, default=None, index=True)
+    sms_phone: Mapped[str | None] = mapped_column(String, default=None)
+    sms_opt_in: Mapped[bool] = mapped_column(Boolean, default=False)
+    sms_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)
     primary_interest: Mapped[str] = mapped_column(String, default="everything")
     onboarding_step: Mapped[str] = mapped_column(String, default="signup")
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     first_tracked_at: Mapped[dt.datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    stripe_customer_id: Mapped[str | None] = mapped_column(String, default=None)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String, default=None)
 
 class Opportunity(Base):
     __tablename__ = "opportunity"
@@ -44,3 +51,33 @@ class Preference(Base):
     categories: Mapped[list[str]] = mapped_column(JSON, default=list)
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
     cadence: Mapped[str] = mapped_column(String, default="daily")
+
+
+class Team(Base):
+    __tablename__ = "teams"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String, default="Team")
+    owner_user_id: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)
+
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id: Mapped[str] = mapped_column(String, index=True)
+    user_id: Mapped[str | None] = mapped_column(String, index=True, default=None)
+    invited_email: Mapped[str] = mapped_column(String, index=True)
+    role: Mapped[str] = mapped_column(String, default="member")  # owner, admin, member
+    invited_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)
+    accepted_at: Mapped[dt.datetime | None] = mapped_column(TIMESTAMP(timezone=True), default=None)
+
+
+class BidNote(Base):
+    __tablename__ = "bid_notes"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id: Mapped[str] = mapped_column(String, index=True)
+    opportunity_id: Mapped[str] = mapped_column(String, index=True)
+    author_user_id: Mapped[str] = mapped_column(String, index=True)
+    body: Mapped[str] = mapped_column(Text)
+    mentions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)

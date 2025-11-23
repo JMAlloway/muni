@@ -57,6 +57,26 @@ async def ensure_onboarding_schema(engine) -> None:
                 await conn.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN first_tracked_at TIMESTAMP"
                 )
+            if "tier" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN tier TEXT DEFAULT 'free'"
+                )
+            if "team_id" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN team_id TEXT"
+                )
+            if "sms_phone" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN sms_phone TEXT"
+                )
+            if "sms_opt_in" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN sms_opt_in INTEGER DEFAULT 0"
+                )
+            if "sms_phone_verified" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN sms_phone_verified INTEGER DEFAULT 0"
+                )
 
             res = await conn.exec_driver_sql(
                 """
@@ -79,6 +99,126 @@ async def ensure_onboarding_schema(engine) -> None:
                 await conn.exec_driver_sql(
                     "CREATE INDEX idx_onboarding_events_email ON user_onboarding_events(user_email)"
                 )
+    except Exception:
+        # Non-SQLite or insufficient permissions; ignore quietly.
+        return
+
+
+async def ensure_team_schema(engine) -> None:
+    """Ensure team tables exist for collaboration features."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql(
+                """
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='teams'
+                """
+            )
+            if not res.fetchone():
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE teams (
+                        id TEXT PRIMARY KEY,
+                        name TEXT DEFAULT 'Team',
+                        owner_user_id TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            else:
+                # Backfill missing created_at column if table exists without it
+                res_cols = await conn.exec_driver_sql("PRAGMA table_info('teams')")
+                cols: Set[str] = {row._mapping["name"] for row in res_cols.fetchall()}
+                if "created_at" not in cols:
+                    await conn.exec_driver_sql(
+                        "ALTER TABLE teams ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    )
+            res = await conn.exec_driver_sql(
+                """
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='team_members'
+                """
+            )
+            if not res.fetchone():
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE team_members (
+                        id TEXT PRIMARY KEY,
+                        team_id TEXT,
+                        user_id TEXT,
+                        invited_email TEXT,
+                        role TEXT DEFAULT 'member',
+                        invited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        accepted_at TIMESTAMP
+                    )
+                    """
+                )
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id)"
+                )
+            else:
+                res_cols = await conn.exec_driver_sql("PRAGMA table_info('team_members')")
+                cols: Set[str] = {row._mapping["name"] for row in res_cols.fetchall()}
+                if "invited_at" not in cols:
+                    await conn.exec_driver_sql(
+                        "ALTER TABLE team_members ADD COLUMN invited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    )
+            # Ensure unique index on (team_id, invited_email) for conflict checks
+            await conn.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_members_unique ON team_members(team_id, invited_email)"
+            )
+            res = await conn.exec_driver_sql(
+                """
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='bid_notes'
+                """
+            )
+            if not res.fetchone():
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE bid_notes (
+                        id TEXT PRIMARY KEY,
+                        team_id TEXT,
+                        opportunity_id TEXT,
+                        author_user_id TEXT,
+                        body TEXT,
+                        mentions JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_bid_notes_team ON bid_notes(team_id)"
+                )
+    except Exception:
+        return
+
+
+async def ensure_user_tier_column(engine) -> None:
+    """Ensure users.tier exists so billing/webhooks can persist plan."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql("PRAGMA table_info('users')")
+            cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
+            if "tier" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN tier TEXT DEFAULT 'Free'"
+                )
+    except Exception:
+        return
+
+
+async def ensure_billing_schema(engine) -> None:
+    """Add billing-related columns to users table if missing."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql("PRAGMA table_info('users')")
+            cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
+
+            if "stripe_customer_id" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
+            if "stripe_subscription_id" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT")
     except Exception:
         # Non-SQLite or insufficient permissions; ignore quietly.
         return

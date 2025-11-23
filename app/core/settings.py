@@ -89,6 +89,24 @@ class Settings(BaseSettings):
     S3_ADDRESSING_STYLE: str = "virtual"  # or 'path'
     LOCAL_UPLOAD_DIR: str = "uploads"
 
+    # ------------------------------------------------------------------
+    # Stripe
+    # ------------------------------------------------------------------
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
+    STRIPE_PRICE_STARTER: Optional[str] = None
+    STRIPE_PRICE_PROFESSIONAL: Optional[str] = None
+    STRIPE_PRICE_ENTERPRISE: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+
+    # ------------------------------------------------------------------
+    # SMS (Twilio)
+    # ------------------------------------------------------------------
+    SMS_ENABLED: bool = False
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_FROM_NUMBER: Optional[str] = None
+
 
 # create global settings instance and normalize DB URL
 settings = Settings()

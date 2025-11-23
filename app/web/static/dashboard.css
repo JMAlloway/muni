@@ -80,3 +80,91 @@
   filter: blur(1px);
 }
 
+/* Team thread drawer */
+#thread-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2,6,23,.35);
+  display: none;
+  z-index: 1100;
+}
+#thread-drawer {
+  position: fixed;
+  top: 0;
+  right: -440px;
+  width: 440px;
+  height: 100%;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -8px 0 24px rgba(2,6,23,.12);
+  display: flex;
+  flex-direction: column;
+  transition: right .25s ease;
+  z-index: 1101;
+}
+#thread-drawer[aria-hidden="false"] { right: 0; }
+#thread-drawer header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid #eef2f7;
+}
+#thread-drawer h3 { margin: 0; font-size: 16px; }
+.thread-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+}
+.thread-messages { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.thread-message {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  width: auto;
+  max-width: 88%;
+  min-width: 140px;
+  box-shadow: 0 2px 8px rgba(15,23,42,.06);
+}
+.thread-message .meta { font-size: 11px; color: #64748b; margin-top: 6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.thread-message .author { font-weight: 700; color:#111827; }
+.thread-compose {
+  padding: 12px 14px;
+  border-top: 1px solid #eef2f7;
+  display: grid;
+  gap: 8px;
+  background: #fff;
+}
+.thread-compose textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  resize: vertical;
+}
+.thread-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.thread-pill {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 11px;
+}
+.link-btn {
+  border: 0;
+  background: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 6px;
+}
+.link-btn:hover { text-decoration: underline; }
+

@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   function getCSRF(){ try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || null; } catch(_) { return null; } }
 
   const grid = document.getElementById("tracked-grid");
@@ -42,6 +42,18 @@
   const txtSearch = document.getElementById("search-filter");
   const btnReset  = document.getElementById("reset-filters");
   const summaryEl = document.getElementById("summary-count");
+  const threadUI = {
+    overlay: document.getElementById("thread-overlay"),
+    drawer: document.getElementById("thread-drawer"),
+    title: document.getElementById("thread-title"),
+    subtitle: document.getElementById("thread-subtitle"),
+    list: document.getElementById("thread-messages"),
+    input: document.getElementById("thread-input"),
+    send: document.getElementById("thread-send"),
+    cancel: document.getElementById("thread-cancel"),
+    label: document.getElementById("thread-label")
+  };
+  const threadState = { oid: null, meta: null };
 
   function pct(n){ return Math.max(0, Math.min(100, Math.round(n))); }
   function computeProgress(it){
@@ -54,6 +66,174 @@
   }
   function dueStr(d){ if (!d) return "TBD"; return String(d).replace("T"," ").slice(0,16); }
   function statusBadge(s){ return `<span class="status-badge">${(s||"prospecting")}</span>`; }
+
+  // --- server-backed collaboration ------------------------------------------
+  const collabState = {
+    notesCache: {}, // oid -> notes array
+    open: {}, // oid -> bool
+    fetching: new Set(),
+  };
+  function setAssignee(){ /* server-backed assignee not yet wired */ }
+  function collabFor(){ return {}; }
+  async function fetchNotes(oid){
+    if (!oid || collabState.fetching.has(oid)) return;
+    collabState.fetching.add(oid);
+    try {
+      const res = await fetch(`/api/team/notes?opportunity_id=${encodeURIComponent(oid)}`, { credentials:'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      collabState.notesCache[oid] = (data.notes || []).map(n => Object.assign({}, n, { body: noteBody(n) }));
+      if (threadState.oid === oid) renderThread();
+    } catch(_) {} finally {
+      collabState.fetching.delete(oid);
+    }
+  }
+  async function ensureNotes(oid){
+    if (!oid) return;
+    if (collabState.notesCache[oid]) return;
+    await fetchNotes(oid);
+  }
+  async function postNote(oid, body){
+    const text = (body || "").trim();
+    if (!text) return;
+    const res = await fetch('/api/team/notes', {
+      method:'POST',
+      credentials:'include',
+      headers:{ 'Content-Type':'application/json', 'X-CSRF-Token': (getCSRF()||'') },
+      body: JSON.stringify({ opportunity_id: oid, body: text })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await fetchNotes(oid);
+  }
+  function getNotes(oid){ return collabState.notesCache[oid] || []; }
+  function toggleCollab(oid, force){
+    collabState.open[oid] = force !== undefined ? !!force : !collabState.open[oid];
+  }
+  function fmtDateShort(iso){
+    try { return new Date(iso).toLocaleString(undefined,{month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}); } catch(_) { return ""; }
+  }
+  function escHtml(str){
+    return (str||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c));
+  }
+  function highlightMentions(str){
+    return escHtml(str).replace(/@([a-zA-Z0-9._-]+)/g, '<span class="mention">@$1</span>');
+  }
+  function noteBody(n){
+    if (!n) return "";
+    return (n.body || n.text || "").toString();
+  }
+
+  // Inject minimal styles for collab UI
+  (function(){
+    const css = `
+      .collab-box { margin-top:12px; padding:12px; border:1px solid #e5e7eb; border-radius:12px; background:#f8fafc; }
+      .collab-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+      .collab-head .label { font-size:12px; font-weight:700; color:#0f172a; }
+      .collab-head .chip { font-size:11px; padding:4px 8px; border-radius:999px; background:#e0e7ff; color:#4338ca; }
+      .collab-toggle { border:none; background:none; color:#6b7280; cursor:pointer; font-size:14px; display:flex; align-items:center; gap:6px; }
+      .collab-toggle:hover { color:#111827; }
+      .collab-toggle .arrow { transition: transform .15s ease; display:inline-block; }
+      .collab-box.collapsed .collab-body { display:none; }
+      .collab-box.collapsed .collab-toggle .arrow { transform: rotate(-90deg); }
+      .collab-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+      .collab-row input { flex:1; border:1px solid #d1d5db; border-radius:10px; padding:8px 10px; }
+      .collab-notes { display:grid; gap:8px; margin-bottom:10px; }
+      .collab-note { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; font-size:13px; color:#111827; box-shadow:0 2px 6px rgba(0,0,0,0.04); }
+      .collab-note .meta { font-size:11px; color:#6b7280; margin-top:4px; }
+      .mention { color:#4338ca; font-weight:700; }
+      .collab-form { display:grid; gap:6px; }
+      .collab-form textarea { width:100%; min-height:60px; padding:8px 10px; border:1px solid #d1d5db; border-radius:10px; resize:vertical; }
+      .collab-actions { display:flex; gap:8px; align-items:center; }
+    `;
+    const el = document.createElement('style');
+    el.textContent = css;
+    document.head.appendChild(el);
+  })();
+
+  function threadMetaFromItem(it){
+    if (!it) return null;
+    return {
+      opportunity_id: it.opportunity_id,
+      title: it.title || "Team thread",
+      agency_name: it.agency_name || "",
+      external_id: it.external_id || ""
+    };
+  }
+  function setThreadMeta(meta){
+    threadState.meta = meta;
+    threadState.oid = meta ? meta.opportunity_id : null;
+    if (threadUI.title) threadUI.title.textContent = meta ? (meta.title || "Team thread") : "Team thread";
+    if (threadUI.subtitle) {
+      const bits = [];
+      if (meta && meta.agency_name) bits.push(meta.agency_name);
+      if (meta && meta.external_id) bits.push(meta.external_id);
+      threadUI.subtitle.textContent = bits.join(" - ");
+    }
+  }
+  function renderThread(){
+    if (!threadUI.list) return;
+    const oid = threadState.oid;
+    const notes = oid ? getNotes(oid) : [];
+    if (!oid) {
+      threadUI.list.innerHTML = "<div class='muted'>Select a solicitation to see its thread.</div>";
+      return;
+    }
+    if (!notes.length) {
+      threadUI.list.innerHTML = "<div class='muted'>No messages yet. Start the thread with an @mention.</div>";
+      return;
+    }
+    threadUI.list.innerHTML = notes.map(n=>{
+      const text = highlightMentions(noteBody(n));
+      const ts = fmtDateShort(n.created_at || n.id);
+      const author = n.author_email || "Someone";
+      return `<div class="thread-message">
+        <div>${text}</div>
+        <div class="meta"><span class="author">${escHtml(author)}</span>${ts ? `<span>&#183;</span><span>${ts}</span>` : ''}</div>
+      </div>`;
+    }).join("");
+  }
+  function openThread(meta){
+    if (!meta || !meta.opportunity_id) return;
+    setThreadMeta(meta);
+    if (threadUI.overlay) threadUI.overlay.style.display = 'block';
+    if (threadUI.drawer) threadUI.drawer.setAttribute('aria-hidden','false');
+    fetchNotes(meta.opportunity_id).then(()=>{ renderThread(); render(); }).catch(()=>{ renderThread(); });
+    if (threadUI.input) threadUI.input.focus();
+  }
+  function closeThread(){
+    threadState.oid = null;
+    threadState.meta = null;
+    if (threadUI.overlay) threadUI.overlay.style.display = 'none';
+    if (threadUI.drawer) threadUI.drawer.setAttribute('aria-hidden','true');
+    if (threadUI.list) threadUI.list.innerHTML = "<div class='muted'>Select a solicitation to see its thread.</div>";
+  }
+  async function sendThreadMessage(){
+    const oid = threadState.oid;
+    if (!oid || !threadUI.input) return;
+    const text = (threadUI.input.value || "").trim();
+    if (!text) return;
+    if (threadUI.send) threadUI.send.disabled = true;
+    try {
+      await postNote(oid, text);
+      threadUI.input.value = "";
+      await fetchNotes(oid);
+      render();
+      renderThread();
+    } catch(_) {} finally {
+      if (threadUI.send) threadUI.send.disabled = false;
+    }
+  }
+  if (threadUI.overlay) threadUI.overlay.addEventListener('click', closeThread);
+  if (threadUI.cancel) threadUI.cancel.addEventListener('click', closeThread);
+  if (threadUI.send) threadUI.send.addEventListener('click', sendThreadMessage);
+  if (threadUI.input) threadUI.input.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      sendThreadMessage();
+    }
+  });
+  const closeThreadBtn = document.getElementById("close-thread");
+  if (closeThreadBtn) closeThreadBtn.addEventListener('click', closeThread);
 
   function openUploads(it){
     if (window.openUploadDrawer) return window.openUploadDrawer(it);
@@ -75,7 +255,7 @@
     alert("Upload manager not available.");
   }
 
-  // ðŸ”— Use your existing vendor guide loader
+  // 🔗 Use your existing vendor guide loader
   function mapAgencyToSlug(name){
     const n = (name||"").toLowerCase();
     if (n.includes("city of columbus")) return "city-of-columbus";
@@ -236,8 +416,8 @@
       const shown = filtered.length;
       const total = items.length;
       const soon = filtered.filter(x=> x.due_date && (new Date(x.due_date).getTime() - Date.now()) < 7*24*60*60*1000).length;
-      summaryEl.textContent = `${shown}/${total} shown · ${soon} due soon`;
-      summaryEl.textContent = summaryEl.textContent.replace(/[^\x20-\x7E·]/g, "·");
+      summaryEl.textContent = `${shown}/${total} shown - ${soon} due soon`;
+      summaryEl.textContent = summaryEl.textContent.replace(/[^\x20-\x7E-]/g, "-");
     } catch(_) {}
   }
   window.updateDashboardSummary = updateSummary;
@@ -251,6 +431,20 @@
       const filesLabel = (it.file_count||0) === 1 ? "1 file" : `${it.file_count||0} files`;
       const dueMs = it.due_date ? (new Date(it.due_date).getTime() - Date.now()) : null;
       const dueSoon = (dueMs !== null) && (dueMs < 7*24*60*60*1000) && (dueMs >= 0);
+      const collab = collabFor(it.opportunity_id);
+      const notes = getNotes(it.opportunity_id);
+      const notesHtml = (notes && notes.length)
+        ? notes.slice(0,3).map(n=>{
+            const txt = noteBody(n);
+            return `
+            <div class="collab-note">
+              <div>${highlightMentions(txt)}</div>
+              <div class="meta">Saved ${fmtDateShort(n.created_at || n.id)} by your team</div>
+            </div>
+          `;
+          }).join("")
+        : `<div class="muted">No notes yet. Start with an @mention.</div>`;
+      const isOpen = !!collabState.open[it.opportunity_id];
       return `
         <article class="tracked-card" data-oid="${it.opportunity_id}" tabindex="0">
           <div class="top">
@@ -283,6 +477,38 @@
             </select>
             <button class="btn-secondary" title="Remove from dashboard" data-action="remove" data-oid="${it.opportunity_id}">Remove</button>
           </div>
+
+          <div class="collab-box ${isOpen ? '' : 'collapsed'}">
+            <div class="collab-head">
+              <div>
+                <div class="label">Team room</div>
+                <div class="muted" style="font-size:12px;">Messages sync into the thread sidebar.</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button class="link-btn" type="button" data-action="open-thread" data-oid="${it.opportunity_id}">Open thread</button>
+                <button class="collab-toggle" type="button" data-action="toggle-collab" data-oid="${it.opportunity_id}">
+                  <span class="arrow">></span><span>${isOpen ? 'Hide' : 'Show'}</span>
+                </button>
+              </div>
+            </div>
+            <div class="collab-body">
+              <div class="collab-row">
+                <input type="text" data-action="assign" data-oid="${it.opportunity_id}" placeholder="Assign to teammate" value="${escHtml(collab.assignee||'')}">
+                <span class="muted" style="font-size:12px;">Use @name in notes below.</span>
+              </div>
+              <div class="collab-notes">
+                ${notesHtml}
+              </div>
+              <div class="collab-form">
+                <textarea data-action="note-text" data-oid="${it.opportunity_id}" placeholder="@sarah can you price the concrete?"></textarea>
+                <div class="collab-actions">
+                  <button class="btn" data-action="add-note" data-oid="${it.opportunity_id}">Add note</button>
+                  <span class="muted" style="font-size:12px;">Recent notes show for your team.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </article>
       `;
     });
@@ -395,6 +621,30 @@
     if (!oid) return;
     const it = items.find(x => String(x.opportunity_id) === String(oid));
     if (!it) return;
+    if (action === 'toggle-collab') {
+      toggleCollab(oid);
+      if (collabState.open[oid]) {
+        ensureNotes(oid).finally(render);
+      } else {
+        render();
+      }
+      return;
+    }
+    if (action === 'open-thread') {
+      ensureNotes(oid).finally(()=> openThread(threadMetaFromItem(it) || { opportunity_id: oid }));
+      return;
+    }
+    if (action === 'add-note') {
+      const textarea = btn.closest('.collab-box') && btn.closest('.collab-box').querySelector('textarea[data-action="note-text"]');
+      const val = textarea ? textarea.value : "";
+      if (!val || !val.trim()) return;
+      postNote(oid, val).then(()=> {
+        if (textarea) textarea.value = "";
+        render();
+        openThread(threadMetaFromItem(it) || { opportunity_id: oid });
+      }).catch(()=>{});
+      return;
+    }
     if (action === 'remove') return removeTracker(it);
     if (action === 'upload') return openUploads(it);
     if (action === 'guide') return openGuide(it);
@@ -402,10 +652,18 @@
 
   grid.addEventListener("change", function(e){
     const sel = e.target.closest('select[data-action="status"]');
-    if (!sel || !grid.contains(sel)) return;
-    const oid = sel.getAttribute('data-oid');
-    const it = items.find(x => String(x.opportunity_id) === String(oid));
-    if (it) updateStatus(it, sel.value);
+    if (sel && grid.contains(sel)) {
+      const oid = sel.getAttribute('data-oid');
+      const it = items.find(x => String(x.opportunity_id) === String(oid));
+      if (it) updateStatus(it, sel.value);
+      return;
+    }
+    const assign = e.target.closest('input[data-action="assign"]');
+    if (assign && grid.contains(assign)) {
+      const oid = assign.getAttribute('data-oid');
+      // TODO: Implement server-side assignee sync; for now local state only
+      setAssignee(oid, assign.value);
+    }
   });
   // Hide any legacy top upload block by default, if present
   try {

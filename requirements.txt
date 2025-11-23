@@ -3,7 +3,9 @@ uvicorn[standard]==0.32.0
 gunicorn==23.0.0
 
 SQLAlchemy==2.0.36
+alembic==1.13.1
 asyncpg==0.29.0  # for Heroku Postgres (or psycopg[binary])
+twilio==9.2.3
 
 pydantic==2.12.3
 pydantic-settings==2.11.0
@@ -25,4 +27,5 @@ bcrypt==4.2.0   # instead of python_bcrypt
 PyJWT==2.10.1   # keep only one
 markdown
 boto3>=1.35.0
+stripe==11.2.0
 

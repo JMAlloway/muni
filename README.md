@@ -1,6 +1,6 @@
-# 🏙️ Muni Alerts
+# 🏙️ EasyRFP
 
-**Muni Alerts** is a FastAPI-based web app that aggregates and classifies municipal RFP/RFQ/bid opportunities across Central Ohio.  
+**EasyRFP** is a FastAPI-based web app that aggregates and classifies municipal RFP/RFQ/bid opportunities across Central Ohio.  
 It automates scraping from government procurement portals, stores structured results in SQLite, and delivers email digests.
 
 ---

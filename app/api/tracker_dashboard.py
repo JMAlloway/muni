@@ -21,7 +21,7 @@ async def tracker_dashboard(request: Request):
           <a class="button-primary" href="/login?next=/tracker/dashboard">Sign in</a>
         </section>
         """
-        return HTMLResponse(page_shell(body, title="Muni Alerts - My Bids", user_email=None), status_code=200)
+        return HTMLResponse(page_shell(body, title="EasyRFP - My Bids", user_email=None), status_code=200)
 
     # --- fetch tracked items for this user ---
     sql = """
@@ -113,6 +113,31 @@ async def tracker_dashboard(request: Request):
   <div id="tracked-grid" class="tracked-grid" data-items='__ITEMS_JSON_ESC__'></div>
 </section>
 
+<!-- Team thread sidebar -->
+<div id="thread-overlay"></div>
+<aside id="thread-drawer" aria-hidden="true">
+  <header>
+    <div>
+      <div id="thread-label" class="muted" style="font-size:12px;">Team room thread</div>
+      <h3 id="thread-title" style="margin:2px 0 4px 0;">Thread</h3>
+      <div id="thread-subtitle" class="muted" style="font-size:12px;"></div>
+    </div>
+    <button class="icon-btn" id="close-thread" type="button">x</button>
+  </header>
+  <div class="thread-body">
+    <div id="thread-messages" class="thread-messages">
+      <div class="muted">Select a solicitation to see its thread.</div>
+    </div>
+  </div>
+  <div class="thread-compose">
+    <textarea id="thread-input" placeholder="@alex can you send pricing?"></textarea>
+    <div class="thread-actions">
+      <button id="thread-send" class="btn" type="button">Send</button>
+      <button id="thread-cancel" class="btn-secondary" type="button">Close</button>
+    </div>
+  </div>
+</aside>
+
 <!-- Overlay + drawer used by vendor.js -->
 <div id="guide-overlay"></div>
 <aside id="guide-drawer" aria-hidden="true">
@@ -126,7 +151,7 @@ async def tracker_dashboard(request: Request):
   <div id="guide-content" class="guide-content">Loading…</div>
 </aside>
 
-<link rel="stylesheet" href="/static/dashboard.css?v=5">
+<link rel="stylesheet" href="/static/dashboard.css?v=6">
 <link rel="stylesheet" href="/static/bid_tracker.css">
 
 
@@ -241,7 +266,7 @@ async def tracker_dashboard(request: Request):
 })();
 </script>
 <script src="/static/vendor.js?v=4"></script>
-<script src="/static/tracker_dashboard.js?v=14"></script>
+<script src="/static/tracker_dashboard.js?v=19"></script>
 <script>
 // Inline: live search + summary layered on top of card rendering
 (function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
@@ -275,7 +300,7 @@ async def tracker_dashboard(request: Request):
         .replace("__ITEM_OPTIONS__", options_html)
         .replace("__ITEMS_JSON_ESC__", items_json_escaped)
     )
-    return HTMLResponse(page_shell(body, title="Muni Alerts My Bids", user_email=user_email))
+    return HTMLResponse(page_shell(body, title="EasyRFP My Bids", user_email=user_email))
 
 
 

@@ -797,7 +797,7 @@ document.addEventListener('click', async (e) => {
     return HTMLResponse(
         page_shell(
             body_html,
-            title="Muni Alerts - Opportunities",
+            title="EasyRFP - Opportunities",
             user_email=user_email,
         )
     )

@@ -42,10 +42,14 @@ async def home(request: Request):
 
     hero = f"""
     <section class="card reveal hero-gradient" style="text-align:center;">
+        <div class="hero-brand">
+            <img src="static/logo.png" alt="EasyRFP logo" class="brand-logo brand-logo-hero" />
+            <div class="brand-tagline">EasyRFP &middot; Central Ohio pilot</div>
+        </div>
         <div class="pill" style="display:inline-block;margin-bottom:10px;">Central Ohio Pilot  &middot;  Early Access</div>
-        <h1 class="section-heading" style="font-size:34px;margin-bottom:12px;letter-spacing:-0.03em;">Find, track, and win local bids faster</h1>
-        <p class="subtext" style="font-size:15px;margin:0 auto 20px;max-width:680px;">
-            See vetted municipal opportunities in one place, read plain-language summaries, and save the ones you care about. We nudge you before deadlines and keep your bid info organized.
+        <h1 class="section-heading" style="font-size:34px;margin-bottom:12px;letter-spacing:-0.03em;">Stop checking 21 city sites—let us watch them for you</h1>
+        <p class="subtext" style="font-size:15px;margin:0 auto 20px;max-width:720px;">
+            Save 10+ hours a week hunting bids. EasyRFP monitors municipal portals, summarizes every opportunity, and alerts you before deadlines so you can spend time drafting proposals—not refreshing websites. Teams that catch opportunities early win more work.
         </p>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
           <a class="button-primary" href="/signup">Start free</a>
@@ -159,6 +163,60 @@ async def home(request: Request):
     </section>
     """
 
+    pricing = """
+    <section class="card">
+        <h2 class="section-heading">Plans built for contractors</h2>
+        <p class="subtext">Start free, upgrade when you need realtime alerts and team tools.</p>
+        <div class="flex-grid" style="align-items:stretch;">
+            <div class="card" style="border:1px solid #e5e7eb; box-shadow:none; margin:0; padding:16px;">
+                <div class="mini-head">Free</div>
+                <div class="mini-desc" style="margin-bottom:8px;">Lead funnel for small teams</div>
+                <div style="font-size:22px;font-weight:700;">$0</div>
+                <ul class="features">
+                    <li>View opportunities (24h delay)</li>
+                    <li>Track up to 3 bids</li>
+                    <li>Weekly digest emails</li>
+                </ul>
+            </div>
+            <div class="card" style="border:1px solid #c7d2fe; box-shadow:none; margin:0; padding:16px;">
+                <div class="mini-head">Starter</div>
+                <div class="mini-desc" style="margin-bottom:8px;">For owners and solo PMs</div>
+                <div style="font-size:22px;font-weight:700;">$29/mo</div>
+                <ul class="features">
+                    <li>Realtime updates</li>
+                    <li>Track unlimited bids</li>
+                    <li>Daily digests and keyword alerts</li>
+                    <li>File uploads (5 GB)</li>
+                </ul>
+            </div>
+            <div class="card" style="border:1px solid #e5e7eb; box-shadow:none; margin:0; padding:16px;">
+                <div class="mini-head">Professional</div>
+                <div class="mini-desc" style="margin-bottom:8px;">For teams that bid often</div>
+                <div style="font-size:22px;font-weight:700;">$99/mo</div>
+                <ul class="features">
+                    <li>Everything in Starter</li>
+                    <li>AI bid matching</li>
+                    <li>Proposal templates</li>
+                    <li>Team collaboration (3 users)</li>
+                    <li>Priority support</li>
+                </ul>
+            </div>
+            <div class="card" style="border:1px solid #e5e7eb; box-shadow:none; margin:0; padding:16px;">
+                <div class="mini-head">Enterprise</div>
+                <div class="mini-desc" style="margin-bottom:8px;">For multi-office contractors</div>
+                <div style="font-size:22px;font-weight:700;">$299/mo</div>
+                <ul class="features">
+                    <li>Everything in Professional</li>
+                    <li>Unlimited team members</li>
+                    <li>Custom agency coverage</li>
+                    <li>API access</li>
+                    <li>Win/loss analytics</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    """
+
     preview = """
     <section class="card">
         <h2 class="section-heading">Welcome dashboard preview</h2>
@@ -199,7 +257,7 @@ async def home(request: Request):
     </section>
     """
 
-    body_html = hero + live_section + audience + how + coverage + preview + email_sample + closer
+    body_html = hero + live_section + audience + how + pricing + coverage + preview + email_sample + closer
     return HTMLResponse(page_shell(body_html, title="EasyRFP  &middot;  Win Local Bids Faster", user_email=user_email))
 
 

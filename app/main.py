@@ -1,18 +1,19 @@
-﻿# app/main.py
+# app/main.py
 import sys
 import asyncio
 import json
+import os
+import re
+import secrets
+from urllib.parse import parse_qs
+
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse, PlainTextResponse, HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-
-import secrets
-from app.core.settings import settings
-import os
-import re
 from sqlalchemy import text
-from urllib.parse import parse_qs
+
+from app.core.settings import settings
 
 # -------------------------------------------------------------------
 # Windows event-loop quirk
@@ -23,7 +24,7 @@ if sys.platform.startswith("win"):
 # -------------------------------------------------------------------
 # FastAPI app setup
 # -------------------------------------------------------------------
-app = FastAPI(title="Muni Alerts", version="0.3")
+app = FastAPI(title="EasyRFP", version="0.3")
 
 # -------------------------------------------------------------------
 # Canonical host middleware (fixes cookie host mismatch)
@@ -60,7 +61,13 @@ from app.core.scheduler import start_scheduler
 from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
 from app.auth.auth_utils import require_login
 from app.api._layout import page_shell
-from app.core.db_migrations import ensure_onboarding_schema, ensure_uploads_schema
+from app.core.db_migrations import (
+    ensure_onboarding_schema,
+    ensure_uploads_schema,
+    ensure_team_schema,
+    ensure_user_tier_column,
+    ensure_billing_schema,
+)
 from app.api import dashboard_order as dashboard_order
 
 # -------------------------------------------------------------------
@@ -86,177 +93,83 @@ async def log_every_request(request: Request, call_next):
     except Exception:
         pass
     return response
-
-
- # (CSRF middleware defined later; keeping a single implementation)
-
-# -------------------------------------------------------------------
-# Routers
-# -------------------------------------------------------------------
-app.include_router(dashboard_order.router)
-
-# -------------------------------------------------------------------
-# HARD OVERRIDE: Real dashboard at /tracker/dashboard (wins precedence)
-# -------------------------------------------------------------------
-@app.get("/tracker/dashboard", include_in_schema=False)
-async def dashboard_override(request: Request):
-    from app.api.tracker_dashboard import tracker_dashboard as _dashboard
-    return await _dashboard(request)
-
-from starlette.middleware.base import BaseHTTPMiddleware
-
-import secrets
-from app.core.settings import settings
-import os
-from sqlalchemy import text
-
-# -------------------------------------------------------------------
-# Windows event-loop quirk
-# -------------------------------------------------------------------
-if sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-# -------------------------------------------------------------------
-# FastAPI app setup
-# -------------------------------------------------------------------
-app = FastAPI(title="Muni Alerts", version="0.3")
-
-# -------------------------------------------------------------------
-# Canonical host middleware (fixes cookie host mismatch)
-# -------------------------------------------------------------------
-CANONICAL_HOST = os.getenv("PUBLIC_APP_HOST")
-
-if CANONICAL_HOST:
-    class CanonicalHostMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request, call_next):
-            host = request.headers.get("host", "")
-            if host and host != CANONICAL_HOST:
-                target = f"{request.url.scheme}://{CANONICAL_HOST}{request.url.path}"
-                if request.url.query:
-                    target += f"?{request.url.query}"
-                return RedirectResponse(target, status_code=308)
-            return await call_next(request)
-
-    app.add_middleware(CanonicalHostMiddleware)
-
-# -------------------------------------------------------------------
-# Static files
-# -------------------------------------------------------------------
-app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
-
-# -------------------------------------------------------------------
-# Core imports (after app is defined)
-# -------------------------------------------------------------------
-from app.core.db import engine, AsyncSessionLocal
-from app.domain.models import Base
-from app.core.models_core import metadata as core_metadata
-from app.auth import create_admin_if_missing, require_admin
-from app.core.scheduler import start_scheduler
-from app.auth.session import get_current_user_email, SESSION_COOKIE_NAME
-from app.auth.auth_utils import require_login
-from app.api._layout import page_shell
-from app.core.db_migrations import ensure_uploads_schema
-from app.api import dashboard_order as dashboard_order
-
-# -------------------------------------------------------------------
-# Log every request
-# -------------------------------------------------------------------
-@app.middleware("http")
-async def log_every_request(request: Request, call_next):
-    # ASCII-safe logs for Windows terminals
-    try:
-        print(f"[REQ] {request.method} {request.url.path}")
-    except Exception:
-        pass
-    response = await call_next(request)
-    try:
-        route = request.scope.get("route")
-        route_path = getattr(route, "path", None)
-        base = f"[RES] {response.status_code} for {request.url.path} (route={route_path})"
-        loc = response.headers.get("location")
-        if loc:
-            print(base + f" Location={loc}")
-        else:
-            print(base)
-    except Exception:
-        pass
-    return response
-
 
 # -------------------------------------------------------------------
 # CSRF protection (cookie 'csrftoken' + header 'X-CSRF-Token')
 # -------------------------------------------------------------------
-CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_COOKIE_NAME = "csrftoken"
+
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Allow Stripe webhook without CSRF
+        if request.url.path == "/stripe/webhook":
+            return await call_next(request)
         token = request.cookies.get(CSRF_COOKIE_NAME)
         # Only enforce on unsafe methods; allow auth endpoints without header
-        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
-            if request.url.path in {'/login', '/signup'}:
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            if request.url.path in {"/login", "/signup"}:
                 response = await call_next(request)
-                # ensure cookie set even on auth pages
                 if not token:
                     try:
                         t = secrets.token_urlsafe(32)
-                        response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
+                        response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite="lax")
                     except Exception:
                         pass
                 return response
-            # Accept either header or a form field named 'csrf_token' without consuming stream for downstream
             ok = False
-            hdr = request.headers.get('X-CSRF-Token') or request.headers.get('x-csrf-token')
+            hdr = request.headers.get("X-CSRF-Token") or request.headers.get("x-csrf-token")
             field = None
-            def _norm(s):
+
+            def _norm(val):
                 try:
-                    v = (s or '').strip()
-                    # strip leading/trailing quotes and backslashes (e.g., \"token\")
-                    v = re.sub(r'^[\\\"]+', '', v)
-                    v = re.sub(r'[\\\"]+$', '', v)
+                    v = (val or "").strip()
+                    v = re.sub(r'^[\\"]+', "", v)
+                    v = re.sub(r'[\\"]+$', "", v)
                     return v
                 except Exception:
-                    return s
+                    return val
+
             t_norm = _norm(token)
             h_norm = _norm(hdr)
             if t_norm and h_norm and h_norm == t_norm:
                 ok = True
             else:
                 try:
-                    ctype = request.headers.get('content-type', '')
-                    if 'application/x-www-form-urlencoded' in ctype:
+                    ctype = request.headers.get("content-type", "")
+                    if "application/x-www-form-urlencoded" in ctype:
                         body = await request.body()
                         try:
-                            # ensure downstream can still read
                             request._body = body  # type: ignore[attr-defined]
                         except Exception:
                             pass
-                        data = parse_qs(body.decode(errors='ignore')) if body else {}
-                        field_vals = data.get('csrf_token') or []
+                        data = parse_qs(body.decode(errors="ignore")) if body else {}
+                        field_vals = data.get("csrf_token") or []
                         field = field_vals[0] if field_vals else None
                         f_norm = _norm(field)
                         if t_norm and f_norm and str(f_norm) == str(t_norm):
                             ok = True
-                    # For multipart, require header to avoid consuming stream
                 except Exception:
                     ok = False
-            # Debug one-liner to help diagnose mismatches (truncated tokens)
             try:
-                c8 = (t_norm or '')[:8]
-                h8 = (h_norm or '')[:8]
-                f8 = (_norm(field) or '')[:8]
+                c8 = (t_norm or "")[:8]
+                h8 = (h_norm or "")[:8]
+                f8 = (_norm(field) or "")[:8]
                 print(f"[CSRF] {request.method} {request.url.path} ok={ok} cookie={c8} hdr={h8} field={f8}")
             except Exception:
                 pass
             if not ok:
-                return PlainTextResponse('Forbidden (CSRF)', status_code=403)
+                return PlainTextResponse("Forbidden (CSRF)", status_code=403)
         response = await call_next(request)
         try:
             if not token:
                 t = secrets.token_urlsafe(32)
-                response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite='lax')
+                response.set_cookie(CSRF_COOKIE_NAME, t, httponly=False, samesite="lax")
         except Exception:
             pass
         return response
+
+
 app.add_middleware(CSRFMiddleware)
 
 # -------------------------------------------------------------------
@@ -269,110 +182,10 @@ app.include_router(dashboard_order.router)
 # -------------------------------------------------------------------
 @app.get("/tracker/dashboard", include_in_schema=False)
 async def dashboard_override(request: Request):
-    # Delegate to the router's canonical implementation to ensure
-    # the dashboard includes the latest Upload Manager and UI.
     from app.api.tracker_dashboard import tracker_dashboard as _dashboard
+
     return await _dashboard(request)
-    user_email = get_current_user_email(request)
 
-    # --- not logged in ---
-    if not user_email:
-        body = """
-        <section class="card">
-          <h2 class="section-heading">Sign in required</h2>
-          <p class="subtext">Please log in to see your dashboard.</p>
-          <a class="button-primary" href="/login?next=/tracker/dashboard">Sign in â†’</a>
-        </section>
-        """
-        return HTMLResponse(page_shell(body, title="Muni Alerts My Bids", user_email=None), status_code=200)
-
-    # --- logged in ---
-    sql = text("""
-    WITH u AS (
-      SELECT user_id, opportunity_id, COUNT(*) AS file_count, MAX(created_at) AS last_upload_at
-      FROM user_uploads
-      GROUP BY user_id, opportunity_id
-    )
-    SELECT
-      t.opportunity_id,
-      o.external_id,
-      o.title,
-      o.agency_name,
-      o.due_date,
-      COALESCE(o.ai_category, o.category) AS category,
-      o.source_url,
-      t.status,
-      t.notes,
-      t.created_at AS tracked_at,
-      COALESCE(u.file_count, 0) AS file_count
-    FROM user_bid_trackers t
-    JOIN opportunities o ON o.id = t.opportunity_id
-    LEFT JOIN u ON u.user_id = t.user_id AND u.opportunity_id = t.opportunity_id
-    WHERE t.user_id = (SELECT id FROM users WHERE email = :email LIMIT 1)
-    ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
-    """)
-
-    async with engine.begin() as conn:
-        # âœ… Correct call for TextClause
-        res = await conn.execute(sql, {"email": user_email})
-        items = [dict(row) for row in res.mappings().all()]
-
-    items_json = json.dumps(items).replace("</", "<\\/")
-
-    body = f"""
-    <section class="card">
-      <div class="head-row">
-        <h2 class="section-heading">My Tracked Solicitations</h2>
-        <div class="muted">Status, files, and step-by-step guidance.</div>
-      </div>
-
-      <div class="toolbar" id="dashboard-actions">
-        <div class="filters">
-          <select id="status-filter">
-            <option value="">All statuses</option>
-            <option value="prospecting">Prospecting</option>
-            <option value="deciding">Deciding</option>
-            <option value="drafting">Drafting</option>
-            <option value="submitted">Submitted</option>
-            <option value="won">Won</option>
-            <option value="lost">Lost</option>
-          </select>
-          <select id="agency-filter">
-            <option value="">All agencies</option>
-            <option value="City of Columbus">City of Columbus</option>
-            <option value="Central Ohio Transit Authority (COTA)">COTA</option>
-          </select>
-          <select id="sort-by">
-            <option value="soonest">Soonest due</option>
-            <option value="latest">Latest due</option>
-            <option value="agency">Agency</option>
-            <option value="title">Title</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="tracked-grid" class="tracked-grid" data-items='{items_json}'></div>
-    </section>
-
-    <div id="guide-overlay"></div>
-    <aside id="guide-drawer" aria-hidden="true">
-      <header>
-        <div>
-          <h3 id="guide-title">How to bid</h3>
-          <div id="guide-agency" class="muted"></div>
-        </div>
-        <button class="icon-btn" onclick="TrackerGuide.close()">Ã—</button>
-      </header>
-      <div id="guide-content" class="guide-content">Loadingâ€¦</div>
-    </aside>
-
-    <link rel="stylesheet" href="/static/dashboard.css">
-    <link rel="stylesheet" href="/static/bid_tracker.css">
-    <script src="/static/vendor.js?v=4"></script>
-    <script src="/static/bid_tracker.js?v=4"></script>
-    <script src="/static/tracker_dashboard.js?v=6"></script>
-    """
-    return HTMLResponse(page_shell(body, title="Muni Alerts My Bids", user_email=user_email), status_code=200)
 
 # -------------------------------------------------------------------
 # Routers (existing)
@@ -384,11 +197,13 @@ from app.api import (
     onboarding,
     auth_web,
     admin,
+    billing,
     columbus_detail,
     cota_detail,
     gahanna_detail,
     columbus_airports_detail,
     opportunity_web,
+    team,
     vendor_guides,
     tracker_dashboard,
     debug_cookies,
@@ -403,10 +218,12 @@ app.include_router(marketing.router)
 app.include_router(opportunities.router)
 app.include_router(preferences.router)
 app.include_router(onboarding.router)
+app.include_router(billing.router)
 app.include_router(welcome.router)
 app.include_router(auth_web.router)
 app.include_router(tracker_router)
 app.include_router(tracker_dashboard.router)
+app.include_router(team.router)
 app.include_router(uploads_router)
 app.include_router(zip_router)
 app.include_router(opportunity_web.router)
@@ -417,7 +234,14 @@ app.include_router(columbus_airports_detail.router)
 app.include_router(admin.router)
 app.include_router(debug_cookies.router)
 app.include_router(dev_auth.router)
-app.include_router(vendor_guides.router) 
+app.include_router(vendor_guides.router)
+
+# -------------------------------------------------------------------
+# Health check
+# -------------------------------------------------------------------
+@app.get("/health", include_in_schema=False)
+async def health():
+    return PlainTextResponse("ok")
 
 # -------------------------------------------------------------------
 # Startup
@@ -432,15 +256,16 @@ async def on_startup():
             await conn.run_sync(prefs_metadata.create_all)
         async with AsyncSessionLocal() as db:
             await create_admin_if_missing(db)
-        # Lightweight, idempotent schema fixes for local SQLite
         await ensure_uploads_schema(engine)
         await ensure_onboarding_schema(engine)
-    # Start scheduler in web only if explicitly enabled
+        await ensure_team_schema(engine)
+        await ensure_user_tier_column(engine)
+        await ensure_billing_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 
 # -------------------------------------------------------------------
-# Global 401 â†’ login redirect
+# Global 401 -> login redirect
 # -------------------------------------------------------------------
 @app.exception_handler(HTTPException)
 async def handle_http_exceptions(request: Request, exc: HTTPException):
@@ -470,6 +295,7 @@ def whoami(request: Request, admin: bool = Depends(require_admin)):
         f"host={request.headers.get('host')}"
     )
 
+
 @app.get("/debug/session")
 async def debug_session(request: Request, admin: bool = Depends(require_admin)):
     raw = request.cookies.get(SESSION_COOKIE_NAME)
@@ -481,13 +307,5 @@ async def debug_session(request: Request, admin: bool = Depends(require_admin)):
         "parsed_email": email,
         "require_login_result": str(auth_result),
         "type": type(auth_result).__name__,
-        "is_redirect": isinstance(auth_result, RedirectResponse)
+        "is_redirect": isinstance(auth_result, RedirectResponse),
     }
-
-
-
-
-
-
-
-

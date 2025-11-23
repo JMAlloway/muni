@@ -1,23 +1,62 @@
-# app/routers/_layout.py
+﻿# app/routers/_layout.py
 
 from typing import Optional
+import sqlite3
+import os
+from urllib.parse import urlparse
+from app.core.settings import settings
 
 def _nav_links_html(user_email: Optional[str]) -> str:
     if user_email:
         return """
-        <a href="/">Overview</a>
-        <a href="/welcome">Welcome</a>
-        <a href="/opportunities">Open Opportunities</a>
-        <a href="/tracker/dashboard">My Dashboard</a>
-        <a href="/account">My Account</a>
-        <a href="/logout">Logout</a>
+        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-overview.png" alt=""></span><span class="nav-text">Overview</span></a>
+        <a href="/opportunities" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-opportunities.png" alt=""></span><span class="nav-text">Open Opportunities</span></a>
+        <a href="/tracker/dashboard" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-dashboard.png" alt=""></span><span class="nav-text">My Dashboard</span></a>
+        <a href="/account" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-account.png" alt=""></span><span class="nav-text">My Account</span></a>
         """
     else:
         return """
-        <a href="/">Home</a>
-        <a href="/signup">Sign up</a>
-        <a href="/login">Sign in</a>
+        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-home.png" alt=""></span><span class="nav-text">Home</span></a>
+        <a href="/signup" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-signup.png" alt=""></span><span class="nav-text">Sign up</span></a>
+        <a href="/login" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-login.png" alt=""></span><span class="nav-text">Sign in</span></a>
         """
+
+
+def _get_user_tier(user_email: Optional[str]) -> str:
+    """Best-effort tier lookup for the header badge."""
+    if not user_email:
+        return "Free"
+    db_url = settings.DB_URL or ""
+    if not db_url.startswith("sqlite"):
+        return "Free"
+    try:
+        # Normalize path for sqlite+aiosqlite:///./muni_local.db
+        if db_url.startswith("sqlite+aiosqlite:///"):
+            db_path = db_url.split(":///")[-1]
+        else:
+            parsed = urlparse(db_url.replace("sqlite+aiosqlite", "sqlite"))
+            db_path = parsed.path
+            if db_path.startswith("//"):
+                db_path = db_path[1:]
+        db_path = os.path.abspath(db_path)
+        conn = sqlite3.connect(db_path)
+        try:
+            # If column is stored as "Tier" vs "tier", select both.
+            cur = conn.execute(
+                "SELECT COALESCE(Tier, tier) FROM users WHERE lower(email) = lower(?) LIMIT 1",
+                (user_email,),
+            )
+            row = cur.fetchone()
+            tier = (row[0] or "Free").title() if row else "Free"
+            try:
+                print(f"[tier lookup] email={user_email} tier={tier} db={db_path}")
+            except Exception:
+                pass
+            return tier
+        finally:
+            conn.close()
+    except Exception:
+        return "Free"
 
 
 def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
@@ -29,6 +68,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     """
 
     nav_links = _nav_links_html(user_email)
+    user_tier = _get_user_tier(user_email)
 
     return f"""
 <!DOCTYPE html>
@@ -37,423 +77,94 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>{title}</title>
-<style>
-    :root {{
-        --bg-page: #f9fafb;
-        --bg-card: #ffffff;
-        --border-card: #e5e7eb;
-        --text-main: #111827;
-        --text-dim: #6b7280;
-        --accent-bg: #4f46e5;
-        --accent-bg-hover: #4338ca;
-        --accent-text: #4f46e5;
-        --pill-bg: #eef2ff;
-        --pill-border: #c7d2fe;
-        --pill-text: #4f46e5;
-        --radius-card: 16px;
-        --radius-pill: 999px;
-        --shadow-card: 0 20px 40px rgba(0,0,0,0.06);
-    }}
-
-    * {{
-        box-sizing: border-box;
-    }}
-
-    body {{
-        margin: 0;
-        background: var(--bg-page);
-        color: var(--text-main);
-        font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-        line-height: 1.45;
-        -webkit-font-smoothing: antialiased;
-        padding: 0 16px 48px;
-    }}
-
-    header.navbar {{
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 20px 0 12px;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-start;
-        justify-content: space-between;
-        row-gap: 12px;
-        border-bottom: 1px solid #e5e7eb;
-    }}
-
-    .brand-block {{
-        display:flex;
-        flex-direction:column;
-    }}
-
-    .brand-name {{
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--text-main);
-    }}
-
-    .brand-tagline {{
-        font-size: 12px;
-        color: var(--text-dim);
-    }}
-
-    /* Site logo in header */
-    .brand-logo {{
-        max-height: 90px;
-        width: auto;
-        height: auto;
-        max-width: 420px;
-        display: block;
-        margin-bottom: 6px;
-        object-fit: contain;
-    }}
-
-    nav.navlinks {{
-        display:flex;
-        flex-wrap:wrap;
-        column-gap:16px;
-        row-gap:8px;
-        font-size:14px;
-        font-weight:500;
-        align-items:flex-start;
-    }}
-
-    nav.navlinks a {{
-        color: var(--accent-text);
-        text-decoration:none;
-    }}
-
-    nav.navlinks a:hover {{
-        text-decoration:underline;
-    }}
-
-    main.page {{
-        max-width: 900px;
-        margin: 24px auto 0;
-        display: grid;
-        row-gap: 24px;
-    }}
-
-    .card {{
-        background: var(--bg-card);
-        border-radius: var(--radius-card);
-        border: 1px solid var(--border-card);
-        box-shadow: var(--shadow-card);
-        padding: 20px 24px;
-    }}
-
-    .section-heading {{
-        font-size: 20px;
-        font-weight:600;
-        color: var(--text-main);
-        margin:0 0 8px 0;
-        line-height:1.2;
-        letter-spacing:-0.03em;
-    }}
-
-    .subtext {{
-        font-size:13px;
-        color: var(--text-dim);
-        line-height:1.4;
-        margin:0 0 16px 0;
-    }}
-
-    .flex-grid {{
-        display:grid;
-        grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));
-        gap:16px;
-    }}
-
-    .mini-head {{
-        font-size:14px;
-        font-weight:600;
-        color: var(--text-main);
-        margin:0 0 4px;
-    }}
-
-    .mini-desc {{
-        font-size:13px;
-        color: var(--text-dim);
-        line-height:1.4;
-        margin:0 0 8px;
-    }}
-
-    a.cta-link {{
-        font-size:14px;
-        font-weight:500;
-        text-decoration:underline;
-        color: var(--accent-text);
-    }}
-
-    a.button-primary {{
-        display:inline-block;
-        background: var(--accent-bg);
-        color:#fff;
-        text-decoration:none;
-        font-size:14px;
-        font-weight:600;
-        line-height:1.2;
-        padding:10px 14px;
-        border-radius:8px;
-        border:1px solid rgba(0,0,0,0.05);
-    }}
-
-    a.button-primary:hover {{
-        background: var(--accent-bg-hover);
-    }}
-
-    .table-wrap {{
-        overflow-x:auto;
-    }}
-
-    table {{
-        width:100%;
-        border-collapse:collapse;
-        font-size:14px;
-        line-height:1.4;
-    }}
-
-    th {{
-        text-align:left;
-        padding:8px 6px;
-        border-bottom:1px solid #e5e7eb;
-        color:#374151;
-        font-weight:600;
-        font-size:13px;
-        white-space:nowrap;
-    }}
-
-    td {{
-        padding:8px 6px;
-        border-bottom:1px solid #f1f5f9;
-        vertical-align:top;
-        font-size:13px;
-        color:var(--text-main);
-    }}
-
-    .muted {{
-        color: var(--text-dim);
-        font-size:12px;
-        line-height:1.3;
-    }}
-
-    .pill {{
-        display:inline-block;
-        font-size:12px;
-        line-height:1.2;
-        background:var(--pill-bg);
-        color:var(--pill-text);
-        padding:3px 8px;
-        border-radius:var(--radius-pill);
-        border:1px solid var(--pill-border);
-        font-weight:500;
-    }}
-
-    .form-row {{
-        display:flex;
-        flex-wrap:wrap;
-        gap:16px;
-        margin:0 0 24px;
-    }}
-
-    .form-col {{
-        flex:1 1 240px;
-        min-width:240px;
-    }}
-
-    label.label-small {{
-        font-size:12px;
-        font-weight:500;
-        color:#374151;
-        margin-bottom:4px;
-        display:block;
-    }}
-
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    select {{
-        width:100%;
-        font-size:14px;
-        line-height:1.4;
-        padding:8px 10px;
-        border-radius:8px;
-        border:1px solid #d1d5db;
-        background:#fff;
-        color:#111827;
-        outline:none;
-    }}
-
-    input[type="text"]:focus,
-    input[type="email"]:focus,
-    input[type="password"]:focus,
-    select:focus {{
-        border-color: var(--accent-bg);
-        box-shadow:0 0 0 3px rgba(79,70,229,0.2);
-    }}
-
-    .help-text {{
-        font-size:12px;
-        color: var(--text-dim);
-        margin-top:6px;
-    }}
-
-    .form-actions {{
-        display:flex;
-        align-items:center;
-        gap:12px;
-        flex-wrap:wrap;
-    }}
-
-    .input-with-toggle {{
-        position:relative;
-    }}
-    .input-with-toggle input {{
-        padding-right:44px;
-    }}
-    .input-with-toggle .pw-toggle {{
-        position:absolute;
-        right:8px;
-        top:50%;
-        transform:translateY(-50%);
-        background:transparent;
-        border:none;
-        color:#6b7280;
-        font-size:12px;
-        cursor:pointer;
-        padding:4px 6px;
-        border-radius:6px;
-    }}
-    .input-with-toggle .pw-toggle:hover {{
-        background:#f3f4f6;
-        color:#374151;
-    }}
-
-    button.button-primary {{
-        appearance:none;
-        border:none;
-        background: var(--accent-bg);
-        color:#fff;
-        border-radius:8px;
-        font-size:14px;
-        font-weight:600;
-        line-height:1.2;
-        padding:10px 14px;
-        cursor:pointer;
-    }}
-
-    button.button-primary:hover {{
-        background: var(--accent-bg-hover);
-    }}
-
-    .agency-grid {{
-        display:grid;
-        grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));
-        gap:8px 16px;
-    }}
-
-    .agency-choice {{
-        font-size:13px;
-        font-weight:500;
-        color:#111;
-        display:block;
-    }}
-
-    .agency-choice input {{
-        margin-right:6px;
-        accent-color: var(--accent-bg);
-    }}
-
-    code.chip {{
-        font-size:12px;
-        background:#f3f4f6;
-        padding:2px 6px;
-        border-radius:6px;
-        border:1px solid #e5e7eb;
-        color:#374151;
-    }}
-
-    /* NEW: pagination controls for /opportunities */
-    .pagination-bar {{
-        display:flex;
-        flex-wrap:wrap;
-        gap:8px;
-        align-items:center;
-        justify-content:flex-start;
-        margin-top:16px;
-        font-size:13px;
-    }}
-
-    .page-link {{
-        display:inline-block;
-        padding:6px 10px;
-        border-radius:8px;
-        border:1px solid #d1d5db;
-        background:#fff;
-        font-weight:500;
-        line-height:1.2;
-        text-decoration:none;
-        color:#374151;
-    }}
-
-    .page-link:hover {{
-        text-decoration:none;
-        border-color: var(--accent-bg);
-        color: var(--accent-bg);
-    }}
-
-    .page-link.current {{
-        background: var(--accent-bg);
-        border-color: var(--accent-bg);
-        color:#fff;
-    }}
-
-    .page-link.disabled {{
-        opacity:0.4;
-        pointer-events:none;
-        cursor:default;
-    }}
-
-    .reveal {{
-        opacity: 0;
-        transform: translateY(16px);
-        transition: opacity 0.5s ease, transform 0.5s ease;
-    }}
-
-    .reveal.reveal-visible {{
-        opacity: 1;
-        transform: translateY(0);
-    }}
-
-    /* Hero and trust styles for Overview */
-    .hero-gradient {{
-        background: radial-gradient(circle at 20% 20%, #eef2ff 0%, #ffffff 60%);
-        border:1px solid var(--pill-border);
-    }}
-    .logo-row {{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; }}
-    .logo-row .logo {{ height:22px; width:auto; opacity:.7; filter:grayscale(100%); }}
-    .stat-row {{ display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }}
-    .stat {{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; min-width:120px; text-align:center; }}
-    .stat b {{ display:block; font-size:18px; }}
-
-</style>
+<link rel="stylesheet" href="/static/base.css">
 </head>
 <body>
-
-<header class="navbar">
-    <div class="brand-block">
-        <img src="static/logo.png" alt="Site logo" class="brand-logo" />
-        <div class="brand-name">EasyRFP</div>
-        <div class="brand-tagline">Find local bids. Faster.</div>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <img src="/static/logo.png" alt="EasyRFP" />
+            <span>EasyRFP</span>
+        </div>
+        <div class="nav-label">Navigation</div>
+        <nav class="navlinks">
+            {nav_links}
+        </nav>
+    </aside>
+    <div class="content">
+        <div class="topbar" role="banner">
+    <div class="topbar-left">
+        <a class="top-pill top-home" href="/" aria-label="Home">
+            <span class="top-home-icon" aria-hidden="true"></span>
+            <span class="top-label">Home</span>
+        </a>
+        <span class="top-pill top-tier" role="status">
+            <span class="top-label">Tier:</span> <strong>{user_tier}</strong>
+            <a href="/billing" class="top-upgrade">Upgrade</a>
+        </span>
     </div>
-    <nav class="navlinks">
-        {nav_links}
-    </nav>
-</header>
+    <div class="topbar-right">
+        <button class="icon-btn" type="button" aria-label="Notifications" id="notif-btn">
+            <img src="/static/bell.png" alt="" class="icon-img"><span class="notif-dot" aria-hidden="true"></span>
+        </button>
+        <div class="top-dropdown">
+            <button class="icon-btn" type="button" aria-label="Help" id="help-btn">?</button>
+            <div class="top-menu" id="help-menu" role="menu">
+                <a href="/privacy" role="menuitem">Privacy Policy</a>
+                <a href="/terms" role="menuitem">Terms of Service</a>
+            </div>
+        </div>
+        <div class="top-dropdown">
+            <button class="avatar-button" type="button" aria-haspopup="menu" aria-expanded="false" id="avatar-btn">
+                <span class="avatar-halo">
+                    <span class="avatar-circle">{(user_email or 'U')[:2].upper()}</span>
+                </span>
+                <span class="top-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="top-menu" id="avatar-menu" role="menu">
+                <a href="/account" role="menuitem">My Account</a>
+                <a href="/account/preferences" role="menuitem">Preferences</a>
+                <a href="/billing" role="menuitem">Account Billing</a>
+                <a href="/logout" role="menuitem">Logout</a>
+            </div>
+        </div>
+    </div>
+</div>
+        <main class="page">
+        {body_html}
+        </main>
+    </div>
+</div>
+<button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar"><<</button>
 
-<main class="page">
-{body_html}
-</main>
+<div id="notif-overlay" aria-hidden="true"></div>
+<aside id="notif-drawer" aria-hidden="true">
+  <header>
+    <div>
+      <div class="notif-title">Notifications</div>
+      <div class="notif-sub">Inbox • Last 14 days</div>
+    </div>
+    <button class="icon-btn" id="notif-close" type="button" aria-label="Close notifications">×</button>
+  </header>
+  <div class="notif-list" id="notif-list">
+    <div class="notif-item unread">
+      <div class="notif-line">
+        <span class="notif-pill">New</span>
+        <span class="notif-time">Just now</span>
+      </div>
+      <div class="notif-body">New opportunity posted matching your keywords.</div>
+      <button class="notif-link" type="button">View</button>
+    </div>
+    <div class="notif-item">
+      <div class="notif-line">
+        <span class="notif-pill muted">Update</span>
+        <span class="notif-time">2h ago</span>
+      </div>
+      <div class="notif-body">Team comment added on “Water Treatment Plant RFP”.</div>
+      <button class="notif-link" type="button">Open thread</button>
+    </div>
+  </div>
+</aside>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {{
@@ -475,7 +186,72 @@ document.addEventListener("DOMContentLoaded", function () {{
     }} else {{
         revealEls.forEach((el) => el.classList.add("reveal-visible"));
     }}
+
 }});
+// notifications drawer
+(function(){{
+  const btn = document.getElementById('notif-btn');
+  const drawer = document.getElementById('notif-drawer');
+  const overlay = document.getElementById('notif-overlay');
+  const closeBtn = document.getElementById('notif-close');
+  if (!btn || !drawer || !overlay) return;
+  const toggle = (open) => {{
+    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+  }};
+  btn.addEventListener('click', function(){{ toggle(true); }});
+  if (closeBtn) closeBtn.addEventListener('click', function(){{ toggle(false); }});
+  overlay.addEventListener('click', function(){{ toggle(false); }});
+}})();
+
+// help dropdown
+(function(){{
+  const btn = document.getElementById('help-btn');
+  const menu = document.getElementById('help-menu');
+  if (!btn || !menu) return;
+  const toggle = (open) => {{
+    menu.style.display = open ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }};
+  btn.addEventListener('click', function(){{
+    const isOpen = menu.style.display === 'block';
+    toggle(!isOpen);
+  }});
+  document.addEventListener('click', function(e){{
+    if (!btn.contains(e.target) && !menu.contains(e.target)) toggle(false);
+  }});
+}})();
+
+
+// avatar dropdown
+(function(){{
+  const btn = document.getElementById('avatar-btn');
+  const menu = document.getElementById('avatar-menu');
+  if (!btn || !menu) return;
+  const toggle = (open) => {{
+    menu.style.display = open ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }};
+  btn.addEventListener('click', function(){{
+    const isOpen = menu.style.display === 'block';
+    toggle(!isOpen);
+  }});
+  document.addEventListener('click', function(e){{
+    if (!btn.contains(e.target) && !menu.contains(e.target)) toggle(false);
+  }});
+}})();
+
+
+// sidebar toggle
+(function(){{
+  const btn = document.getElementById('sidebar-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', function(){{
+    const collapsed = document.body.classList.toggle('sidebar-collapsed');
+    btn.textContent = collapsed ? '>>' : '<<';
+  }});
+}})();
+
 </script>
 
 
