@@ -1,4 +1,4 @@
-﻿# app/routers/auth_web.py
+# app/routers/auth_web.py
 from fastapi import APIRouter, Request, Form
 import secrets
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -41,6 +41,11 @@ async def _load_user_by_email(email: str):
 async def signup_form(request: Request, next: str = "/"):
     user_email = get_current_user_email(request)
     csrf_cookie = request.cookies.get("csrftoken") or secrets.token_urlsafe(32)
+    selected_plan = (request.query_params.get("plan") or "free").lower()
+    if selected_plan not in {"free", "starter", "professional", "enterprise"}:
+        selected_plan = "free"
+    paid_flag = (request.query_params.get("paid") or "").strip()
+    prefill_email = request.query_params.get("email") or ""
     interest_opts = list_interest_options()
     options_html = "".join(
         f"<option value='{opt['key']}' {'selected' if opt['key'] == DEFAULT_INTEREST_KEY else ''}>{opt['label']}</option>"
@@ -56,7 +61,7 @@ async def signup_form(request: Request, next: str = "/"):
         [
             f"""
             <label class="plan-tile {'plan-best' if p['best'] else ''}" data-plan="{p['key']}">
-              <input type="radio" name="plan_choice" value="{p['key']}" {'checked' if p['key']=='free' else ''}>
+              <input type="radio" name="plan_choice" value="{p['key']}" {'checked' if p['key']==selected_plan else ''}>
               <div class="plan-top">
                 <div class="plan-name">{p['name']}</div>
                 <div class="plan-price">{p['price']}</div>
@@ -71,15 +76,17 @@ async def signup_form(request: Request, next: str = "/"):
     body_html = f"""
     <section class="card">
       <h2 class="section-heading">Create your account</h2>
-      <p class="subtext">Start in seconds. Pick a plan now—paid plans head straight to secure Stripe checkout.</p>
+      <p class="subtext">Start in seconds. Confirm a plan, finish checkout, then complete signup.</p>
+      {"<div class='alert success' style='margin-bottom:10px;'>Payment received for your selected plan. Finish creating your account below.</div>" if paid_flag else ""}
 
       <form method="POST" action="/signup">\n        <input type="hidden" name="csrf_token" id="csrf_signup" value="{csrf_cookie}">
         <input type="hidden" name="next" value="{next}">
-        <input type="hidden" name="plan" id="plan-hidden" value="free">
+        <input type="hidden" name="plan" id="plan-hidden" value="{selected_plan}">
+        {"<input type='hidden' name='paid' value='1'>" if paid_flag else ""}
         <div class="form-row">
           <div class="form-col">
             <label class="label-small">Email</label>
-            <input type="email" name="email" placeholder="you@company.com" required />
+            <input type="email" name="email" id="signup-email" placeholder="you@company.com" value="{prefill_email}" required />
           </div>
           <div class="form-col">
             <label class="label-small">Password</label>
@@ -101,18 +108,21 @@ async def signup_form(request: Request, next: str = "/"):
           <div class="plan-chooser-head">
             <div>
               <div class="label-small">Pick your starting plan</div>
-              <div class="help-text">Upgrade sends you to Stripe after signup; Free goes straight to your dashboard.</div>
+              <div class="help-text">Confirm your plan. Paid plans go to Stripe checkout, then you return here to finish signup.</div>
             </div>
             <div class="plan-chooser-note">Change anytime</div>
           </div>
           <div class="plan-tiles">{plan_html}</div>
         </div>
-        <div class="form-actions">
-          <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
-          <button class="button-primary" type="submit">Create account & continue</button>
+        <div class="form-actions" style="justify-content:space-between; align-items:center;">
+          <button class="button-secondary" type="button" id="pay-now-btn">Confirm plan & go to Stripe</button>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
+            <button class="button-primary" type="submit">Create account & continue</button>
+          </div>
         </div>
         <div class="help-text">Already have an account? <a href="/login?next={next}">Sign in</a>.</div>
-      </form>\\n    </section>
+      </form>\n    </section>
     <style>
       .plan-chooser {{ display:grid; gap:12px; }}
       .plan-chooser-head {{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }}
@@ -125,7 +135,8 @@ async def signup_form(request: Request, next: str = "/"):
       .plan-tile .plan-price {{ color:#2563eb; }}
       .plan-tile .plan-perk {{ color:#334155; font-size:13px; }}
       .plan-tile .plan-cta {{ font-size:12px; color:#0f172a; opacity:0.8; }}
-      .plan-tile.plan-best {{ border-color: rgba(37,99,235,0.5); box-shadow:0 0 0 2px rgba(37,99,235,0.15); }}
+      .plan-tile.plan-best {{ border-color:#e5e7eb; box-shadow:0 4px 10px rgba(37,99,235,0.08); position:relative; }}
+      .plan-tile.plan-best::after {{ content:'Most popular'; position:absolute; top:10px; right:10px; font-size:11px; color:#2563eb; background:rgba(37,99,235,0.08); padding:3px 8px; border-radius:999px; }}
       .plan-tile.selected {{ border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,0.2); }}
     </style>
     <script>
@@ -141,14 +152,35 @@ async def signup_form(request: Request, next: str = "/"):
           }});
         }}
         var tiles = Array.prototype.slice.call(document.querySelectorAll('.plan-tile'));
+        var hidden = document.getElementById('plan-hidden');
+        var emailInput = document.getElementById('signup-email');
+        var selectTile = function(tile){{
+          var radio = tile.querySelector('input[type=\"radio\"]');
+          if(!radio) return;
+          radio.checked = true;
+          tiles.forEach(function(t){{ t.classList.toggle('selected', t===tile); }});
+          if(hidden) hidden.value = radio.value;
+        }};
         tiles.forEach(function(tile){{
+          if((tile.querySelector('input[type=\"radio\"]') || {{}}).checked) {{
+            selectTile(tile);
+          }}
           tile.addEventListener('click', function(ev){{
-            var radio = tile.querySelector('input[type=\"radio\"]');
-            if(!radio) return;
-            radio.checked = true;
-            tiles.forEach(function(t){{ t.classList.toggle('selected', t===tile); }});
+            ev.preventDefault();
+            selectTile(tile);
           }});
         }});
+        var payBtn = document.getElementById('pay-now-btn');
+        if(payBtn){{
+          payBtn.addEventListener('click', function(ev){{
+            ev.preventDefault();
+            var emailVal = emailInput ? (emailInput.value || '').trim() : '';
+            if(!emailVal) {{ alert('Enter your email first.'); return; }}
+            var planVal = hidden ? (hidden.value || 'free') : 'free';
+            var returnTo = '/signup?plan=' + encodeURIComponent(planVal) + '&email=' + encodeURIComponent(emailVal) + '&paid=1';
+            window.location.href = '/billing/checkout?plan=' + encodeURIComponent(planVal) + '&email=' + encodeURIComponent(emailVal) + '&return_to=' + encodeURIComponent(returnTo);
+          }});
+        }}
       }})();
     </script>
     """
@@ -165,6 +197,7 @@ async def signup_submit(
     remember: bool = Form(False),
     primary_interest: str = Form(DEFAULT_INTEREST_KEY),
     plan: str = Form("free"),
+    paid: str = Form(""),
 ):
     email_clean = email.strip().lower()
     pw_hash = hash_password(password)
@@ -176,6 +209,26 @@ async def signup_submit(
     plan_choice = (plan or "free").strip().lower()
     if plan_choice not in allowed_plans:
         plan_choice = "free"
+
+    # If the email already exists, prompt login instead of overwriting credentials.
+    existing = await _load_user_by_email(email_clean)
+    if existing:
+        return HTMLResponse(
+            page_shell(
+                f"""
+                <section class="card">
+                  <h2 class="section-heading">Account already exists</h2>
+                  <p class="subtext">We found an account for <b>{email_clean}</b>. Please sign in instead of creating a new one.</p>
+                  <div class="form-actions" style="margin-top:10px;">
+                    <a class="button-primary" href="/login?next={next}">Go to login</a>
+                  </div>
+                </section>
+                """,
+                title="Account exists",
+                user_email=None,
+            ),
+            status_code=400,
+        )
 
     async with AsyncSessionLocal() as session:
         await session.execute(
@@ -199,7 +252,11 @@ async def signup_submit(
     await record_milestone(email_clean, "signup", {"source": "signup_form"})
 
     token = create_session_token(email_clean)
-    redirect_to = "/welcome" if plan_choice == "free" else f"/billing/checkout?plan={plan_choice}"
+    paid_flag = (paid or "").strip()
+    if plan_choice != "free" and not paid_flag:
+        redirect_to = f"/billing/checkout?plan={plan_choice}"
+    else:
+        redirect_to = "/welcome"
     resp = RedirectResponse(url=redirect_to, status_code=303)
 
     is_prod = settings.ENV.lower() == "production"
@@ -248,7 +305,7 @@ async def login_form(request: Request, next: str = "/"):
           <button class="button-primary" type="submit">Sign in</button>
         </div>
         <div class="help-text">No account yet? <a href="/signup?next={next}">Create one</a>.</div>
-      </form>\\n    </section>
+      </form>\n    </section>
     <script>
       (function() {{
         var btn=document.querySelector('.pw-toggle');
@@ -487,6 +544,17 @@ async def team_settings(request: Request):
   align-items:center;
   gap:8px;
 }}
+.member-actions {{ display:flex; gap:8px; align-items:center; }}
+.btn-ghost {{
+  border:1px solid #e2e8f0;
+  background:transparent;
+  border-radius:10px;
+  padding:6px 10px;
+  cursor:pointer;
+  font-weight:600;
+  color:#0f172a;
+}}
+.btn-ghost:hover {{ background:#e2e8f0; }}
 .pill {{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }}
 .pill.pending {{ background:#fff7ed; color:#c2410c; border-color:#fed7aa; }}
 .pill.active {{ background:#ecfdf3; color:#166534; border-color:#bbf7d0; }}
@@ -521,6 +589,7 @@ async def team_settings(request: Request):
     <ul id="team-list" class="team-list">
       <li class="muted">Loading team...</li>
     </ul>
+    <div id="member-status" class="muted" style="margin-top:6px;"></div>
     <div class="actions" style="margin-top:10px;">
       <button id="accept-btn" class="btn-secondary" type="button">Accept invite for this account</button>
       <span id="accept-status" class="muted"></span>
@@ -539,8 +608,9 @@ async def team_settings(request: Request):
   const seatEl = document.getElementById("seat-count");
   const btn = document.getElementById("invite-btn");
   const acceptBtn = document.getElementById("accept-btn");
-    const acceptStatus = document.getElementById("accept-status");
-    const currentUser = "__CURRENT_USER__".toLowerCase();
+  const acceptStatus = document.getElementById("accept-status");
+  const memberStatus = document.getElementById("member-status");
+  const currentUser = "__CURRENT_USER__".toLowerCase();
 
   function renderMembers(members){
     seatEl.textContent = members.length;
@@ -552,9 +622,16 @@ async def team_settings(request: Request):
       <li>
         <div>
           <div><b>${m.user_email || m.invited_email}</b></div>
-          <div class="muted">${m.user_id ? "Accepted" : "Pending invite"} · Role: ${m.role}</div>
+          <div class="muted">${m.user_id ? "Accepted" : "Pending invite"} - Role: ${m.role}</div>
         </div>
-        <span class="pill ${m.user_id ? "active" : "pending"}">${m.user_id ? "Active" : "Pending"}</span>
+        <div class="member-actions">
+          <span class="pill ${m.user_id ? "active" : "pending"}">${m.user_id ? "Active" : "Pending"}</span>
+          ${
+            ((m.role || "").toLowerCase() !== "owner" && (m.user_email || "").toLowerCase() !== currentUser)
+              ? `<button class="btn-ghost remove-btn" data-id="${m.id}" data-email="${m.user_email || m.invited_email || ""}">Remove</button>`
+              : ""
+          }
+        </div>
       </li>
     `).join("");
   }
@@ -612,6 +689,31 @@ async def team_settings(request: Request):
   }
 
   btn.addEventListener("click", sendInvites);
+  listEl.addEventListener("click", async function(ev){
+    const btnEl = ev.target.closest(".remove-btn");
+    if (!btnEl) return;
+    const memberId = btnEl.getAttribute("data-id");
+    const label = btnEl.getAttribute("data-email") || "this member";
+    if (!memberId) return;
+    if (!confirm("Remove " + label + " from the team?")) return;
+    btnEl.disabled = true;
+    if (memberStatus) memberStatus.textContent = "Removing " + label + "...";
+    try{
+      const res = await fetch("/api/team/members/" + memberId + "/remove", {
+        method:"POST",
+        credentials:"include",
+        headers:{ "X-CSRF-Token": getCSRF() || "" }
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (memberStatus) memberStatus.textContent = "Removed " + label + ".";
+      loadMembers();
+    }catch(err){
+      if (memberStatus) memberStatus.textContent = "Could not remove member (owner access required).";
+    }finally{
+      btnEl.disabled = false;
+      if (memberStatus) setTimeout(() => { memberStatus.textContent = ""; }, 4000);
+    }
+  });
   if (acceptBtn) {
     acceptBtn.addEventListener("click", async function(){
       acceptStatus.textContent = "";
@@ -677,4 +779,3 @@ async def accept_invite_ui(request: Request):
     """
     body = body.replace("{EMAIL}", user_email or "")
     return HTMLResponse(page_shell(body, title="Accept Team Invite", user_email=user_email))
-

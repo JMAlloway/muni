@@ -206,6 +206,7 @@ from app.api import (
     team,
     vendor_guides,
     tracker_dashboard,
+    notifications,
     debug_cookies,
     dev_auth,
     welcome,
@@ -227,6 +228,7 @@ app.include_router(team.router)
 app.include_router(uploads_router)
 app.include_router(zip_router)
 app.include_router(opportunity_web.router)
+app.include_router(notifications.router)
 app.include_router(columbus_detail.router)
 app.include_router(cota_detail.router)
 app.include_router(gahanna_detail.router)

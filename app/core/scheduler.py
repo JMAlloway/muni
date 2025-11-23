@@ -188,7 +188,13 @@ async def _send_digest_to_matching_users(
             sms_opt_in,
             sms_phone_verified,
         ) = row
-        if (freq or "").strip().lower() != target_frequency:
+        freq_norm = (freq or "").strip().lower()
+        if not freq_norm:
+            # No preference set: default to weekly
+            freq_norm = "weekly"
+        if freq_norm in {"none", "off", "unsubscribed", "unsubscribe"}:
+            continue
+        if freq_norm != target_frequency:
             continue
 
         # parse agency filter JSON

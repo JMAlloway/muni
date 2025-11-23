@@ -2,13 +2,100 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from app.api._layout import page_shell, _get_user_tier
+from app.api._layout import page_shell, _get_user_tier, _get_user_tier_info
 from app.auth.session import get_current_user_email
 from app.core.settings import settings
 from app.core.db import AsyncSessionLocal
 from sqlalchemy import text
 
 router = APIRouter(tags=["billing"])
+
+
+async def _sync_tier_from_stripe(user_email: str | None) -> None:
+    """Best-effort: pull latest subscription for this email and update tier + IDs."""
+    if not user_email:
+        return
+    key = (settings.STRIPE_SECRET_KEY or "").strip()
+    if not key or key.startswith("pk_"):
+        return
+    try:
+        import stripe  # type: ignore
+    except ModuleNotFoundError:
+        return
+    stripe.api_key = key
+    try:
+        # Find customer by email
+        cust = None
+        try:
+            found = stripe.Customer.search(query=f"email:'{user_email}'", limit=1)
+            cust = (found.get("data") or [None])[0]
+        except Exception:
+            found = stripe.Customer.list(email=user_email, limit=1)
+            cust = (found.get("data") or [None])[0]
+        if not cust:
+            return
+        customer_id = cust.get("id")
+
+        subs = stripe.Subscription.list(customer=customer_id, status="all", limit=1)
+        items = subs.get("data") or []
+        if not items:
+            return
+        sub = items[0]
+        price_id = ((sub.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id", "")
+        price_to_tier = {
+            (settings.STRIPE_PRICE_STARTER or "").lower(): "Starter",
+            (settings.STRIPE_PRICE_PROFESSIONAL or "").lower(): "Professional",
+            (settings.STRIPE_PRICE_ENTERPRISE or "").lower(): "Enterprise",
+        }
+        tier = price_to_tier.get(price_id.lower())
+        if not tier:
+            return
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET tier = :tier,
+                        stripe_customer_id = COALESCE(stripe_customer_id, :cid),
+                        stripe_subscription_id = :sid
+                    WHERE lower(email) = lower(:email)
+                    """
+                ),
+                {"tier": tier, "email": user_email, "cid": customer_id, "sid": sub.get("id")},
+            )
+            await db.commit()
+        try:
+            print(f"[billing sync] refreshed tier for {user_email}: {tier} via subscription {sub.get('id')}")
+        except Exception:
+            pass
+    except Exception:
+        # Silent; this is best-effort
+        return
+
+
+async def _ensure_billing_owner(user_email: str | None):
+    """
+    Allow billing actions only for the team owner (or platform admin) when a team is present.
+    """
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("SELECT id, team_id, is_admin FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+            {"email": user_email},
+        )
+        row = res.fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="Login required")
+        user_id, team_id, is_admin = row
+        if team_id:
+            role_res = await db.execute(
+                text("SELECT role FROM team_members WHERE team_id = :team AND user_id = :uid LIMIT 1"),
+                {"team": team_id, "uid": user_id},
+            )
+            role = (role_res.scalar() or "").lower()
+            if role != "owner" and not bool(is_admin):
+                raise HTTPException(status_code=403, detail="Billing is restricted to the team owner.")
 
 
 def _plan_card(name: str, price: str, highlights: list[str], cta_href: str, cta_label: str, current: bool) -> str:
@@ -33,7 +120,12 @@ def _plan_card(name: str, price: str, highlights: list[str], cta_href: str, cta_
 @router.get("/billing", response_class=HTMLResponse)
 async def billing_page(request: Request):
     user_email = get_current_user_email(request)
-    current_tier = _get_user_tier(user_email).title()
+    tier_info = _get_user_tier_info(user_email)
+    current_tier = tier_info.get("effective", "Free")
+
+    # Restrict billing to team owner (or platform admin) when the user belongs to a team.
+    if user_email:
+        await _ensure_billing_owner(user_email)
 
     payment_links = {
         "Starter": "https://buy.stripe.com/test_6oUfZj4DeaNkdzO3NXcV201",
@@ -194,6 +286,7 @@ async def billing_page(request: Request):
     status = request.query_params.get("status")
     banner = ""
     if status == "success":
+        await _sync_tier_from_stripe(user_email)
         banner = '<div class="alert success">Payment received. Your plan will update shortly.</div>'
     elif status == "cancel":
         banner = '<div class="alert muted">Checkout canceled.</div>'
@@ -218,10 +311,10 @@ async def billing_page(request: Request):
 
 
 @router.get("/billing/checkout")
-async def billing_checkout(request: Request, plan: str = "starter"):
-    user_email = get_current_user_email(request)
+async def billing_checkout(request: Request, plan: str = "starter", email: str | None = None, return_to: str | None = None):
+    user_email = get_current_user_email(request) or (email or "").strip().lower()
     if not user_email:
-        raise HTTPException(status_code=401, detail="Login required")
+        raise HTTPException(status_code=401, detail="Login required or email required")
 
     # Configure Stripe
     key = (settings.STRIPE_SECRET_KEY or "").strip()
@@ -245,6 +338,9 @@ async def billing_checkout(request: Request, plan: str = "starter"):
     base = str(request.base_url).rstrip("/")
     success_url = f"{base}/billing?status=success"
     cancel_url = f"{base}/billing?status=cancel"
+    if return_to and return_to.startswith("/signup"):
+        success_url = f"{base}{return_to}"
+        cancel_url = f"{base}/signup?plan={plan}"
 
     try:
         session = stripe.checkout.Session.create(
@@ -318,6 +414,11 @@ async def stripe_webhook(request: Request):
         tier = payment_link_to_tier.get(link)
         customer_id = data.get("customer") or customer_id
         subscription_id = data.get("subscription") or subscription_id
+        # For Checkout Sessions we create (not payment links), pull plan from metadata or price.
+        meta_plan = (data.get("metadata") or {}).get("plan", "")
+        if meta_plan:
+            tier = meta_plan.title()
+        price_id_dbg = (data.get("line_items") or [{}])[0].get("price", "") if not tier else price_id_dbg
 
     if event_type in {"invoice.paid", "invoice.payment_succeeded"}:
         email = data.get("customer_email") or email
@@ -344,6 +445,15 @@ async def stripe_webhook(request: Request):
         if set_parts:
             async with AsyncSessionLocal() as db:
                 await db.execute(
+                    text(
+                        """
+                        INSERT OR IGNORE INTO users (email, password_hash, digest_frequency, agency_filter, is_active, created_at, tier)
+                        VALUES (:email, '', 'daily', '[]', 1, CURRENT_TIMESTAMP, COALESCE(:tier, 'Free'))
+                        """
+                    ),
+                    {"email": email, "tier": tier or "Free"},
+                )
+                await db.execute(
                     text(f"UPDATE users SET {', '.join(set_parts)} WHERE lower(email) = lower(:email)"),
                     updates,
                 )
@@ -369,6 +479,7 @@ async def billing_portal(request: Request):
     key = (settings.STRIPE_SECRET_KEY or "").strip()
     if not user_email:
         raise HTTPException(status_code=401, detail="Login required")
+    await _ensure_billing_owner(user_email)
     if not key:
         raise HTTPException(status_code=503, detail="Stripe not configured")
     if key.startswith("pk_"):
@@ -481,5 +592,5 @@ async def billing_portal(request: Request):
 @router.get("/billing/debug-tier", response_class=JSONResponse, include_in_schema=False)
 async def billing_debug_tier(request: Request):
     email = get_current_user_email(request)
-    tier = _get_user_tier(email)
-    return {"email": email, "tier": tier}
+    info = _get_user_tier_info(email)
+    return {"email": email, "tier": info.get("effective"), "label": info.get("label"), "source": info.get("source")}

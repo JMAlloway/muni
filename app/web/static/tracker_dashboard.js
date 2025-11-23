@@ -3,6 +3,8 @@
 
   const grid = document.getElementById("tracked-grid");
   let items = JSON.parse(grid.getAttribute("data-items") || "[]");
+  const currentUserEmail = (grid.getAttribute("data-user-email") || "").toLowerCase();
+  const currentUserId = parseInt(grid.getAttribute("data-user-id") || "", 10) || null;
 
   const selStatus = document.getElementById("status-filter");
   const selAgency = document.getElementById("agency-filter");
@@ -186,9 +188,13 @@
       const text = highlightMentions(noteBody(n));
       const ts = fmtDateShort(n.created_at || n.id);
       const author = n.author_email || "Someone";
-      return `<div class="thread-message">
+      const isMineEmail = currentUserEmail && author && author.toLowerCase() === currentUserEmail;
+      const isMineId = currentUserId && n.author_user_id && String(n.author_user_id) === String(currentUserId);
+      const isMine = !!(isMineEmail || isMineId);
+      const label = isMine ? "You" : author;
+      return `<div class="thread-message ${isMine ? 'mine' : ''}">
         <div>${text}</div>
-        <div class="meta"><span class="author">${escHtml(author)}</span>${ts ? `<span>&#183;</span><span>${ts}</span>` : ''}</div>
+        <div class="meta"><span class="author">${escHtml(label)}</span>${ts ? `<span>&#183;</span><span>${ts}</span>` : ''}</div>
       </div>`;
     }).join("");
   }
@@ -433,6 +439,8 @@
       const dueSoon = (dueMs !== null) && (dueMs < 7*24*60*60*1000) && (dueMs >= 0);
       const collab = collabFor(it.opportunity_id);
       const notes = getNotes(it.opportunity_id);
+      const trackedBy = (it.tracked_by || "").toString();
+      const trackedByLabel = it.is_mine ? "You" : (trackedBy || "Teammate");
       const notesHtml = (notes && notes.length)
         ? notes.slice(0,3).map(n=>{
             const txt = noteBody(n);
@@ -455,6 +463,7 @@
                 <span>${it.agency_name||""}</span><span></span>
                 <span>Due: ${dueStr(it.due_date)}</span>${dueSoon?`<span class="badge-soon">Due soon</span>`:''}
                 <span>${filesLabel}</span>
+                ${trackedBy ? `<span class="tracked-by ${it.is_mine ? 'mine' : ''}">Tracked by ${escHtml(trackedByLabel)}</span>` : ''}
               </div>
             </div>
             ${statusBadge(it.status)}

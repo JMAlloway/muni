@@ -1,0 +1,37 @@
+:root {
+    --bg-page: #f9fafb;
+    --bg-card: #ffffff;
+    --border-card: #e5e7eb;
+    --text-main: #111827;
+    --text-dim: #6b7280;
+    --accent-bg: #4f46e5;
+    --accent-bg-hover: #4338ca;
+    --accent-text: #4f46e5;
+    --pill-bg: #eef2ff;
+    --pill-border: #c7d2fe;
+    --pill-text: #4f46e5;
+    --radius-card: 16px;
+    --radius-pill: 999px;
+    --shadow-card: 0 20px 40px rgba(0,0,0,0.06);
+    --focus-ring: 0 0 0 3px rgba(79,70,229,0.25);
+    --focus-color: #4338ca;
+    --skeleton-base: #e5e7eb;
+    --skeleton-highlight: #f3f4f6;
+}
+
+:root[data-theme="dark"] {
+    --bg-page: #0f172a;
+    --bg-card: #111827;
+    --border-card: #1f2937;
+    --text-main: #e5e7eb;
+    --text-dim: #94a3b8;
+    --accent-bg: #38bdf8;
+    --accent-bg-hover: #0ea5e9;
+    --accent-text: #38bdf8;
+    --pill-bg: rgba(56,189,248,0.12);
+    --pill-border: rgba(56,189,248,0.28);
+    --pill-text: #67e8f9;
+    --shadow-card: 0 20px 40px rgba(0,0,0,0.35);
+}
+
+/* Note: dark theme now opt-in only via [data-theme="dark"] to keep the default light look */

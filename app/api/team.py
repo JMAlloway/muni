@@ -14,6 +14,7 @@ from app.auth.session import get_current_user_email
 from app.core.db import AsyncSessionLocal
 from app.core.settings import settings
 from app.core.emailer import send_email
+from app.api.notifications import create_notification
 
 router = APIRouter(tags=["team"])
 
@@ -35,6 +36,50 @@ def _ensure_premium_tier(tier: Optional[str], is_admin: bool = False):
     return
 
 
+async def _ensure_team_feature_access(session, user_email: str):
+    """
+    Require that the team owner is Professional/Enterprise (or the user is platform admin).
+    Returns (user_id, team_id).
+    """
+    res = await session.execute(
+        text("SELECT id, team_id, tier, is_admin FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+        {"email": user_email},
+    )
+    row = res.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_id, team_id, tier, is_admin = row
+
+    # Admin override
+    if bool(is_admin):
+        return user_id, team_id
+
+    allowed_tiers = {"professional", "enterprise"}
+    # If the user is the owner (team_id), look up owner tier; otherwise, use the owner tier of their team.
+    owner_tier = (tier or "").strip().lower()
+    if team_id:
+        owner_res = await session.execute(
+            text(
+                """
+                SELECT COALESCE(u.tier, u.Tier) AS owner_tier
+                FROM teams t
+                LEFT JOIN users u ON u.id = t.owner_user_id
+                WHERE t.id = :team
+                LIMIT 1
+                """
+            ),
+            {"team": team_id},
+        )
+        o_row = owner_res.fetchone()
+        if o_row and o_row[0]:
+            owner_tier = (o_row[0] or "").strip().lower()
+
+    if owner_tier not in allowed_tiers:
+        raise HTTPException(status_code=403, detail="Team features require a Professional or Enterprise owner.")
+
+    return user_id, team_id
+
+
 @router.get("/api/team/members", response_class=JSONResponse)
 async def list_team_members(request: Request):
     user_email = get_current_user_email(request)
@@ -42,15 +87,7 @@ async def list_team_members(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     async with AsyncSessionLocal() as session:
-        res = await session.execute(
-            text("SELECT id, team_id, tier, is_admin FROM users WHERE email = :email LIMIT 1"),
-            {"email": user_email},
-        )
-        row = res.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="User not found")
-        user_id, team_id, tier, is_admin = row
-        _ensure_premium_tier(tier, bool(is_admin))
+        user_id, team_id = await _ensure_team_feature_access(session, user_email)
 
         if not team_id:
             team_id = await _create_team(session, owner_id=user_id, name="Team")
@@ -145,6 +182,7 @@ async def invite_member(request: Request, payload: dict):
         if not row:
             raise HTTPException(status_code=404, detail="User not found")
         user_id, team_id, tier, is_admin = row
+        role = None
         _ensure_premium_tier(tier, bool(is_admin))
 
         # ensure team exists
@@ -163,9 +201,32 @@ async def invite_member(request: Request, payload: dict):
                 ),
                 {"team": team_id, "uid": user_id, "email": user_email},
             )
+            role = "owner"
+
+        if not role:
+            role_res = await session.execute(
+                text("SELECT role FROM team_members WHERE team_id = :team AND user_id = :uid LIMIT 1"),
+                {"team": team_id, "uid": user_id},
+            )
+            role = (role_res.scalar() or "").lower()
+        if role != "owner" and not bool(is_admin):
+            raise HTTPException(status_code=403, detail="Only the team owner or an admin can invite members.")
 
         # seat limit: owner + 2 more for professional; unlimited for enterprise
-        seat_limit = 4 if (tier or "").lower() == "professional" else 50
+        owner_tier_val = None
+        if team_id:
+            owner_tier_res = await session.execute(
+                text(
+                    """
+                    SELECT COALESCE(u.tier, u.Tier) FROM teams t
+                    LEFT JOIN users u ON u.id = t.owner_user_id
+                    WHERE t.id = :team LIMIT 1
+                    """
+                ),
+                {"team": team_id},
+            )
+            owner_tier_val = (owner_tier_res.scalar() or "").lower()
+        seat_limit = 4 if owner_tier_val == "professional" else 50
         count_res = await session.execute(
             text("SELECT COUNT(*) FROM team_members WHERE team_id = :team"),
             {"team": team_id},
@@ -173,6 +234,26 @@ async def invite_member(request: Request, payload: dict):
         seat_count = count_res.scalar() or 0
         if seat_count >= seat_limit:
             raise HTTPException(status_code=403, detail="Seat limit reached for your plan.")
+
+        invited_user_id = None
+        invited_user_res = await session.execute(
+            text("SELECT id FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+            {"email": invite_email},
+        )
+        invited_user_row = invited_user_res.fetchone()
+        if invited_user_row:
+            invited_user_id = invited_user_row[0]
+
+        team_name = "Team"
+        try:
+            tname_res = await session.execute(
+                text("SELECT name FROM teams WHERE id = :team LIMIT 1"), {"team": team_id}
+            )
+            tname_row = tname_res.fetchone()
+            if tname_row and tname_row[0]:
+                team_name = tname_row[0]
+        except Exception:
+            team_name = "Team"
 
         await session.execute(
             text(
@@ -189,6 +270,21 @@ async def invite_member(request: Request, payload: dict):
                 "invited_at": dt.datetime.utcnow(),
             },
         )
+
+        # If the invited person already has an account, create an in-app notification.
+        if invited_user_id:
+            try:
+                await create_notification(
+                    session,
+                    recipient_user_id=invited_user_id,
+                    notif_type="team_invite",
+                    title="Team invitation",
+                    body=f"{user_email} invited you to join {team_name}",
+                    metadata={"team_id": team_id, "inviter_email": user_email},
+                )
+            except Exception:
+                pass
+
         await session.commit()
 
     # Send invite email (best-effort)
@@ -256,9 +352,85 @@ async def accept_invite(request: Request):
             text("UPDATE users SET team_id = :team WHERE id = :uid"),
             {"team": team_id, "uid": user_id},
         )
+        # Clean up other pending invites for this email (only keep the accepted one)
+        await session.execute(
+            text(
+                """
+                DELETE FROM team_members
+                WHERE invited_email = :email AND accepted_at IS NULL AND team_id != :team
+                """
+            ),
+            {"email": user_email, "team": team_id},
+        )
         await session.commit()
 
     return {"ok": True, "team_id": team_id}
+
+
+@router.post("/api/team/members/{member_id}/remove", response_class=JSONResponse)
+async def remove_member(request: Request, member_id: str):
+    """
+    Remove a pending invite or accepted member from the current team.
+    Only the team owner (or platform admin) can perform this action.
+    """
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with AsyncSessionLocal() as session:
+        # Identify caller + role
+        user_res = await session.execute(
+            text("SELECT id, team_id, is_admin FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+            {"email": user_email},
+        )
+        user_row = user_res.fetchone()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id, team_id, is_admin = user_row
+        if not team_id:
+            raise HTTPException(status_code=403, detail="No team assigned")
+
+        role_res = await session.execute(
+            text("SELECT role FROM team_members WHERE team_id = :team AND user_id = :uid LIMIT 1"),
+            {"team": team_id, "uid": user_id},
+        )
+        caller_role = (role_res.scalar() or "").lower()
+        if caller_role != "owner" and not bool(is_admin):
+            raise HTTPException(status_code=403, detail="Only the team owner or an admin can remove members.")
+
+        # Load target member
+        target_res = await session.execute(
+            text(
+                """
+                SELECT id, team_id, user_id, invited_email, role
+                FROM team_members
+                WHERE id = :id
+                LIMIT 1
+                """
+            ),
+            {"id": member_id},
+        )
+        target = target_res.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        _, target_team_id, target_user_id, target_email, target_role = target
+        if target_team_id != team_id:
+            raise HTTPException(status_code=403, detail="Cannot modify another team")
+        if (target_role or "").lower() == "owner":
+            raise HTTPException(status_code=400, detail="Cannot remove the team owner.")
+        if target_user_id == user_id and not bool(is_admin):
+            raise HTTPException(status_code=400, detail="Owners cannot remove themselves.")
+
+        await session.execute(text("DELETE FROM team_members WHERE id = :id"), {"id": member_id})
+        if target_user_id:
+            await session.execute(
+                text("UPDATE users SET team_id = NULL WHERE id = :uid AND team_id = :team"),
+                {"uid": target_user_id, "team": team_id},
+            )
+        await session.commit()
+
+    return {"ok": True, "removed": target_email or target_user_id}
 
 
 @router.get("/api/team/notes", response_class=JSONResponse)
@@ -268,15 +440,7 @@ async def list_notes(request: Request, opportunity_id: str):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     async with AsyncSessionLocal() as session:
-        res = await session.execute(
-            text("SELECT team_id, tier, id, is_admin FROM users WHERE email = :email LIMIT 1"),
-            {"email": user_email},
-        )
-        row = res.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="User not found")
-        team_id, tier, user_id, is_admin = row
-        _ensure_premium_tier(tier, bool(is_admin))
+        user_id, team_id = await _ensure_team_feature_access(session, user_email)
         if not team_id:
             return {"notes": []}
 
@@ -327,15 +491,7 @@ async def add_note(request: Request, payload: dict):
     mentions = [m.lower() for m in re.findall(r"@([a-zA-Z0-9._-]+)", body)]
 
     async with AsyncSessionLocal() as session:
-        res = await session.execute(
-            text("SELECT id, team_id, tier, is_admin FROM users WHERE email = :email LIMIT 1"),
-            {"email": user_email},
-        )
-        row = res.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="User not found")
-        user_id, team_id, tier, is_admin = row
-        _ensure_premium_tier(tier, bool(is_admin))
+        user_id, team_id = await _ensure_team_feature_access(session, user_email)
         if not team_id:
             raise HTTPException(status_code=403, detail="No team assigned")
 

@@ -23,63 +23,119 @@ async def tracker_dashboard(request: Request):
         """
         return HTMLResponse(page_shell(body, title="EasyRFP - My Bids", user_email=None), status_code=200)
 
-    # --- fetch tracked items for this user ---
-    sql = """
-    WITH u AS (
-      SELECT user_id, opportunity_id, COUNT(*) AS file_count, MAX(created_at) AS last_upload_at
-      FROM user_uploads
-      GROUP BY user_id, opportunity_id
-    )
-    SELECT
-      t.opportunity_id,
-      o.external_id,
-      o.title,
-      o.agency_name,
-      o.due_date,
-      COALESCE(o.ai_category, o.category) AS category,
-      o.source_url,
-      t.status,
-      t.notes,
-      t.created_at AS tracked_at,
-      COALESCE(u.file_count, 0) AS file_count
-    FROM user_bid_trackers t
-    JOIN opportunities o ON o.id = t.opportunity_id
-    LEFT JOIN u ON u.user_id = t.user_id AND u.opportunity_id = t.opportunity_id
-    WHERE t.user_id = (SELECT id FROM users WHERE email = :email LIMIT 1)
-    ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
-    """
+    # --- fetch tracked items for this user (and their team, if applicable) ---
+    team_name = None
+    team_owner_email = None
+    team_member_count = 0
+    user_id = None
+    team_id = None
+
     async with engine.begin() as conn:
-        rows = await conn.exec_driver_sql(sql, {"email": user_email})
+        user_res = await conn.exec_driver_sql(
+            "SELECT id, team_id FROM users WHERE lower(email) = lower(:email) LIMIT 1",
+            {"email": user_email},
+        )
+        user_row = user_res.first()
+        if user_row:
+            user_id = user_row._mapping.get("id")
+            team_id = user_row._mapping.get("team_id")
+
+        if team_id:
+            meta_res = await conn.exec_driver_sql(
+                """
+                SELECT t.name, owner.email AS owner_email
+                FROM teams t
+                LEFT JOIN users owner ON owner.id = t.owner_user_id
+                WHERE t.id = :team
+                LIMIT 1
+                """,
+                {"team": team_id},
+            )
+            meta_row = meta_res.first()
+            if meta_row:
+                meta_map = meta_row._mapping
+                team_name = meta_map.get("name") or "Team"
+                team_owner_email = meta_map.get("owner_email")
+            count_res = await conn.exec_driver_sql(
+                "SELECT COUNT(*) FROM team_members WHERE team_id = :team AND (accepted_at IS NOT NULL OR role = 'owner')",
+                {"team": team_id},
+            )
+            team_member_count = count_res.scalar() or 0
+
+        params = {"email": user_email, "user_id": user_id, "team_id": team_id}
+        filter_clause = "tracker_user.team_id = :team_id" if team_id else "tracker_user.id = :user_id"
+
+        sql = f"""
+        WITH u AS (
+          SELECT user_id, opportunity_id, COUNT(*) AS file_count, MAX(created_at) AS last_upload_at
+          FROM user_uploads
+          GROUP BY user_id, opportunity_id
+        )
+        SELECT
+          t.opportunity_id,
+          o.external_id,
+          o.title,
+          o.agency_name,
+          o.due_date,
+          COALESCE(o.ai_category, o.category) AS category,
+          o.source_url,
+          t.status,
+          t.notes,
+          t.created_at AS tracked_at,
+          COALESCE(u.file_count, 0) AS file_count,
+          tracker_user.email AS tracked_by,
+          CASE WHEN lower(tracker_user.email) = lower(:email) THEN 1 ELSE 0 END AS is_mine
+        FROM user_bid_trackers t
+        JOIN opportunities o ON o.id = t.opportunity_id
+        JOIN users tracker_user ON tracker_user.id = t.user_id
+        LEFT JOIN u ON u.user_id = t.user_id AND u.opportunity_id = t.opportunity_id
+        WHERE {filter_clause}
+        ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
+        """
+        rows = await conn.exec_driver_sql(sql, params)
         items = [dict(r._mapping) for r in rows.fetchall()]
+
+    for it in items:
+        it["is_mine"] = bool(it.get("is_mine"))
 
     # --- dynamic bits (built separately; no f-strings in HTML) ---
     def esc_text(x: str) -> str:
         return html.escape(x or "")
 
     options_html = "".join(
-        [
-            (
-                "<option value='{val}'>[{ext}] {title} â€” {agency}</option>"
-                .format(
-                    val=str(it["opportunity_id"]),
-                    ext=esc_text((it.get("external_id") or "â€”")),
-                    title=esc_text(it.get("title", "")),
-                    agency=esc_text(it.get("agency_name", ""))
-                )
-            )
-            for it in items
-        ]
+        "<option value='{val}'>[{ext}] {title} - {agency}</option>".format(
+            val=str(it["opportunity_id"]),
+            ext=esc_text(it.get("external_id") or "-"),
+            title=esc_text(it.get("title", "")),
+            agency=esc_text(it.get("agency_name", "")),
+        )
+        for it in items
     )
+
+    team_banner_html = ""
+    if team_id:
+        owner_display = team_owner_email or user_email
+        member_label = f"{team_member_count} member{'s' if team_member_count != 1 else ''}"
+        team_banner_html = f"""
+<div class="team-banner">
+  <div>
+    <div class="team-name">{esc_text(team_name or 'Team')}</div>
+    <div class="team-sub">Lead: {esc_text(owner_display)} - {member_label}</div>
+  </div>
+  <div class="team-pill">Shared dashboard</div>
+</div>
+"""
 
     # JSON for the page (embedded in a JSON script tag)
     items_json = json.dumps(items)
     items_json_escaped = (
         items_json
-        .replace("</", "<\\/")  # prevent </script> early close
+        .replace("</", "<\/")  # prevent </script> early close
     )
 
     # --- plain triple-quoted HTML with placeholders ---
     body = """
+__TEAM_BANNER__
 <section class="card">
   <div class="head-row">
     <h2 class="section-heading">My Tracked Solicitations</h2>
@@ -110,7 +166,7 @@ async def tracker_dashboard(request: Request):
       </select>\n      <input id="search-filter" placeholder="Search title, ID, agency" style="min-width:220px; padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px;" />\n      <button id="reset-filters" class="btn-secondary" type="button">Reset</button>\n    </div>\n    <div class="muted" id="summary-count" style="font-size:12px; margin-left:auto;"></div>\n  </div>
 
   <!-- Provide items directly to the grid as a data attribute for tracker_dashboard.js -->
-  <div id="tracked-grid" class="tracked-grid" data-items='__ITEMS_JSON_ESC__'></div>
+  <div id="tracked-grid" class="tracked-grid" data-items='__ITEMS_JSON_ESC__' data-user-email="__USER_EMAIL__" data-user-id="__USER_ID__"></div>
 </section>
 
 <!-- Team thread sidebar -->
@@ -151,7 +207,7 @@ async def tracker_dashboard(request: Request):
   <div id="guide-content" class="guide-content">Loading…</div>
 </aside>
 
-<link rel="stylesheet" href="/static/dashboard.css?v=6">
+<link rel="stylesheet" href="/static/dashboard.css?v=8">
 <link rel="stylesheet" href="/static/bid_tracker.css">
 
 
@@ -266,7 +322,7 @@ async def tracker_dashboard(request: Request):
 })();
 </script>
 <script src="/static/vendor.js?v=4"></script>
-<script src="/static/tracker_dashboard.js?v=19"></script>
+<script src="/static/tracker_dashboard.js?v=22"></script>
 <script>
 // Inline: live search + summary layered on top of card rendering
 (function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
@@ -298,7 +354,10 @@ async def tracker_dashboard(request: Request):
     body = (
         body
         .replace("__ITEM_OPTIONS__", options_html)
+        .replace("__TEAM_BANNER__", team_banner_html)
         .replace("__ITEMS_JSON_ESC__", items_json_escaped)
+        .replace("__USER_EMAIL__", esc_text(user_email or ""))
+        .replace("__USER_ID__", esc_text(str(user_id or "")))
     )
     return HTMLResponse(page_shell(body, title="EasyRFP My Bids", user_email=user_email))
 

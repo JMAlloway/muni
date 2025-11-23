@@ -1,6 +1,6 @@
 ﻿# app/routers/_layout.py
 
-from typing import Optional
+from typing import Dict, Optional
 import sqlite3
 import os
 from urllib.parse import urlparse
@@ -22,13 +22,39 @@ def _nav_links_html(user_email: Optional[str]) -> str:
         """
 
 
-def _get_user_tier(user_email: Optional[str]) -> str:
-    """Best-effort tier lookup for the header badge."""
+_TIER_ORDER = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
+
+
+def _normalize_tier(raw: Optional[str]) -> str:
+    mapping = {
+        "free": "Free",
+        "starter": "Starter",
+        "professional": "Professional",
+        "enterprise": "Enterprise",
+    }
+    key = (raw or "Free").strip().lower()
+    return mapping.get(key, "Free")
+
+
+def _get_user_tier_info(user_email: Optional[str]) -> Dict[str, Optional[str]]:
+    """
+    Best-effort effective tier lookup for the header badge and billing.
+    Returns a dict with keys: effective, label, source, team_id, team_name, team_member_count.
+    """
+    default = {
+        "effective": "Free",
+        "label": "Free",
+        "source": "self",
+        "team_id": None,
+        "team_name": None,
+        "team_member_count": 0,
+        "user_id": None,
+    }
     if not user_email:
-        return "Free"
+        return default
     db_url = settings.DB_URL or ""
     if not db_url.startswith("sqlite"):
-        return "Free"
+        return default
     try:
         # Normalize path for sqlite+aiosqlite:///./muni_local.db
         if db_url.startswith("sqlite+aiosqlite:///"):
@@ -41,22 +67,76 @@ def _get_user_tier(user_email: Optional[str]) -> str:
         db_path = os.path.abspath(db_path)
         conn = sqlite3.connect(db_path)
         try:
-            # If column is stored as "Tier" vs "tier", select both.
             cur = conn.execute(
-                "SELECT COALESCE(Tier, tier) FROM users WHERE lower(email) = lower(?) LIMIT 1",
+                "SELECT id, team_id, COALESCE(Tier, tier) FROM users WHERE lower(email) = lower(?) LIMIT 1",
                 (user_email,),
             )
             row = cur.fetchone()
-            tier = (row[0] or "Free").title() if row else "Free"
+            if not row:
+                return default
+            user_id, team_id, raw_tier = row
+            user_tier = _normalize_tier(raw_tier)
+
+            team_name = None
+            team_member_count = 0
+            effective_tier = user_tier
+            via_team = False
+
+            if team_id:
+                # Pull owner tier + team name
+                tcur = conn.execute(
+                    """
+                    SELECT t.name, COALESCE(u.Tier, u.tier) AS owner_tier
+                    FROM teams t
+                    LEFT JOIN users u ON u.id = t.owner_user_id
+                    WHERE t.id = ?
+                    LIMIT 1
+                    """,
+                    (team_id,),
+                )
+                trow = tcur.fetchone()
+                if trow:
+                    team_name = trow[0] or "Team"
+                    owner_tier = _normalize_tier(trow[1])
+                    if _TIER_ORDER.get(owner_tier.lower(), 0) > _TIER_ORDER.get(user_tier.lower(), 0):
+                        effective_tier = owner_tier
+                        via_team = True
+                try:
+                    ccur = conn.execute(
+                        "SELECT COUNT(*) FROM team_members WHERE team_id = ? AND (accepted_at IS NOT NULL OR role = 'owner')",
+                        (team_id,),
+                    )
+                    crow = ccur.fetchone()
+                    team_member_count = int(crow[0]) if crow and crow[0] is not None else 0
+                except Exception:
+                    team_member_count = 0
+
+            label = f"{effective_tier} (via Team)" if via_team else effective_tier
+            info = {
+                "effective": effective_tier,
+                "label": label,
+                "source": "team" if via_team else "self",
+                "team_id": team_id,
+                "team_name": team_name,
+                "team_member_count": team_member_count,
+                "user_id": user_id,
+            }
             try:
-                print(f"[tier lookup] email={user_email} tier={tier} db={db_path}")
+                print(
+                    f"[tier lookup] email={user_email} tier={effective_tier} label={label} via_team={via_team} db={db_path}"
+                )
             except Exception:
                 pass
-            return tier
+            return info
         finally:
             conn.close()
     except Exception:
-        return "Free"
+        return default
+
+
+def _get_user_tier(user_email: Optional[str]) -> str:
+    """Compatibility wrapper used by older views; returns the effective label."""
+    return _get_user_tier_info(user_email).get("label", "Free")
 
 
 def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
@@ -68,15 +148,148 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     """
 
     nav_links = _nav_links_html(user_email)
-    user_tier = _get_user_tier(user_email)
+    tier_info = _get_user_tier_info(user_email)
+    user_tier = tier_info.get("label", "Free")
+    team_badge = ""
+    if tier_info.get("source") == "team":
+        team_badge = '<span class="team-badge">via team</span>'
 
-    return f"""
+    notif_js = r"""
+// notifications drawer (dynamic)
+(function(){
+  const btn = document.getElementById('notif-btn');
+  const drawer = document.getElementById('notif-drawer');
+  const overlay = document.getElementById('notif-overlay');
+  const closeBtn = document.getElementById('notif-close');
+  const list = document.getElementById('notif-list');
+  const badge = document.querySelector('.notif-dot');
+  if (!btn || !drawer || !overlay || !list) return;
+  const getCSRF = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || "";
+  const esc = (s) => (s==null?"":String(s)).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]||c));
+  let notifications = [];
+
+  const updateBadge = (count) => {
+    if (!badge) return;
+    if (count > 0) {
+      badge.style.display = 'inline-flex';
+      badge.textContent = count > 99 ? '99+' : String(count);
+    } else {
+      badge.style.display = 'none';
+      badge.textContent = '';
+    }
+  };
+
+  const timeAgo = (iso) => {
+    if (!iso) return '';
+    try {
+      const then = new Date(iso).getTime();
+      const now = Date.now();
+      const diff = Math.max(0, now - then) / 1000;
+      if (diff < 60) return 'Just now';
+      if (diff < 3600) return Math.floor(diff/60)+'m ago';
+      if (diff < 86400) return Math.floor(diff/3600)+'h ago';
+      return Math.floor(diff/86400)+'d ago';
+    } catch(_) { return ''; }
+  };
+
+  const render = () => {
+    if (!notifications.length) {
+      list.innerHTML = "<div class='notif-item muted'>No notifications yet.</div>";
+      return;
+    }
+    list.innerHTML = notifications.map((n) => {
+      const unread = !n.read_at;
+      const inviteActions = (n.type === 'team_invite' && !n.actioned_at)
+        ? `<div class="notif-actions">
+            <button class="notif-btn accept" data-action="accept" data-id="${n.id}">Accept</button>
+            <button class="notif-btn decline" data-action="decline" data-id="${n.id}">Decline</button>
+           </div>`
+        : '';
+      const pill = unread ? '<span class="notif-pill">New</span>' : '<span class="notif-pill muted">Seen</span>';
+      return `
+        <div class="notif-item ${unread ? 'unread' : ''}">
+          <div class="notif-line">
+            ${pill}
+            <span class="notif-time">${timeAgo(n.created_at)}</span>
+          </div>
+          <div class="notif-body"><strong>${esc(n.title||'')}</strong><br>${esc(n.body||'')}</div>
+          ${inviteActions}
+        </div>
+      `;
+    }).join('');
+  };
+
+  const fetchNotifs = async () => {
+    try {
+      const res = await fetch('/api/notifications', { credentials:'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      notifications = data.notifications || [];
+      updateBadge(data.unread_count || 0);
+      render();
+    } catch(_) {}
+  };
+
+  const markAllRead = async () => {
+    try {
+      const unread = notifications.filter(n => !n.read_at);
+      await Promise.all(unread.map(n => fetch(`/api/notifications/${n.id}/read`, {
+        method:'POST',
+        credentials:'include',
+        headers: { 'X-CSRF-Token': getCSRF() }
+      })));
+      notifications = notifications.map(n => Object.assign({}, n, { read_at: n.read_at || new Date().toISOString() }));
+      updateBadge(0);
+      render();
+    } catch(_) {}
+  };
+
+  const toggle = (open) => {
+    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (open) {
+      fetchNotifs().then(markAllRead);
+    }
+  };
+
+  list.addEventListener('click', async function(e){
+    const btnEl = e.target.closest('[data-action][data-id]');
+    if (!btnEl) return;
+    const action = btnEl.getAttribute('data-action');
+    const id = btnEl.getAttribute('data-id');
+    try {
+      const res = await fetch(`/api/notifications/${id}/action`, {
+        method:'POST',
+        credentials:'include',
+        headers: { 'Content-Type':'application/json', 'X-CSRF-Token': getCSRF() },
+        body: JSON.stringify({ action })
+      });
+      if (!res.ok) return;
+      if (action === 'accept') {
+        window.location.reload();
+        return;
+      }
+      await fetchNotifs();
+    } catch(_) {}
+  });
+
+  btn.addEventListener('click', function(){ toggle(true); });
+  if (closeBtn) closeBtn.addEventListener('click', function(){ toggle(false); });
+  overlay.addEventListener('click', function(){ toggle(false); });
+
+  // Initial load + polling
+  fetchNotifs();
+  setInterval(fetchNotifs, 30000);
+})();
+"""
+
+    template = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>{title}</title>
+<title>__TITLE__</title>
 <link rel="stylesheet" href="/static/base.css">
 </head>
 <body>
@@ -88,7 +301,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
         </div>
         <div class="nav-label">Navigation</div>
         <nav class="navlinks">
-            {nav_links}
+            __NAV__
         </nav>
     </aside>
     <div class="content">
@@ -99,7 +312,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
             <span class="top-label">Home</span>
         </a>
         <span class="top-pill top-tier" role="status">
-            <span class="top-label">Tier:</span> <strong>{user_tier}</strong>
+            <span class="top-label">Tier:</span> <strong>__TIER__</strong> __TEAM_BADGE__
             <a href="/billing" class="top-upgrade">Upgrade</a>
         </span>
     </div>
@@ -117,9 +330,9 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
         <div class="top-dropdown">
             <button class="avatar-button" type="button" aria-haspopup="menu" aria-expanded="false" id="avatar-btn">
                 <span class="avatar-halo">
-                    <span class="avatar-circle">{(user_email or 'U')[:2].upper()}</span>
+                    <span class="avatar-circle">__AVATAR__</span>
                 </span>
-                <span class="top-caret" aria-hidden="true">▾</span>
+                <span class="top-caret" aria-hidden="true">&gt;</span>
             </button>
             <div class="top-menu" id="avatar-menu" role="menu">
                 <a href="/account" role="menuitem">My Account</a>
@@ -131,11 +344,11 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     </div>
 </div>
         <main class="page">
-        {body_html}
+        __BODY__
         </main>
     </div>
 </div>
-<button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar"><<</button>
+<button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">&lt;&lt;</button>
 
 <div id="notif-overlay" aria-hidden="true"></div>
 <aside id="notif-drawer" aria-hidden="true">
@@ -144,113 +357,61 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
       <div class="notif-title">Notifications</div>
       <div class="notif-sub">Inbox • Last 14 days</div>
     </div>
-    <button class="icon-btn" id="notif-close" type="button" aria-label="Close notifications">×</button>
+    <button class="icon-btn" id="notif-close" type="button" aria-label="Close notifications">x</button>
   </header>
-  <div class="notif-list" id="notif-list">
-    <div class="notif-item unread">
-      <div class="notif-line">
-        <span class="notif-pill">New</span>
-        <span class="notif-time">Just now</span>
-      </div>
-      <div class="notif-body">New opportunity posted matching your keywords.</div>
-      <button class="notif-link" type="button">View</button>
-    </div>
-    <div class="notif-item">
-      <div class="notif-line">
-        <span class="notif-pill muted">Update</span>
-        <span class="notif-time">2h ago</span>
-      </div>
-      <div class="notif-body">Team comment added on “Water Treatment Plant RFP”.</div>
-      <button class="notif-link" type="button">Open thread</button>
-    </div>
-  </div>
+  <div class="notif-list" id="notif-list"></div>
 </aside>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {{
-    const revealEls = Array.prototype.slice.call(document.querySelectorAll(".reveal"));
-
-    if ("IntersectionObserver" in window) {{
-        const obs = new IntersectionObserver((entries) => {{
-            entries.forEach((entry) => {{
-                if (entry.isIntersecting) {{
-                    entry.target.classList.add("reveal-visible");
-                    obs.unobserve(entry.target);
-                }}
-            }});
-        }}, {{
-            threshold: 0.15
-        }});
-
-        revealEls.forEach((el) => obs.observe(el));
-    }} else {{
-        revealEls.forEach((el) => el.classList.add("reveal-visible"));
-    }}
-
-}});
-// notifications drawer
-(function(){{
-  const btn = document.getElementById('notif-btn');
-  const drawer = document.getElementById('notif-drawer');
-  const overlay = document.getElementById('notif-overlay');
-  const closeBtn = document.getElementById('notif-close');
-  if (!btn || !drawer || !overlay) return;
-  const toggle = (open) => {{
-    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-    overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
-  }};
-  btn.addEventListener('click', function(){{ toggle(true); }});
-  if (closeBtn) closeBtn.addEventListener('click', function(){{ toggle(false); }});
-  overlay.addEventListener('click', function(){{ toggle(false); }});
-}})();
+__NOTIF_JS__
 
 // help dropdown
-(function(){{
+(function(){
   const btn = document.getElementById('help-btn');
   const menu = document.getElementById('help-menu');
   if (!btn || !menu) return;
-  const toggle = (open) => {{
+  const toggle = (open) => {
     menu.style.display = open ? 'block' : 'none';
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }};
-  btn.addEventListener('click', function(){{
+  };
+  btn.addEventListener('click', function(){
     const isOpen = menu.style.display === 'block';
     toggle(!isOpen);
-  }});
-  document.addEventListener('click', function(e){{
+  });
+  document.addEventListener('click', function(e){
     if (!btn.contains(e.target) && !menu.contains(e.target)) toggle(false);
-  }});
-}})();
+  });
+})();
 
 
 // avatar dropdown
-(function(){{
+(function(){
   const btn = document.getElementById('avatar-btn');
   const menu = document.getElementById('avatar-menu');
   if (!btn || !menu) return;
-  const toggle = (open) => {{
+  const toggle = (open) => {
     menu.style.display = open ? 'block' : 'none';
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }};
-  btn.addEventListener('click', function(){{
+  };
+  btn.addEventListener('click', function(){
     const isOpen = menu.style.display === 'block';
     toggle(!isOpen);
-  }});
-  document.addEventListener('click', function(e){{
+  });
+  document.addEventListener('click', function(e){
     if (!btn.contains(e.target) && !menu.contains(e.target)) toggle(false);
-  }});
-}})();
+  });
+})();
 
 
 // sidebar toggle
-(function(){{
+(function(){
   const btn = document.getElementById('sidebar-toggle');
   if (!btn) return;
-  btn.addEventListener('click', function(){{
+  btn.addEventListener('click', function(){
     const collapsed = document.body.classList.toggle('sidebar-collapsed');
     btn.textContent = collapsed ? '>>' : '<<';
-  }});
-}})();
+  });
+})();
 
 </script>
 
@@ -259,3 +420,13 @@ document.addEventListener("DOMContentLoaded", function () {{
 </html>
 
     """
+    html = (
+        template.replace("__TITLE__", title)
+        .replace("__NAV__", nav_links)
+        .replace("__TIER__", user_tier)
+        .replace("__TEAM_BADGE__", team_badge)
+        .replace("__AVATAR__", (user_email or "U")[:2].upper())
+        .replace("__BODY__", body_html)
+        .replace("__NOTIF_JS__", notif_js)
+    )
+    return html

@@ -1,4 +1,4 @@
-﻿/* Minimal, clean, modern */
+/* Minimal, clean, modern */
 .toolbar { display:flex; gap:12px; align-items:center; margin:12px 0; }
 .toolbar .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 .toolbar .filters select { padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; width:auto; min-width:220px; }
@@ -19,7 +19,8 @@
 }
 .tracked-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(2,6,23,.08); }
 .tracked-card.dragging { opacity:.6; }
-.tracked-card.drop-before { outline:2px dashed #93c5fd; outline-offset: -8px; }\n.tracked-card.drop-after { outline:2px dashed #93c5fd; outline-offset: -8px; }
+.tracked-card.drop-before { outline:2px dashed #93c5fd; outline-offset: -8px; }
+.tracked-card.drop-after { outline:2px dashed #93c5fd; outline-offset: -8px; }
 
 /* Highlight pulse for newly focused/added cards */
 .tracked-card.highlight { box-shadow: 0 0 0 2px #93c5fd inset, 0 8px 24px rgba(2,6,23,.12); animation: cardPulse 1.2s ease-out 1; }
@@ -32,6 +33,19 @@
 .tracked-card .top { display:flex; justify-content:space-between; gap:12px; }
 .tracked-card .title { font-weight:600; line-height:1.25; }
 .tracked-card .meta { color:#64748b; font-size:12px; display:flex; gap:10px; flex-wrap:wrap; }
+.tracked-by {
+  background:#ecfeff;
+  border:1px solid #bae6fd;
+  border-radius:999px;
+  padding:4px 8px;
+  font-weight:700;
+  color:#075985;
+}
+.tracked-by.mine {
+  background:#e0f2fe;
+  border-color:#bfdbfe;
+  color:#0f172a;
+}
 
 .status-badge {
   font-size:12px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; align-self:flex-start;
@@ -132,6 +146,16 @@
   min-width: 140px;
   box-shadow: 0 2px 8px rgba(15,23,42,.06);
 }
+.thread-message.mine {
+  margin-left: auto;
+  align-self: flex-end;
+  background: #ecfeff;
+  border-color: #bae6fd;
+  text-align: right;
+}
+.thread-message.mine .meta {
+  justify-content: flex-end;
+}
 .thread-message .meta { font-size: 11px; color: #64748b; margin-top: 6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
 .thread-message .author { font-weight: 700; color:#111827; }
 .thread-compose {
@@ -168,6 +192,29 @@
 }
 .link-btn:hover { text-decoration: underline; }
 
+.team-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #f8fafc, #f0fdfa);
+}
+.team-banner .team-name { font-weight: 700; font-size: 16px; }
+.team-banner .team-sub { color: #475569; font-size: 13px; }
+.team-banner .team-pill {
+  background: #0ea5e9;
+  color: #0f172a;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid #38bdf8;
+}
+
 /* Responsive: make tracked grid single column on small screens */
 @media (max-width: 900px) {
   .tracked-grid {
@@ -180,4 +227,3 @@
   .tracked-card { padding: 12px; }
   .tracked-card .top { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
-
