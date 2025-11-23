@@ -17,13 +17,18 @@ async def create_admin_if_missing(db: AsyncSession):
     """Ensure a default admin user exists based on .env settings."""
     if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
         return
-        u = User(
-            email=settings.ADMIN_EMAIL,
-            password_hash=_hash_password(settings.ADMIN_PASSWORD),
-            is_admin=True,
-        )
-        db.add(u)
-        await db.commit()
+    # Check if admin already exists
+    res = await db.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
+    existing = res.scalar_one_or_none()
+    if existing:
+        return
+    u = User(
+        email=settings.ADMIN_EMAIL,
+        password_hash=_hash_password(settings.ADMIN_PASSWORD),
+        is_admin=True,
+    )
+    db.add(u)
+    await db.commit()
 
 
 def create_token(user_id: str, email: str) -> str:

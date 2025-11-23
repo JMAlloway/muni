@@ -1,10 +1,20 @@
-﻿# app/routers/_layout.py
+# app/routers/_layout.py
 
 from typing import Dict, Optional
 import sqlite3
 import os
+import logging
 from urllib.parse import urlparse
 from app.core.settings import settings
+
+logger = logging.getLogger(__name__)
+
+# PostgreSQL support - import psycopg2 if available
+try:
+    import psycopg2
+    HAS_PSYCOPG2 = True
+except ImportError:
+    HAS_PSYCOPG2 = False
 
 def _nav_links_html(user_email: Optional[str]) -> str:
     if user_email:
@@ -40,6 +50,7 @@ def _get_user_tier_info(user_email: Optional[str]) -> Dict[str, Optional[str]]:
     """
     Best-effort effective tier lookup for the header badge and billing.
     Returns a dict with keys: effective, label, source, team_id, team_name, team_member_count.
+    Supports both SQLite (local) and PostgreSQL (Heroku).
     """
     default = {
         "effective": "Free",
@@ -53,22 +64,23 @@ def _get_user_tier_info(user_email: Optional[str]) -> Dict[str, Optional[str]]:
     if not user_email:
         return default
     db_url = settings.DB_URL or ""
-    if not db_url.startswith("sqlite"):
-        return default
+
     try:
-        # Normalize path for sqlite+aiosqlite:///./muni_local.db
-        if db_url.startswith("sqlite+aiosqlite:///"):
-            db_path = db_url.split(":///")[-1]
+        # Determine database type and get connection
+        if db_url.startswith("sqlite") or db_url.startswith("sqlite+aiosqlite"):
+            conn = _get_sqlite_connection(db_url)
+            placeholder = "?"
+        elif ("postgresql" in db_url or "postgres" in db_url) and HAS_PSYCOPG2:
+            conn = _get_postgres_connection(db_url)
+            placeholder = "%s"
         else:
-            parsed = urlparse(db_url.replace("sqlite+aiosqlite", "sqlite"))
-            db_path = parsed.path
-            if db_path.startswith("//"):
-                db_path = db_path[1:]
-        db_path = os.path.abspath(db_path)
-        conn = sqlite3.connect(db_path)
+            return default
+
         try:
-            cur = conn.execute(
-                "SELECT id, team_id, COALESCE(Tier, tier) FROM users WHERE lower(email) = lower(?) LIMIT 1",
+            cur = conn.cursor()
+            # PostgreSQL is case-sensitive with column names, use lowercase
+            cur.execute(
+                f"SELECT id, team_id, tier FROM users WHERE lower(email) = lower({placeholder}) LIMIT 1",
                 (user_email,),
             )
             row = cur.fetchone()
@@ -84,17 +96,17 @@ def _get_user_tier_info(user_email: Optional[str]) -> Dict[str, Optional[str]]:
 
             if team_id:
                 # Pull owner tier + team name
-                tcur = conn.execute(
-                    """
-                    SELECT t.name, COALESCE(u.Tier, u.tier) AS owner_tier
+                cur.execute(
+                    f"""
+                    SELECT t.name, u.tier AS owner_tier
                     FROM teams t
                     LEFT JOIN users u ON u.id = t.owner_user_id
-                    WHERE t.id = ?
+                    WHERE t.id = {placeholder}
                     LIMIT 1
                     """,
                     (team_id,),
                 )
-                trow = tcur.fetchone()
+                trow = cur.fetchone()
                 if trow:
                     team_name = trow[0] or "Team"
                     owner_tier = _normalize_tier(trow[1])
@@ -102,11 +114,11 @@ def _get_user_tier_info(user_email: Optional[str]) -> Dict[str, Optional[str]]:
                         effective_tier = owner_tier
                         via_team = True
                 try:
-                    ccur = conn.execute(
-                        "SELECT COUNT(*) FROM team_members WHERE team_id = ? AND (accepted_at IS NOT NULL OR role = 'owner')",
+                    cur.execute(
+                        f"SELECT COUNT(*) FROM team_members WHERE team_id = {placeholder} AND (accepted_at IS NOT NULL OR role = 'owner')",
                         (team_id,),
                     )
-                    crow = ccur.fetchone()
+                    crow = cur.fetchone()
                     team_member_count = int(crow[0]) if crow and crow[0] is not None else 0
                 except Exception:
                     team_member_count = 0
@@ -121,17 +133,36 @@ def _get_user_tier_info(user_email: Optional[str]) -> Dict[str, Optional[str]]:
                 "team_member_count": team_member_count,
                 "user_id": user_id,
             }
-            try:
-                print(
-                    f"[tier lookup] email={user_email} tier={effective_tier} label={label} via_team={via_team} db={db_path}"
-                )
-            except Exception:
-                pass
+            # Use proper logging instead of print
+            logger.debug(
+                f"Tier lookup: email={user_email[:3]}*** tier={effective_tier} via_team={via_team}"
+            )
             return info
         finally:
             conn.close()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Tier lookup failed: {e}")
         return default
+
+
+def _get_sqlite_connection(db_url: str):
+    """Get a SQLite connection from the database URL."""
+    if db_url.startswith("sqlite+aiosqlite:///"):
+        db_path = db_url.split(":///")[-1]
+    else:
+        parsed = urlparse(db_url.replace("sqlite+aiosqlite", "sqlite"))
+        db_path = parsed.path
+        if db_path.startswith("//"):
+            db_path = db_path[1:]
+    db_path = os.path.abspath(db_path)
+    return sqlite3.connect(db_path)
+
+
+def _get_postgres_connection(db_url: str):
+    """Get a PostgreSQL connection from the database URL."""
+    # Convert async URL to sync format for psycopg2
+    sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    return psycopg2.connect(sync_url)
 
 
 def _get_user_tier(user_email: Optional[str]) -> str:

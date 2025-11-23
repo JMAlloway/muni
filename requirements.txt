@@ -4,7 +4,8 @@ gunicorn==23.0.0
 
 SQLAlchemy==2.0.36
 alembic==1.13.1
-asyncpg==0.29.0  # for Heroku Postgres (or psycopg[binary])
+asyncpg==0.29.0  # for Heroku Postgres async
+psycopg2-binary==2.9.9  # for sync PostgreSQL operations
 twilio==9.2.3
 
 pydantic==2.12.3

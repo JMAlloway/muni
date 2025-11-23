@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     PUBLIC_APP_HOST: Optional[str] = None  # e.g., "www.easyrfp.ai" (no scheme)
     START_SCHEDULER_WEB: bool = False      # start APScheduler in web dyno (default off)
-    RUN_DDL_ON_START: bool = True          # run create_all on startup (disable in prod)
+    RUN_DDL_ON_START: bool = False         # run create_all on startup (use Alembic migrations in prod)
 
     # ------------------------------------------------------------------
     # Model configuration
