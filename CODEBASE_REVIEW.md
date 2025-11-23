@@ -420,3 +420,555 @@ The EasyRFP codebase is well-structured and demonstrates good async Python pract
 8. **Low:** Consolidate model definitions
 
 The application has a solid foundation for a SaaS product. With these fixes, it should deploy smoothly to Heroku.
+
+---
+
+# Part 2: Feature Improvements
+
+## 9. Onboarding Flow Enhancements
+
+### Current State
+- Multi-step form: Industry → Agency → Email frequency → Keywords
+- Interest profiles in `app/onboarding/interests.py`
+- Milestone tracking via `user_onboarding_events` table
+
+### Issues Found
+| Issue | Location | Impact |
+|-------|----------|--------|
+| Industry selection NOT persisted | `app/api/onboarding.py:461` | User selections are lost |
+| No email verification | - | Fake emails can subscribe |
+| Hardcoded industries (only 8) | `app/api/onboarding.py:31-38` | Limited customization |
+| No abandonment tracking | - | Can't recover incomplete signups |
+
+### Recommended Improvements
+
+**9.1 Persist Industry Selection**
+```python
+# Create user_industries table
+# Store selected industries from onboarding step 1
+# Use for recommendation engine
+```
+
+**9.2 Add Email Verification**
+- Send confirmation email with token on signup
+- Block digest emails until verified
+- Add `email_verified` column to users table
+
+**9.3 Onboarding Progress Bar**
+- Show "Step 2 of 4" visual indicator
+- Track estimated completion time
+- Enable back/forward navigation
+
+**9.4 Abandonment Recovery**
+- Email users who started but didn't complete after 3 days
+- Offer simplified "quick setup" alternative
+- Track abandonment reasons for optimization
+
+---
+
+## 10. User Preferences Enhancements
+
+### Current State
+- Preferences split across `users` and `user_preferences` tables
+- Agency filtering via checkboxes (20 agencies)
+- SMS opt-in with phone verification
+- Application variables form for company details
+
+### Issues Found
+- No saved search functionality
+- No budget/contract value filtering
+- No geographic/location filtering
+- No capability-based filtering (match certs to requirements)
+
+### Recommended Improvements
+
+**10.1 Saved Searches**
+```sql
+CREATE TABLE saved_searches (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    name VARCHAR(100),
+    filter_json JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+- Quick-apply buttons in opportunities UI
+- Share saved searches with team
+
+**10.2 Budget Range Filter**
+- Extract estimated contract value from opportunity text using AI
+- Store in `opportunities.estimated_budget_min/max`
+- Add slider filter: "$0-$50K", "$50K-$250K", "$250K-$1M", "$1M+"
+
+**10.3 Capability Matching**
+- Cross-reference user's certifications with opportunity requirements
+- Show "Qualifications Match" badge (0-100%)
+- Surface highly-matched opportunities first in feed
+
+**10.4 Preference Analytics**
+- Track which filters users apply most
+- Suggest optimized defaults based on behavior
+- Show "Users like you also filter by..." suggestions
+
+---
+
+## 11. Notification System Enhancements
+
+### Current State
+- In-app notifications only
+- Team invite notifications work
+- 30-second polling in browser
+
+### Issues Found
+- No email/SMS/push notification delivery
+- No notification preferences (users can't control what they receive)
+- No notification batching/digest
+- Polling wastes resources when tab is inactive
+
+### Recommended Improvements
+
+**11.1 Multi-Channel Delivery**
+| Channel | Implementation | Priority |
+|---------|---------------|----------|
+| Email | SMTP via existing emailer | High |
+| SMS | Twilio (already integrated) | Medium |
+| Push | OneSignal or Firebase | Low |
+
+**11.2 Notification Preference Center**
+```python
+# Add to /api/preferences/notifications
+notification_preferences = {
+    "team_invite": {"in_app": True, "email": True, "sms": False},
+    "bid_due_soon": {"in_app": True, "email": True, "sms": True},
+    "new_opportunities": {"in_app": False, "email": True, "sms": False},
+    "team_note_mention": {"in_app": True, "email": True, "sms": False},
+}
+```
+
+**11.3 Smart Polling**
+```javascript
+// Use Page Visibility API to pause polling when tab is hidden
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        clearInterval(pollInterval);
+    } else {
+        pollInterval = setInterval(fetchNotifs, 30000);
+        fetchNotifs(); // Immediate refresh on return
+    }
+});
+```
+
+**11.4 Notification Threading**
+- Group related notifications (e.g., all mentions from same bid)
+- Show collapsed threads in drawer
+- Add `parent_notification_id` column
+
+---
+
+## 12. Team Collaboration Enhancements
+
+### Current State
+- Basic team creation and member invitations
+- Shared bid tracking across team
+- Notes with @mentions on tracked bids
+- Seat limits: 4 (Professional), 50 (Enterprise)
+
+### Issues Found
+- Only owner/member roles (no granular permissions)
+- No audit logging for compliance
+- No team-level settings
+- No activity tracking or analytics
+- Tier enforcement commented out (`app/api/team.py:35-36`)
+
+### Recommended Improvements
+
+**12.1 Role-Based Access Control**
+| Role | Permissions |
+|------|-------------|
+| Owner | Full access, billing, delete team |
+| Manager | Invite/remove members, edit settings |
+| Member | Track bids, add notes, view all |
+| Viewer | Read-only access to tracked bids |
+
+**12.2 Team Audit Log**
+```sql
+CREATE TABLE team_audit_log (
+    id UUID PRIMARY KEY,
+    team_id UUID REFERENCES teams(id),
+    actor_user_id UUID REFERENCES users(id),
+    action VARCHAR(50),  -- 'member_invited', 'note_created', 'bid_tracked'
+    resource_type VARCHAR(50),
+    resource_id UUID,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**12.3 Team Activity Dashboard**
+- Recent actions feed: "John tracked RFQ-123", "Jane added note"
+- Activity heatmap (by day/hour)
+- Member contribution metrics
+- Filter by member or date range
+
+**12.4 Team Notifications**
+- Notify members when @mentioned in notes
+- Alert team when new bids are tracked
+- Weekly team activity summary email
+
+---
+
+## 13. Bid Tracking Enhancements
+
+### Current State
+- Track/untrack opportunities
+- Status and notes per tracked bid
+- Team visibility for shared tracking
+- Basic dashboard view
+
+### Issues Found
+- No predefined status workflow
+- No due date alerts/reminders
+- No outcome tracking (won/lost)
+- No assignment to team members
+- No calendar integration
+
+### Recommended Improvements
+
+**13.1 Status Workflow**
+```
+watching → responding → submitted → won/lost/passed
+                     ↘ passed
+```
+- Visual progress indicator
+- Automatic status suggestions based on due date
+
+**13.2 Due Date Alerts**
+| Alert | Timing | Channel |
+|-------|--------|---------|
+| Early warning | 7 days before | Email |
+| Approaching | 3 days before | Email + In-app |
+| Urgent | 1 day before | Email + SMS |
+| Expired | Day after due | In-app only |
+
+**13.3 Outcome Tracking**
+```sql
+ALTER TABLE user_bid_trackers ADD COLUMN
+    outcome VARCHAR(20),  -- 'won', 'lost', 'passed', 'submitted'
+    outcome_date TIMESTAMP,
+    award_value DECIMAL(15,2),
+    outcome_notes TEXT;
+```
+- Win rate analytics by category/agency
+- Revenue forecasting from submitted bids
+
+**13.4 Bid Assignment**
+- Add `assigned_to_user_id` column
+- Assignment notification
+- Filter dashboard by "My assignments"
+- Reassignment history tracking
+
+**13.5 Calendar Integration**
+- Generate iCal feed URL: `/api/calendar/ical/{user_token}`
+- Include: tracked bid due dates, prebid meetings
+- Works with Google Calendar, Outlook, Apple Calendar
+
+---
+
+## 14. Opportunities Feed Enhancements
+
+### Current State
+- Agency, keyword, due date filtering
+- Sort by due date or alphabetically
+- Pagination (25 items/page)
+- Tag/specialty filtering
+
+### Issues Found
+- Basic LIKE search (no full-text search)
+- No typo tolerance
+- No saved/bookmarked opportunities
+- No recommendation engine
+- No search analytics
+
+### Recommended Improvements
+
+**14.1 Full-Text Search**
+```sql
+-- PostgreSQL
+ALTER TABLE opportunities ADD COLUMN search_vector tsvector;
+CREATE INDEX opportunities_search_idx ON opportunities USING gin(search_vector);
+
+-- Update trigger
+UPDATE opportunities SET search_vector =
+    to_tsvector('english', coalesce(title,'') || ' ' ||
+                coalesce(summary,'') || ' ' ||
+                coalesce(full_text,''));
+```
+
+**14.2 Search Autocomplete**
+- Endpoint: `GET /api/search/suggest?q=constr`
+- Returns: matching agencies, keywords, recent searches
+- Typo tolerance using Levenshtein distance
+
+**14.3 Bookmarking System**
+```sql
+CREATE TABLE user_bookmarks (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    opportunity_id UUID REFERENCES opportunities(id),
+    folder VARCHAR(100) DEFAULT 'default',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, opportunity_id)
+);
+```
+
+**14.4 Recommendation Engine**
+- Collaborative filtering: "Users who tracked X also tracked Y"
+- Content-based: similar opportunities to recently tracked
+- Endpoint: `GET /api/opportunities/recommended?limit=10`
+- Show "Recommended for you" section in feed
+
+**14.5 Opportunity Comparison**
+- Multi-select up to 3 opportunities
+- Side-by-side comparison view
+- Export comparison to PDF
+- Share comparison with team
+
+---
+
+## 15. AI Classification Enhancements
+
+### Current State
+- Keyword-based category classification
+- Deterministic specialty tagging
+- Optional LLM fallback for weak matches
+- AI summary generation
+
+### Issues Found
+- No feedback loop for misclassifications
+- Single category per opportunity (no multi-label)
+- No entity extraction (contacts, locations)
+- No classification audit trail
+
+### Recommended Improvements
+
+**15.1 Classification Feedback**
+```sql
+CREATE TABLE classification_feedback (
+    id UUID PRIMARY KEY,
+    opportunity_id UUID REFERENCES opportunities(id),
+    user_id UUID REFERENCES users(id),
+    field VARCHAR(50),  -- 'category', 'tags', 'summary'
+    original_value TEXT,
+    suggested_value TEXT,
+    feedback_type VARCHAR(20),  -- 'incorrect', 'missing', 'spam'
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+- "Is this correct?" button on opportunity view
+- Use feedback to retrain classifiers
+- Track classification accuracy over time
+
+**15.2 Multi-Label Classification**
+- Store multiple categories: `ai_categories: ["Construction", "IT"]`
+- Show category badges (e.g., "Construction | Professional Services")
+- Filter supports OR matching on categories
+
+**15.3 Entity Extraction**
+- Extract from opportunity text:
+  - Contact emails/phones
+  - Project location/address
+  - Key dates mentioned
+  - Dollar amounts/budgets
+- Store in `opportunity_entities` table
+- Enable geographic filtering
+
+**15.4 Change Detection**
+- Hash opportunity content
+- Detect significant changes on re-scrape
+- Generate "Updated" notifications for tracked bids
+- Show change diff in UI
+
+---
+
+## 16. Email Digest Enhancements
+
+### Current State
+- Daily and weekly digest options
+- Grouped by agency
+- AI summaries and tags included
+- SMS nudge for premium tiers
+
+### Issues Found
+- No unsubscribe link (CAN-SPAM compliance issue!)
+- No engagement tracking (opens/clicks)
+- No digest customization
+- No digest preview capability
+
+### Recommended Improvements
+
+**16.1 Unsubscribe Link (CRITICAL)**
+```python
+# Add to every digest email footer
+unsubscribe_token = generate_secure_token(user_id)
+unsubscribe_url = f"{APP_BASE_URL}/email/unsubscribe/{unsubscribe_token}"
+
+footer = f"""
+<p style="font-size:11px;color:#888;">
+    <a href="{unsubscribe_url}">Unsubscribe</a> |
+    <a href="{APP_BASE_URL}/preferences">Manage preferences</a>
+</p>
+"""
+```
+
+**16.2 Engagement Tracking**
+```sql
+CREATE TABLE email_events (
+    id UUID PRIMARY KEY,
+    user_id UUID,
+    digest_id UUID,
+    event_type VARCHAR(20),  -- 'sent', 'opened', 'clicked'
+    opportunity_id UUID,  -- for click events
+    timestamp TIMESTAMP DEFAULT NOW()
+);
+```
+- Pixel tracking for opens
+- Link tracking for clicks
+- Dashboard: open rate, CTR, popular opportunities
+
+**16.3 Digest Customization**
+```python
+# User preferences
+digest_settings = {
+    "format": "detailed",  # compact, detailed, visual
+    "max_items": 20,
+    "include_summary": True,
+    "include_tags": True,
+    "sort_by": "relevance",  # due_date, relevance, agency
+    "agencies_first": ["City of Columbus", "COTA"],
+}
+```
+
+**16.4 Digest Preview**
+- Endpoint: `GET /api/digest/preview`
+- Show sample digest before subscribing
+- "Send test to myself" button
+- Preview in preferences page
+
+**16.5 Smart Prioritization**
+- Learn from user's tracking behavior
+- Show most likely-to-bid opportunities first
+- Personalized "Top picks for you" section
+- De-prioritize opportunities user passed on before
+
+---
+
+## 17. New Feature Opportunities
+
+### 17.1 Bid Calendar View
+- Visual calendar showing all due dates
+- Color-coded by category or status
+- Click to view/track opportunity
+- Export to external calendar
+
+### 17.2 Competitive Intelligence
+- Track which competitors bid on opportunities
+- Award history analysis
+- Market share estimates by category/agency
+- Pricing intelligence (from public awards)
+
+### 17.3 Proposal Templates
+- Create reusable proposal sections
+- Company boilerplate management
+- Team template library
+- Auto-fill from opportunity details
+
+### 17.4 Document Management
+- Upload and organize bid documents
+- Version control for proposals
+- Team document sharing
+- Integration with Google Drive/Dropbox
+
+### 17.5 Mobile App
+- Native iOS/Android apps
+- Push notifications for due dates
+- Quick bid tracking on-the-go
+- Offline opportunity viewing
+
+### 17.6 API Access
+- Public API for enterprise customers
+- Webhook notifications
+- Integration with CRM systems
+- Zapier/Make.com integration
+
+### 17.7 Analytics Dashboard
+- Personal win rate tracking
+- Revenue by category/agency
+- Response time metrics
+- Team performance comparisons
+
+---
+
+## 18. Feature Priority Matrix
+
+| Feature | Impact | Effort | Priority |
+|---------|--------|--------|----------|
+| Unsubscribe link | High (compliance) | Low | **Critical** |
+| Classification feedback | High | Medium | **High** |
+| Due date alerts | High | Low | **High** |
+| Saved searches | Medium | Low | **High** |
+| Full-text search | High | Medium | **High** |
+| Notification preferences | Medium | Low | **Medium** |
+| Team RBAC | Medium | Medium | **Medium** |
+| Outcome tracking | Medium | Low | **Medium** |
+| Calendar integration | Medium | Low | **Medium** |
+| Recommendation engine | High | High | **Medium** |
+| Mobile app | High | High | **Low** |
+| Competitive intelligence | High | High | **Low** |
+
+---
+
+## 19. Technical Debt to Address
+
+| Issue | Location | Recommendation |
+|-------|----------|----------------|
+| 191 print() statements | Multiple files | Replace with `logging` module |
+| Dual preference tables | `users` + `user_preferences` | Consolidate to single table |
+| No database indexes | `opportunities` table | Add indexes on `agency_name`, `due_date`, `status` |
+| N+1 queries | `tracker_dashboard.py` | Use eager loading / JOINs |
+| Hardcoded values | `billing.py:130-134` | Move to environment variables |
+| No rate limiting | All API endpoints | Add `slowapi` middleware |
+
+---
+
+## 20. Implementation Roadmap
+
+### Phase 1: Pre-Launch Critical (Week 1)
+1. Add unsubscribe links to all emails
+2. Add due date alert notifications
+3. Fix all Heroku deployment issues
+4. Add basic engagement tracking
+
+### Phase 2: Core Enhancements (Weeks 2-4)
+1. Implement full-text search
+2. Add saved searches
+3. Build notification preference center
+4. Add outcome tracking for bids
+
+### Phase 3: Collaboration Features (Weeks 5-8)
+1. Implement team RBAC
+2. Add team audit logging
+3. Build team activity dashboard
+4. Add calendar integration
+
+### Phase 4: Intelligence Features (Weeks 9-12)
+1. Build recommendation engine
+2. Add classification feedback loop
+3. Implement competitive intelligence
+4. Build analytics dashboard
+
+### Phase 5: Scale & Mobile (Months 4-6)
+1. Public API development
+2. Mobile app (React Native)
+3. Advanced AI features
+4. Enterprise integrations
