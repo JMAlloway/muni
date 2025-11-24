@@ -59,20 +59,6 @@ async def get_guide(agency_slug: str):
         ">
             {rendered}
         </div>
-        <style>
-            #vendor-guide-markdown h2, #vendor-guide-markdown h3 {{
-                margin-top:0.8rem; margin-bottom:0.4rem; font-size:14px; color:#111827;
-            }}
-            #vendor-guide-markdown p {{
-                margin-bottom:0.5rem;
-            }}
-            #vendor-guide-markdown ul {{
-                margin-left:1.1rem; margin-bottom:0.5rem; list-style:disc;
-            }}
-            #vendor-guide-markdown a {{
-                color:#2563eb; text-decoration:underline;
-            }}
-        </style>
-    </article>
+            </article>
     """
     return HTMLResponse(content=html)

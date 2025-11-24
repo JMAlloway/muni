@@ -203,6 +203,8 @@ from app.api import (
     gahanna_detail,
     columbus_airports_detail,
     opportunity_web,
+    calendar,
+    unsubscribe,
     team,
     vendor_guides,
     tracker_dashboard,
@@ -229,6 +231,8 @@ app.include_router(uploads_router)
 app.include_router(zip_router)
 app.include_router(opportunity_web.router)
 app.include_router(notifications.router)
+app.include_router(calendar.router)
+app.include_router(unsubscribe.router)
 app.include_router(columbus_detail.router)
 app.include_router(cota_detail.router)
 app.include_router(gahanna_detail.router)

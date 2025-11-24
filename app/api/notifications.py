@@ -101,7 +101,8 @@ async def _get_user(session, email: str):
 async def list_notifications(request: Request):
     user_email = get_current_user_email(request)
     if not user_email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        # If not logged in, return an empty inbox instead of erroring to avoid noisy 401s.
+        return {"notifications": [], "unread_count": 0}
 
     async with AsyncSessionLocal() as session:
         await _ensure_table(session)

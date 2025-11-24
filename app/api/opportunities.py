@@ -445,30 +445,7 @@ async def opportunities(request: Request):
 
     body_filter_html = f"""
     <section class="card filter-card" style="padding:18px 18px 14px;">
-      <style>
-        .filter-card .filter-head {{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }}
-        .filter-card .filter-head h3 {{ margin:0; font-size:17px; }}
-        .filter-card .filter-head .subtext {{ margin-top:2px; color:#64748b; font-size:13px; }}
-        .filter-card .reset-link {{ font-size:12px; color:#2563eb; text-decoration:none; }}
-        .filter-card .reset-link:hover {{ text-decoration:underline; }}
-        .filter-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; align-items:end; }}
-        @media (min-width: 980px) {{
-          .filter-grid {{ grid-template-columns: repeat(4, minmax(220px, 1fr)); }}
-        }}
-        .span-2 {{ grid-column: span 2; min-width:220px; }}
-        .filter-grid input[type="text"], .filter-grid select {{
-          padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; font-size:14px; height:40px; width:100%;
-        }}
-        .filter-grid label.label-small {{ margin-bottom:4px; display:block; color:#0f172a; }}
-        .filter-grid .checkbox-row {{ display:flex; align-items:center; gap:8px; font-size:14px; padding:6px 0; color:#0f172a; }}
-        .filter-grid .checkbox-row input {{ width:16px; height:16px; accent-color:#2563eb; }}
-        .filter-chips {{ margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:#0f172a; }}
-        .filter-chips .chip {{ background:#eef2ff; color:#4338ca; padding:6px 8px; border-radius:999px; font-weight:600; }}
-        .filter-chips .chip-clear {{ font-size:12px; color:#2563eb; text-decoration:none; }}
-        .filter-chips .chip-clear:hover {{ text-decoration:underline; }}
-        .filter-card .muted {{ color:#94a3b8; font-size:12px; margin-top:2px; }}
-      </style>
-
+      
       <div class="filter-head">
         <div>
           <h3 class="section-heading">Filters</h3>

@@ -291,13 +291,14 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
 <link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/pages.css">
 </head>
 <body>
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <img src="/static/logo.png" alt="EasyRFP" />
-            <span>EasyRFP</span>
+            <img src="/static/logo.svg" alt="EasyRFP" />
+            <span></span>
         </div>
         <div class="nav-label">Navigation</div>
         <nav class="navlinks">

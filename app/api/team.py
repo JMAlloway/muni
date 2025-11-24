@@ -17,6 +17,7 @@ from app.core.emailer import send_email
 from app.api.notifications import create_notification
 
 router = APIRouter(tags=["team"])
+ALLOWED_ROLES = {"owner", "manager", "member", "viewer"}
 
 def _fmt_ts(val):
     if not val:
@@ -34,6 +35,30 @@ def _fmt_ts(val):
 def _ensure_premium_tier(tier: Optional[str], is_admin: bool = False):
     # Temporarily allow all tiers (admin or not) to use team features.
     return
+
+
+async def _current_role(session, team_id: str, user_id: str) -> str:
+    role_res = await session.execute(
+        text("SELECT role FROM team_members WHERE team_id = :team AND user_id = :uid LIMIT 1"),
+        {"team": team_id, "uid": user_id},
+    )
+    return (role_res.scalar() or "").lower()
+
+
+def _can_invite(role: str, is_admin: bool) -> bool:
+    if is_admin:
+        return True
+    return role in {"owner", "manager"}
+
+
+def _can_remove(role: str, target_role: str, is_admin: bool) -> bool:
+    if is_admin:
+        return True
+    if role == "owner":
+        return True
+    if role == "manager" and target_role not in {"owner", "manager"}:
+        return True
+    return False
 
 
 async def _ensure_team_feature_access(session, user_email: str):
@@ -170,6 +195,11 @@ async def invite_member(request: Request, payload: dict):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     invite_email = (payload.get("email") or "").strip().lower()
+    invite_role = (payload.get("role") or "member").strip().lower()
+    if invite_role not in ALLOWED_ROLES:
+        invite_role = "member"
+    if invite_role == "owner":
+        raise HTTPException(status_code=400, detail="Cannot invite a new owner")
     if not invite_email or not re.match(r"[^@]+@[^@]+\.[^@]+", invite_email):
         raise HTTPException(status_code=400, detail="Valid email required")
 
@@ -204,13 +234,11 @@ async def invite_member(request: Request, payload: dict):
             role = "owner"
 
         if not role:
-            role_res = await session.execute(
-                text("SELECT role FROM team_members WHERE team_id = :team AND user_id = :uid LIMIT 1"),
-                {"team": team_id, "uid": user_id},
-            )
-            role = (role_res.scalar() or "").lower()
-        if role != "owner" and not bool(is_admin):
-            raise HTTPException(status_code=403, detail="Only the team owner or an admin can invite members.")
+            role = await _current_role(session, team_id, user_id)
+        if not _can_invite(role, bool(is_admin)):
+            raise HTTPException(status_code=403, detail="Only owners or managers can invite members.")
+        if role == "manager" and invite_role in {"owner", "manager"}:
+            raise HTTPException(status_code=403, detail="Managers can only invite members or viewers.")
 
         # seat limit: owner + 2 more for professional; unlimited for enterprise
         owner_tier_val = None
@@ -259,7 +287,7 @@ async def invite_member(request: Request, payload: dict):
             text(
                 """
                 INSERT INTO team_members (id, team_id, invited_email, role, invited_at, accepted_at)
-                VALUES (:id, :team, :email, 'member', :invited_at, NULL)
+                VALUES (:id, :team, :email, :role, :invited_at, NULL)
                 ON CONFLICT(invited_email, team_id) DO NOTHING
                 """
             ),
@@ -267,6 +295,7 @@ async def invite_member(request: Request, payload: dict):
                 "id": str(uuid.uuid4()),
                 "team": team_id,
                 "email": invite_email,
+                "role": invite_role,
                 "invited_at": dt.datetime.utcnow(),
             },
         )
@@ -371,7 +400,7 @@ async def accept_invite(request: Request):
 async def remove_member(request: Request, member_id: str):
     """
     Remove a pending invite or accepted member from the current team.
-    Only the team owner (or platform admin) can perform this action.
+    Only the team owner/manager (or platform admin) can perform this action.
     """
     user_email = get_current_user_email(request)
     if not user_email:
@@ -390,13 +419,7 @@ async def remove_member(request: Request, member_id: str):
         if not team_id:
             raise HTTPException(status_code=403, detail="No team assigned")
 
-        role_res = await session.execute(
-            text("SELECT role FROM team_members WHERE team_id = :team AND user_id = :uid LIMIT 1"),
-            {"team": team_id, "uid": user_id},
-        )
-        caller_role = (role_res.scalar() or "").lower()
-        if caller_role != "owner" and not bool(is_admin):
-            raise HTTPException(status_code=403, detail="Only the team owner or an admin can remove members.")
+        caller_role = await _current_role(session, team_id, user_id)
 
         # Load target member
         target_res = await session.execute(
@@ -420,7 +443,9 @@ async def remove_member(request: Request, member_id: str):
         if (target_role or "").lower() == "owner":
             raise HTTPException(status_code=400, detail="Cannot remove the team owner.")
         if target_user_id == user_id and not bool(is_admin):
-            raise HTTPException(status_code=400, detail="Owners cannot remove themselves.")
+            raise HTTPException(status_code=400, detail="You cannot remove yourself.")
+        if not _can_remove(caller_role, (target_role or "").lower(), bool(is_admin)):
+            raise HTTPException(status_code=403, detail="Insufficient role to remove this member.")
 
         await session.execute(text("DELETE FROM team_members WHERE id = :id"), {"id": member_id})
         if target_user_id:
@@ -431,6 +456,68 @@ async def remove_member(request: Request, member_id: str):
         await session.commit()
 
     return {"ok": True, "removed": target_email or target_user_id}
+
+
+@router.post("/api/team/members/{member_id}/role", response_class=JSONResponse)
+async def update_member_role(request: Request, member_id: str, payload: dict):
+    """
+    Update a member's role. Owner or platform admin only.
+    Cannot change the owner; manager cannot promote/demote.
+    """
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    new_role = (payload.get("role") or "").strip().lower()
+    if new_role not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    if new_role == "owner":
+        raise HTTPException(status_code=400, detail="Cannot promote via API")
+
+    async with AsyncSessionLocal() as session:
+        user_res = await session.execute(
+            text("SELECT id, team_id, is_admin FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+            {"email": user_email},
+        )
+        user_row = user_res.fetchone()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id, team_id, is_admin = user_row
+        if not team_id:
+            raise HTTPException(status_code=403, detail="No team assigned")
+
+        caller_role = await _current_role(session, team_id, user_id)
+        if caller_role != "owner" and not bool(is_admin):
+            raise HTTPException(status_code=403, detail="Only the team owner can change roles.")
+
+        target_res = await session.execute(
+            text(
+                """
+                SELECT id, team_id, user_id, invited_email, role
+                FROM team_members
+                WHERE id = :id
+                LIMIT 1
+                """
+            ),
+            {"id": member_id},
+        )
+        target = target_res.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Member not found")
+
+        _, target_team_id, target_user_id, target_email, target_role = target
+        if target_team_id != team_id:
+            raise HTTPException(status_code=403, detail="Cannot modify another team")
+        if (target_role or "").lower() == "owner":
+            raise HTTPException(status_code=400, detail="Cannot change owner role.")
+
+        await session.execute(
+            text("UPDATE team_members SET role = :role WHERE id = :id"),
+            {"role": new_role, "id": member_id},
+        )
+        await session.commit()
+
+    return {"ok": True, "role": new_role}
 
 
 @router.get("/api/team/notes", response_class=JSONResponse)

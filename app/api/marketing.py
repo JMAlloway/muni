@@ -43,7 +43,7 @@ async def home(request: Request):
     hero = f"""
     <section class="card reveal hero-gradient" style="text-align:center;">
         <div class="hero-brand">
-            <img src="static/logo.png" alt="EasyRFP logo" class="brand-logo brand-logo-hero" />
+            <img src="static/logo.svg" alt="EasyRFP logo" class="brand-logo brand-logo-hero" />
             <div class="brand-tagline">EasyRFP &middot; Central Ohio pilot</div>
         </div>
         <div class="pill" style="display:inline-block;margin-bottom:10px;">Central Ohio Pilot  &middot;  Early Access</div>
@@ -61,27 +61,7 @@ async def home(request: Request):
 
     live_section = f"""
     <section class="card">
-        <style>
-            .preview-grid {{
-                display:grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap:12px;
-                margin-top:16px;
-            }}
-            .preview-card {{
-                border:1px dashed #cbd5f5;
-                border-radius:14px;
-                padding:14px;
-                background:#f8fafc;
-            }}
-            .blurred-text {{
-                filter: blur(4px);
-                font-weight:600;
-                margin:8px 0;
-                min-height:42px;
-            }}
-        </style>
-        <div class="head-row" style="align-items:flex-start;">
+                <div class="head-row" style="align-items:flex-start;">
             <div>
                 <h2 class="section-heading">Live snapshot</h2>
                 <div class="mini-desc">Updated automatically every few hours.</div>
@@ -156,9 +136,9 @@ async def home(request: Request):
         </div>
         <div class="logo-row" style="margin-top:10px;">
             <img class="logo" alt="Columbus" src="/static/columbus.png" onerror="this.style.display='none'">
-            <img class="logo" alt="Agency" src="/static/logo.png" onerror="this.style.display='none'">
-            <img class="logo" alt="Agency" src="/static/logo.png" onerror="this.style.display='none'">
-            <img class="logo" alt="Agency" src="/static/logo.png" onerror="this.style.display='none'">
+            <img class="logo" alt="Agency" src="/static/logo.svg" onerror="this.style.display='none'">
+            <img class="logo" alt="Agency" src="/static/logo.svg" onerror="this.style.display='none'">
+            <img class="logo" alt="Agency" src="/static/logo.svg" onerror="this.style.display='none'">
         </div>
     </section>
     """

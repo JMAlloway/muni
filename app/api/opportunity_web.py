@@ -15,50 +15,15 @@ HTML_TEMPLATE = """
   <meta charset="utf-8" />
   <title>{title}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body {{
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      max-width: 760px;
-      margin: 0 auto;
-      padding: 20px 16px 40px 16px;
-      background: #f7f7f7;
-    }}
-    .card {{
-      background: #fff;
-      border-radius: 10px;
-      padding: 18px 20px 20px 20px;
-      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
-      margin-top: 20px;
-    }}
-    .chips span {{
-      display: inline-block;
-      background: #eef;
-      border-radius: 999px;
-      padding: 4px 10px;
-      margin: 0 6px 6px 0;
-      font-size: 12px;
-      color: #334;
-    }}
-    a.source {{
-      display: inline-block;
-      margin-top: 14px;
-      color: #0366d6;
-      text-decoration: none;
-      font-weight: 500;
-    }}
-    .muted {{
-      color: #666;
-      font-size: 13px;
-      margin-bottom: 10px;
-    }}
-  </style>
+  <link rel="stylesheet" href="/static/base.css" />
+  <link rel="stylesheet" href="/static/pages.css" />
 </head>
-<body>
-  <h1 style="margin-top:0;">{title}</h1>
+<body class="opportunity-page">
+  <h1>{title}</h1>
   <p class="muted">Agency: {agency} · Due: {due}</p>
 
   <div class="card">
-    <h2 style="margin-top:0;font-size:16px;">Summary</h2>
+    <h2>Summary</h2>
     <p>{summary}</p>
 
     {tags_html}

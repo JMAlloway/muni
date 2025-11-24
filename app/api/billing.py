@@ -99,7 +99,7 @@ async def _ensure_billing_owner(user_email: str | None):
 
 
 def _plan_card(name: str, price: str, highlights: list[str], cta_href: str, cta_label: str, current: bool) -> str:
-    badge = '<span class="pill">Current</span>' if current else ""
+    badge = '<span class="pill plan-pill">Current</span>' if current else ""
     btn_class = "btn-secondary" if current else "btn"
     btn_attrs = 'aria-disabled="true" tabindex="-1"' if current else ""
     items = "".join([f"<li>{h}</li>" for h in highlights])
@@ -256,32 +256,6 @@ async def billing_page(request: Request):
 </script>
 """
     style_html = """
-<style>
-.plan-grid {
-  display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap:12px;
-}
-.plan-card {
-  border:1px solid #e5e7eb;
-  border-radius:16px;
-  padding:14px;
-  background:#fff;
-  box-shadow:0 6px 14px rgba(15,23,42,0.08);
-  display:grid;
-  gap:10px;
-}
-.plan-current { border-color: rgba(49,179,124,0.4); box-shadow:0 0 0 2px rgba(49,179,124,0.15); }
-.plan-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.plan-name { font-weight:700; font-size:16px; }
-.plan-price { color:#475569; font-weight:600; }
-.plan-list { list-style:none; padding:0; margin:0; display:grid; gap:6px; color:#334155; font-size:13px; }
-.plan-list li::before { content:'• '; color:#31b37c; }
-.btn { background:#2563eb; color:#fff; padding:8px 10px; border-radius:10px; text-decoration:none; font-weight:600; }
-.btn-secondary { background:#f1f5f9; color:#0f172a; padding:8px 10px; border-radius:10px; text-decoration:none; font-weight:600; pointer-events:auto; opacity:1; }
-.btn-secondary[aria-disabled="true"] { pointer-events:none; opacity:0.8; }
-.pill { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(49,179,124,0.14); color:#126a45; font-size:11px; margin-left:6px; }
-</style>
 """
     status = request.query_params.get("status")
     banner = ""

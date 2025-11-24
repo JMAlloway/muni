@@ -1,6 +1,7 @@
 # app/scheduler.py
 import asyncio
 from datetime import datetime, timedelta
+import uuid
 from typing import Dict, List, Tuple
 import json
 from urllib.parse import quote_plus
@@ -15,6 +16,7 @@ from app.core.db import AsyncSessionLocal  # legacy ORM session factory for user
 from app.core.emailer import send_email
 from app.core.sms import send_sms
 from app.ingest.runner import run_ingestors_once
+from app.core.unsubscribe import build_unsubscribe_url
 
 
 APP_BASE_URL = getattr(settings, "PUBLIC_APP_URL", "http://localhost:8000")
@@ -274,6 +276,7 @@ async def _send_digest_to_matching_users(
         if not agency_sections_html:
             continue
 
+        unsubscribe_url = build_unsubscribe_url(email)
         html_body = (
             "<div style='font-family:Arial,sans-serif;color:#111;font-size:15px;line-height:1.5;"
             "background-color:#ffffff;padding:24px;max-width:640px;margin:auto;'>"
@@ -283,8 +286,9 @@ async def _send_digest_to_matching_users(
             + "".join(agency_sections_html) +
             "<hr style='border:none;border-top:1px solid #ddd;margin:24px 0;'>"
             "<p style='font-size:12px;color:#888;'>"
-            "You're receiving this because you're subscribed to EasyRFP. "
-            "To change preferences, update your account settings."
+            "You're receiving this because you're subscribed to EasyRFP.<br>"
+            f"<a href='{unsubscribe_url}' style='color:#1a73e8;'>Unsubscribe instantly</a> or "
+            "adjust your preferences."
             "</p>"
             "</div>"
         )
@@ -382,6 +386,144 @@ async def job_weekly_digest():
     print(f"[job_weekly_digest] done, sent {sent_count} emails")
     return {"sent": sent_count, "note": "weekly digest complete"}
 
+
+# --------------------------------------------------------------------------------------
+# Due-date reminders (7/3/1 days)
+# --------------------------------------------------------------------------------------
+
+_DUE_REMINDER_LOG_SQL = """
+CREATE TABLE IF NOT EXISTS due_reminder_log (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    opportunity_id INTEGER NOT NULL,
+    stage TEXT NOT NULL,
+    due_date TEXT,
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, opportunity_id, stage)
+)
+"""
+
+
+async def _ensure_due_reminder_table():
+    async with engine.begin() as conn:
+        await conn.execute(text(_DUE_REMINDER_LOG_SQL))
+
+
+async def job_due_date_reminders():
+    """
+    Send reminders at 7/3/1 days before due date for tracked opportunities.
+    Skips users who have digest_frequency 'none'/'off'.
+    """
+    print("[job_due_date_reminders] starting")
+    await _ensure_due_reminder_table()
+
+    today = datetime.utcnow().date()
+    max_day = today + timedelta(days=7)
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text(
+                """
+                SELECT
+                    t.user_id,
+                    u.email,
+                    t.opportunity_id,
+                    o.title,
+                    o.agency_name,
+                    o.due_date,
+                    o.external_id,
+                    o.id AS oid
+                FROM user_bid_trackers t
+                JOIN users u ON u.id = t.user_id
+                JOIN opportunities o ON o.id = t.opportunity_id
+                WHERE o.status = 'open'
+                  AND o.due_date IS NOT NULL
+                  AND DATE(o.due_date) BETWEEN DATE(:today) AND DATE(:max_day)
+            """
+            ),
+            {"today": today.isoformat(), "max_day": max_day.isoformat()},
+        )
+        rows = [dict(r) for r in res.mappings().all()]
+
+        for r in rows:
+            due_val = r.get("due_date")
+            try:
+                due_date = due_val.date() if hasattr(due_val, "date") else datetime.fromisoformat(str(due_val)).date()
+            except Exception:
+                continue
+            days_out = (due_date - today).days
+            if days_out not in {1, 3, 7}:
+                continue
+
+            # Honor user opt-out (reuse digest_frequency as global preference)
+            freq_res = await db.execute(
+                text("SELECT digest_frequency FROM users WHERE id = :uid LIMIT 1"),
+                {"uid": r["user_id"]},
+            )
+            freq_val = (freq_res.scalar() or "").lower()
+            if freq_val in {"none", "off", "unsubscribe", "unsubscribed"}:
+                continue
+
+            stage = f"due_{days_out}"
+            already = await db.execute(
+                text(
+                    """
+                    SELECT 1 FROM due_reminder_log
+                    WHERE user_id = :uid AND opportunity_id = :oid AND stage = :stage
+                    LIMIT 1
+                    """
+                ),
+                {"uid": r["user_id"], "oid": r["opportunity_id"], "stage": stage},
+            )
+            if already.scalar():
+                continue
+
+            detail_url = f"{APP_BASE_URL}/opportunities?ext={quote_plus(str(r.get('external_id') or r.get('oid')))}"
+            title = r.get("title") or "Opportunity"
+            agency = r.get("agency_name") or ""
+            due_str = due_date.isoformat()
+
+            html_body = (
+                "<div style='font-family:Arial,sans-serif;color:#111;font-size:15px;line-height:1.5;"
+                "background-color:#ffffff;padding:20px;max-width:620px;margin:auto;'>"
+                f"<h3 style='margin:0 0 12px;font-size:18px;font-weight:700;'>Due in {days_out} day"
+                f"{'' if days_out == 1 else 's'}: {title}</h3>"
+                f"<p style='margin:0 0 8px;color:#4b5563;'>Agency: {agency}</p>"
+                f"<p style='margin:0 0 8px;color:#4b5563;'>Due date: {due_str}</p>"
+                f"<p style='margin:12px 0;'><a href='{detail_url}' style='color:#1a73e8;font-weight:600;'>View opportunity</a></p>"
+                f"<p style='font-size:12px;color:#888;'>To stop due-date reminders, set your alerts to 'None' in preferences or unsubscribe from digests.</p>"
+                "</div>"
+            )
+
+            try:
+                await asyncio.to_thread(
+                    send_email,
+                    r["email"],
+                    f"Reminder: {title} due in {days_out} days",
+                    html_body,
+                )
+                await db.execute(
+                    text(
+                        """
+                        INSERT INTO due_reminder_log (id, user_id, opportunity_id, stage, due_date)
+                        VALUES (:id, :uid, :oid, :stage, :due)
+                        ON CONFLICT(user_id, opportunity_id, stage) DO NOTHING
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "uid": r["user_id"],
+                        "oid": r["opportunity_id"],
+                        "stage": stage,
+                        "due": due_str,
+                    },
+                )
+                await db.commit()
+            except Exception as exc:
+                print(f"[job_due_date_reminders] failed for {r.get('email')} oid={r.get('opportunity_id')}: {exc}")
+                await db.rollback()
+
+
 # --------------------------------------------------------------------------------------
 # APScheduler configuration
 # --------------------------------------------------------------------------------------
@@ -416,6 +558,13 @@ def start_scheduler():
         job_weekly_digest,
         CronTrigger(day_of_week="fri", hour=7, minute=0),
         name="weekly_digest",
+    )
+
+    # Due-date reminders (daily, morning)
+    scheduler.add_job(
+        job_due_date_reminders,
+        CronTrigger(hour=7, minute=30),
+        name="due_date_reminders",
     )
 
     scheduler.start()

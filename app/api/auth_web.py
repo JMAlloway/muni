@@ -123,22 +123,6 @@ async def signup_form(request: Request, next: str = "/"):
         </div>
         <div class="help-text">Already have an account? <a href="/login?next={next}">Sign in</a>.</div>
       </form>\n    </section>
-    <style>
-      .plan-chooser {{ display:grid; gap:12px; }}
-      .plan-chooser-head {{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }}
-      .plan-chooser-note {{ font-size:12px; color:#0f172a; background:#e0f2fe; padding:6px 10px; border-radius:12px; }}
-      .plan-tiles {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }}
-      .plan-tile {{ border:1px solid #e5e7eb; border-radius:12px; padding:12px; display:grid; gap:6px; cursor:pointer; transition:all 0.15s ease; background:#fff; position:relative; }}
-      .plan-tile:hover {{ box-shadow:0 8px 20px rgba(15,23,42,0.08); transform:translateY(-1px); }}
-      .plan-tile input[type="radio"] {{ position:absolute; opacity:0; inset:0; }}
-      .plan-tile .plan-top {{ display:flex; justify-content:space-between; align-items:center; font-weight:600; }}
-      .plan-tile .plan-price {{ color:#2563eb; }}
-      .plan-tile .plan-perk {{ color:#334155; font-size:13px; }}
-      .plan-tile .plan-cta {{ font-size:12px; color:#0f172a; opacity:0.8; }}
-      .plan-tile.plan-best {{ border-color:#e5e7eb; box-shadow:0 4px 10px rgba(37,99,235,0.08); position:relative; }}
-      .plan-tile.plan-best::after {{ content:'Most popular'; position:absolute; top:10px; right:10px; font-size:11px; color:#2563eb; background:rgba(37,99,235,0.08); padding:3px 8px; border-radius:999px; }}
-      .plan-tile.selected {{ border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,0.2); }}
-    </style>
     <script>
       (function() {{
         var btn=document.querySelector('.pw-toggle');
@@ -418,32 +402,6 @@ async def account_page(request: Request):
         )
 
     body = """
-<style>
-._card-shell {{ border:1px solid #e2e8f0; border-radius:18px; padding:18px; background:#fff; box-shadow:0 10px 40px rgba(15,23,42,.08); }}
-.account-hero {{ display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }}
-.account-hero .title {{ font-size:22px; font-weight:800; margin:0; letter-spacing:-0.01em; }}
-.account-hero .subtext {{ margin:6px 0 0 0; color:#475569; }}
-.pill {{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:600; }}
-.account-subnav {{ display:flex; gap:8px; flex-wrap:wrap; margin:18px 0 10px 0; }}
-.account-subnav a {{
-  padding:10px 14px; border-radius:12px; border:1px solid #e2e8f0; background:#f8fafc;
-  text-decoration:none; color:#0f172a; font-weight:600; font-size:14px; transition:all .15s ease;
-}}
-.account-subnav a:hover {{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(15,23,42,.08); }}
-.account-subnav a.primary {{ background:#2563eb; color:#fff; border-color:#2563eb; box-shadow:0 10px 28px rgba(37,99,235,.25); }}
-.account-grid {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }}
-.account-card {{
-  border:1px solid #e5e7eb; border-radius:16px; padding:16px;
-  background:linear-gradient(180deg, #fff, #f8fafc);
-  box-shadow:0 10px 28px rgba(15,23,42,.08);
-  display:grid; gap:9px;
-}}
-.account-card h3 {{ margin:0; font-size:16px; font-weight:700; color:#0f172a; }}
-.account-card p {{ margin:0; color:#475569; font-size:14px; line-height:1.55; }}
-.account-card .actions {{ display:flex; gap:8px; flex-wrap:wrap; }}
-.account-meta {{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; color:#475569; font-size:13px; }}
-.muted {{ color:#64748b; }}
-</style>
 <section class="card" style="border:0; box-shadow:none; padding:0;">
   <div class="account-hero">
     <div>
@@ -519,49 +477,6 @@ async def team_settings(request: Request):
         return RedirectResponse("/login?next=/account/team", status_code=303)
 
     body = """
-<style>
-.team-shell {{
-  display:grid; gap:12px;
-}}
-.team-card {{
-  border:1px solid #e5e7eb;
-  border-radius:16px;
-  padding:16px;
-  background:#fff;
-  box-shadow:0 12px 30px rgba(15,23,42,.08);
-}}
-.team-card h3 {{ margin:0 0 6px 0; font-size:18px; font-weight:700; }}
-.team-card p {{ margin:0 0 8px 0; color:#475569; }}
-.muted {{ color:#64748b; font-size:13px; }}
-.team-list {{ display:grid; gap:8px; padding:0; margin:0; list-style:none; }}
-.team-list li {{
-  border:1px solid #e5e7eb;
-  border-radius:12px;
-  padding:10px 12px;
-  background:#f8fafc;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:8px;
-}}
-.member-actions {{ display:flex; gap:8px; align-items:center; }}
-.btn-ghost {{
-  border:1px solid #e2e8f0;
-  background:transparent;
-  border-radius:10px;
-  padding:6px 10px;
-  cursor:pointer;
-  font-weight:600;
-  color:#0f172a;
-}}
-.btn-ghost:hover {{ background:#e2e8f0; }}
-.pill {{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }}
-.pill.pending {{ background:#fff7ed; color:#c2410c; border-color:#fed7aa; }}
-.pill.active {{ background:#ecfdf3; color:#166534; border-color:#bbf7d0; }}
-.form-row {{ display:flex; gap:8px; flex-wrap:wrap; }}
-.form-row input {{ flex:1; min-width:220px; padding:9px 10px; border:1px solid #e5e7eb; border-radius:10px; }}
-</style>
-
 <section class="card team-shell">
   <div class="head-row" style="align-items:flex-start;">
     <div>
@@ -611,6 +526,16 @@ async def team_settings(request: Request):
   const acceptStatus = document.getElementById("accept-status");
   const memberStatus = document.getElementById("member-status");
   const currentUser = "__CURRENT_USER__".toLowerCase();
+  const roleOptions = [
+    { value: "manager", label: "Manager" },
+    { value: "member", label: "Member" },
+    { value: "viewer", label: "Viewer" },
+  ];
+
+  function currentUserRole(members){
+    const mine = members.find(m => (m.user_email || "").toLowerCase() === currentUser);
+    return (mine && (mine.role || "")).toLowerCase();
+  }
 
   function renderMembers(members){
     seatEl.textContent = members.length;
@@ -618,6 +543,7 @@ async def team_settings(request: Request):
       listEl.innerHTML = "<li class='muted'>No team members yet.</li>";
       return;
     }
+    const myRole = currentUserRole(members);
     listEl.innerHTML = members.map(m => `
       <li>
         <div>
@@ -629,6 +555,13 @@ async def team_settings(request: Request):
           ${
             ((m.role || "").toLowerCase() !== "owner" && (m.user_email || "").toLowerCase() !== currentUser)
               ? `<button class="btn-ghost remove-btn" data-id="${m.id}" data-email="${m.user_email || m.invited_email || ""}">Remove</button>`
+              : ""
+          }
+          ${
+            (myRole === "owner" && (m.role || "").toLowerCase() !== "owner")
+              ? `<select class="role-select" data-id="${m.id}">
+                  ${roleOptions.map(opt => `<option value="${opt.value}" ${opt.value === (m.role || "").toLowerCase() ? "selected" : ""}>${opt.label}</option>`).join("")}
+                 </select>`
               : ""
           }
         </div>
@@ -711,6 +644,31 @@ async def team_settings(request: Request):
       if (memberStatus) memberStatus.textContent = "Could not remove member (owner access required).";
     }finally{
       btnEl.disabled = false;
+      if (memberStatus) setTimeout(() => { memberStatus.textContent = ""; }, 4000);
+    }
+  });
+  listEl.addEventListener("change", async function(ev){
+    const sel = ev.target.closest(".role-select");
+    if (!sel) return;
+    const memberId = sel.getAttribute("data-id");
+    const newRole = sel.value;
+    if (!memberId || !newRole) return;
+    sel.disabled = true;
+    if (memberStatus) memberStatus.textContent = "Updating role...";
+    try{
+      const res = await fetch("/api/team/members/" + memberId + "/role", {
+        method:"POST",
+        credentials:"include",
+        headers:{ "Content-Type":"application/json", "X-CSRF-Token": getCSRF() || "" },
+        body: JSON.stringify({ role: newRole })
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (memberStatus) memberStatus.textContent = "Role updated.";
+      loadMembers();
+    }catch(err){
+      if (memberStatus) memberStatus.textContent = "Could not update role (owner only).";
+    }finally{
+      sel.disabled = false;
       if (memberStatus) setTimeout(() => { memberStatus.textContent = ""; }, 4000);
     }
   });

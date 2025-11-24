@@ -7,6 +7,7 @@ from sqlalchemy import text
 from app.core.db_core import engine
 from app.core.emailer import send_email
 from app.ai.client import get_llm_client
+from app.core.unsubscribe import build_unsubscribe_url
 
 
 async def build_digest_html(conn, llm_client=None) -> str:
@@ -95,9 +96,14 @@ async def send_digest(to_email: str):
     llm_client = get_llm_client()
     async with engine.begin() as conn:
         html = await build_digest_html(conn, llm_client=llm_client)
+    unsub_url = build_unsubscribe_url(to_email)
+    footer = (
+        f"<hr><p style='font-size:12px;color:#666;'>You're receiving this because you're subscribed to EasyRFP. "
+        f"<a href='{unsub_url}'>Unsubscribe instantly</a>.</p>"
+    )
     subject = "EasyRFP - New Opportunities"
-    send_email(to_email, subject, html)
-    print(f"✅ Digest sent to {to_email}")
+    send_email(to_email, subject, html + footer)
+    print(f"[digest] sent to {to_email}")
 
 
 async def preview_digest(outfile: str = "digest_preview.html"):
