@@ -201,7 +201,10 @@
   function openThread(meta){
     if (!meta || !meta.opportunity_id) return;
     setThreadMeta(meta);
-    if (threadUI.overlay) threadUI.overlay.style.display = 'block';
+    if (threadUI.overlay) {
+      threadUI.overlay.style.display = 'block';
+      threadUI.overlay.setAttribute('aria-hidden','false');
+    }
     if (threadUI.drawer) threadUI.drawer.setAttribute('aria-hidden','false');
     fetchNotes(meta.opportunity_id).then(()=>{ renderThread(); render(); }).catch(()=>{ renderThread(); });
     if (threadUI.input) threadUI.input.focus();
@@ -209,7 +212,10 @@
   function closeThread(){
     threadState.oid = null;
     threadState.meta = null;
-    if (threadUI.overlay) threadUI.overlay.style.display = 'none';
+    if (threadUI.overlay) {
+      threadUI.overlay.style.display = 'none';
+      threadUI.overlay.setAttribute('aria-hidden','true');
+    }
     if (threadUI.drawer) threadUI.drawer.setAttribute('aria-hidden','true');
     if (threadUI.list) threadUI.list.innerHTML = "<div class='muted'>Select a solicitation to see its thread.</div>";
   }
@@ -428,6 +434,8 @@
   }
   window.updateDashboardSummary = updateSummary;
 
+  let expandedState = {};
+
   function render(){
     const view = items.filter(matchesFilters);
     sortItems(view);
@@ -437,87 +445,86 @@
       const filesLabel = (it.file_count||0) === 1 ? "1 file" : `${it.file_count||0} files`;
       const dueMs = it.due_date ? (new Date(it.due_date).getTime() - Date.now()) : null;
       const dueSoon = (dueMs !== null) && (dueMs < 7*24*60*60*1000) && (dueMs >= 0);
-      const collab = collabFor(it.opportunity_id);
-      const notes = getNotes(it.opportunity_id);
+      const status = (it.status || "prospecting").toLowerCase();
+      const statusStyles = {
+        prospecting: { dot: "#126a45", dueBg: "rgba(18,106,69,0.1)", dueText: "#126a45" },
+        deciding: { dot: "#b45309", dueBg: "rgba(180,83,9,0.12)", dueText: "#b45309" },
+        drafting: { dot: "#2563eb", dueBg: "rgba(37,99,235,0.12)", dueText: "#2563eb" },
+        submitted: { dot: "#0f766e", dueBg: "rgba(15,118,110,0.12)", dueText: "#0f766e" },
+        won: { dot: "#15803d", dueBg: "rgba(21,128,61,0.14)", dueText: "#15803d" },
+        lost: { dot: "#b91c1c", dueBg: "rgba(185,28,28,0.12)", dueText: "#b91c1c" },
+      };
+      const colors = statusStyles[status] || statusStyles.prospecting;
+      const expanded = !!expandedState[it.opportunity_id];
       const trackedBy = (it.tracked_by || "").toString();
       const trackedByLabel = it.is_mine ? "You" : (trackedBy || "Teammate");
-      const notesHtml = (notes && notes.length)
-        ? notes.slice(0,3).map(n=>{
-            const txt = noteBody(n);
-            return `
-            <div class="collab-note">
-              <div>${highlightMentions(txt)}</div>
-              <div class="meta">Saved ${fmtDateShort(n.created_at || n.id)} by your team</div>
-            </div>
-          `;
-          }).join("")
-        : `<div class="muted">No notes yet. Start with an @mention.</div>`;
-      const isOpen = !!collabState.open[it.opportunity_id];
+      const ringCirc = 2 * Math.PI * 18; // matches 113 in demo
+      const dashOffset = ringCirc - (ringCirc * Math.max(0, Math.min(100, prog)) / 100);
+      const statusClass = dueSoon ? "status-due-soon" : "";
       return `
-        <article class="tracked-card" data-oid="${it.opportunity_id}" tabindex="0">
-          <div class="top">
-            <div>
-              <div class="title">${it.title||"Untitled"}</div>
-              <div class="meta">
-                <span>${it.external_id||"-"}</span><span></span>
-                <span>${it.agency_name||""}</span><span></span>
-                <span>Due: ${dueStr(it.due_date)}</span>${dueSoon?`<span class="badge-soon">Due soon</span>`:''}
-                <span>${filesLabel}</span>
-                ${trackedBy ? `<span class="tracked-by ${it.is_mine ? 'mine' : ''}">Tracked by ${escHtml(trackedByLabel)}</span>` : ''}
+        <article class="solicitation-card tracked-card ${statusClass} ${expanded ? 'expanded' : ''}" data-oid="${it.opportunity_id}" tabindex="0" style="--primary:${colors.dot};">
+          <div class="solicitation-card-header" data-action="toggle-card" data-oid="${it.opportunity_id}">
+            <div class="solicitation-left">
+              <div class="status-dot" style="background:${colors.dot};"></div>
+              <div class="solicitation-info">
+                <div class="solicitation-title" title="${escHtml(it.title||'Untitled')}">${it.title||"Untitled"}</div>
+                <div class="solicitation-agency">
+                  ${it.agency_name ? `<span class="agency-badge">${escHtml(it.agency_name)}</span>` : ""}
+                  ${it.external_id ? `<span class="agency-badge">${escHtml(it.external_id)}</span>` : ""}
+                  <span>${filesLabel}</span>
+                </div>
               </div>
             </div>
-            ${statusBadge(it.status)}
-          </div>
-
-          <div class="progress"><div style="width:${pct(prog)}%; background:linear-gradient(90deg,#6366f1,#22d3ee)"></div></div>
-
-          <ul class="card-list">
-            <li><span class="dot"></span>Type: ${it.category||"-"}</li>
-            <li><span class="dot"></span>Status: ${(it.status||"prospecting")}</li>
-          </ul>
-
-          <div class="actions">
-            <button class="btn" data-action="upload" data-oid="${it.opportunity_id}">Upload files</button>
-            <button class="btn-secondary" data-action="upload" data-oid="${it.opportunity_id}">View files</button>
-            <button class="btn-secondary" data-action="guide" data-oid="${it.opportunity_id}">How to bid</button>
-            <a class="btn-secondary" href="${it.source_url || "#"}" target="_blank">Source</a>
-            <select data-action="status" data-oid="${it.opportunity_id}">
-              ${["prospecting","deciding","drafting","submitted","won","lost"].map(s=>`<option value="${s}" ${((it.status||"prospecting")===s?"selected":"")}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}
-            </select>
-            <button class="btn-secondary" title="Remove from dashboard" data-action="remove" data-oid="${it.opportunity_id}">Remove</button>
-          </div>
-
-          <div class="collab-box ${isOpen ? '' : 'collapsed'}">
-            <div class="collab-head">
-              <div>
-                <div class="label">Team room</div>
-                <div class="muted" style="font-size:12px;">Messages sync into the thread sidebar.</div>
+            <div class="solicitation-right">
+              <div class="progress-ring tooltip" data-tooltip="${prog}% complete">
+                <svg viewBox="0 0 44 44">
+                  <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                  <circle class="progress-ring-fill" cx="22" cy="22" r="18"
+                          stroke="${colors.dot}"
+                          stroke-dasharray="${ringCirc}"
+                          stroke-dashoffset="${dashOffset}"/>
+                </svg>
+                <span class="progress-ring-text">${pct(prog)}%</span>
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <button class="link-btn" type="button" data-action="open-thread" data-oid="${it.opportunity_id}">Open thread</button>
-                <button class="collab-toggle" type="button" data-action="toggle-collab" data-oid="${it.opportunity_id}">
-                  <span class="arrow">></span><span>${isOpen ? 'Hide' : 'Show'}</span>
-                </button>
+              <div class="due-badge" style="background:${colors.dueBg}; color:${colors.dueText}; border:1px solid ${colors.dueBg};">
+                <span class="due-icon">🕒</span>
+                Due ${dueStr(it.due_date)}
               </div>
+              <button class="expand-btn" type="button" data-action="toggle-card" data-oid="${it.opportunity_id}" aria-expanded="${expanded}">⌄</button>
             </div>
-            <div class="collab-body">
-              <div class="collab-row">
-                <input type="text" data-action="assign" data-oid="${it.opportunity_id}" placeholder="Assign to teammate" value="${escHtml(collab.assignee||'')}">
-                <span class="muted" style="font-size:12px;">Use @name in notes below.</span>
+          </div>
+
+          <div class="solicitation-details ${expanded ? '' : 'hidden'}">
+            <div class="details-divider"></div>
+            <div class="details-grid">
+              <div class="detail-section checklist">
+                <h4>Checklist Progress</h4>
+                <ul class="checklist">
+                  <li class="done"><span class="check-icon">✓</span>Downloaded RFP documents</li>
+                  <li class="done"><span class="check-icon">✓</span>Reviewed requirements</li>
+                  <li class="done"><span class="check-icon">✓</span>Prepared pricing sheet</li>
+                  <li class="pending"><span class="check-icon">○</span>Final review & submit</li>
+                </ul>
               </div>
-              <div class="collab-notes">
-                ${notesHtml}
+              <div class="detail-section files">
+                <h4>Attached Files</h4>
+                <div class="file-chips">
+                  <a class="file-chip" href="${it.source_url || "#"}" target="_blank">RFP_Document.pdf</a>
+                  <a class="file-chip" href="${it.source_url || "#"}" target="_blank">Pricing_Sheet.xlsx</a>
+                  <a class="file-chip" href="${it.source_url || "#"}" target="_blank">Technical_Proposal.docx</a>
+                </div>
               </div>
-              <div class="collab-form">
-                <textarea data-action="note-text" data-oid="${it.opportunity_id}" placeholder="@sarah can you price the concrete?"></textarea>
-                <div class="collab-actions">
-                  <button class="btn" data-action="add-note" data-oid="${it.opportunity_id}">Add note</button>
-                  <span class="muted" style="font-size:12px;">Recent notes show for your team.</span>
+              <div class="detail-section actions">
+                <h4>Quick Actions</h4>
+                <div class="quick-actions">
+                  <button class="action-btn primary" data-action="open-thread" data-oid="${it.opportunity_id}">Submit Proposal</button>
+                  <button class="action-btn" data-action="upload" data-oid="${it.opportunity_id}">Upload Document</button>
+                  <button class="action-btn" data-action="guide" data-oid="${it.opportunity_id}">View Requirements</button>
+                  <button class="action-btn" data-action="open-thread" data-oid="${it.opportunity_id}">Team Thread</button>
                 </div>
               </div>
             </div>
           </div>
-
         </article>
       `;
     });
@@ -630,6 +637,11 @@
     if (!oid) return;
     const it = items.find(x => String(x.opportunity_id) === String(oid));
     if (!it) return;
+    if (action === 'toggle-card') {
+      expandedState[oid] = !expandedState[oid];
+      render();
+      return;
+    }
     if (action === 'toggle-collab') {
       toggleCollab(oid);
       if (collabState.open[oid]) {
@@ -762,6 +774,8 @@
     }
   };
 })();
+
+
 
 
 

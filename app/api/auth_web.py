@@ -11,7 +11,7 @@ from app.security import hash_password, verify_password
 from app.auth.session import create_session_token, get_current_user_email, SESSION_COOKIE_NAME
 from app.core.settings import settings
 
-from app.api._layout import page_shell
+from app.api._layout import auth_shell, page_shell
 from app.onboarding.interests import DEFAULT_INTEREST_KEY, list_interest_options
 from app.services import record_milestone, set_primary_interest
 
@@ -74,55 +74,56 @@ async def signup_form(request: Request, next: str = "/"):
         ]
     )
     body_html = f"""
-    <section class="card">
-      <h2 class="section-heading">Create your account</h2>
-      <p class="subtext">Start in seconds. Confirm a plan, finish checkout, then complete signup.</p>
-      {"<div class='alert success' style='margin-bottom:10px;'>Payment received for your selected plan. Finish creating your account below.</div>" if paid_flag else ""}
+    <h1 class="auth-title">Create your account</h1>
+    <p class="auth-subtext">Start in seconds. Confirm a plan, finish checkout, then complete signup.</p>
+    {"<div class='auth-alert' style='color:#166534; border-color:#bbf7d0; background:#ecfdf3;'>Payment received for your selected plan. Finish creating your account below.</div>" if paid_flag else ""}
 
-      <form method="POST" action="/signup">\n        <input type="hidden" name="csrf_token" id="csrf_signup" value="{csrf_cookie}">
-        <input type="hidden" name="next" value="{next}">
-        <input type="hidden" name="plan" id="plan-hidden" value="{selected_plan}">
-        {"<input type='hidden' name='paid' value='1'>" if paid_flag else ""}
-        <div class="form-row">
-          <div class="form-col">
-            <label class="label-small">Email</label>
-            <input type="email" name="email" id="signup-email" placeholder="you@company.com" value="{prefill_email}" required />
-          </div>
-          <div class="form-col">
-            <label class="label-small">Password</label>
-            <div class="input-with-toggle">
-              <input id="signup-password" type="password" name="password" placeholder="Create a strong password" required />
-              <button type="button" class="pw-toggle" aria-controls="signup-password" aria-label="Show password">Show</button>
-            </div>
-            <div class="help-text">Minimum 8 characters recommended.</div>
-          </div>
+    <form class="auth-form" method="POST" action="/signup">\n        <input type="hidden" name="csrf_token" id="csrf_signup" value="{csrf_cookie}">
+      <input type="hidden" name="next" value="{next}">
+      <input type="hidden" name="plan" id="plan-hidden" value="{selected_plan}">
+      {"<input type='hidden' name='paid' value='1'>" if paid_flag else ""}
+      <div class="form-row">
+        <div class="form-col">
+          <label class="auth-label">Email</label>
+          <input class="auth-input" type="email" name="email" id="signup-email" placeholder="you@company.com" value="{prefill_email}" required />
         </div>
-        <div class="form-row">
-          <div class="form-col">
-            <label class="label-small">Primary interest</label>
-            <select name="primary_interest">{options_html}</select>
-            <div class="help-text">We use this to auto-tailor your welcome dashboard.</div>
+        <div class="form-col">
+          <label class="auth-label">Password</label>
+          <div class="input-with-toggle">
+            <input class="auth-input" id="signup-password" type="password" name="password" placeholder="Create a strong password" required />
+            <button type="button" class="pw-toggle" aria-controls="signup-password" aria-label="Show password">Show</button>
           </div>
+          <div class="help-text">Minimum 8 characters recommended.</div>
         </div>
-        <div class="form-row plan-chooser">
-          <div class="plan-chooser-head">
-            <div>
-              <div class="label-small">Pick your starting plan</div>
-              <div class="help-text">Confirm your plan. Paid plans go to Stripe checkout, then you return here to finish signup.</div>
-            </div>
-            <div class="plan-chooser-note">Change anytime</div>
+      </div>
+      <div class="form-row">
+        <div class="form-col">
+          <label class="auth-label">Primary interest</label>
+          <select name="primary_interest">{options_html}</select>
+          <div class="help-text">We use this to auto-tailor your welcome dashboard.</div>
+        </div>
+      </div>
+      <div class="form-row plan-chooser">
+        <div class="plan-chooser-head">
+          <div>
+            <div class="label-small">Pick your starting plan</div>
+            <div class="help-text">Confirm your plan. Paid plans go to Stripe checkout, then you return here to finish signup.</div>
           </div>
-          <div class="plan-tiles">{plan_html}</div>
+          <div class="plan-chooser-note">Change anytime</div>
         </div>
-        <div class="form-actions" style="justify-content:space-between; align-items:center;">
-          <button class="button-secondary" type="button" id="pay-now-btn">Confirm plan & go to Stripe</button>
-          <div style="display:flex; gap:12px; align-items:center;">
-            <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
-            <button class="button-primary" type="submit">Create account & continue</button>
-          </div>
+        <div class="plan-tiles">{plan_html}</div>
+      </div>
+      <div class="form-actions" style="justify-content:space-between; align-items:center;">
+        <button class="button-secondary" type="button" id="pay-now-btn">Confirm plan & go to Stripe</button>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
+          <button class="button-primary" type="submit">Create account & continue</button>
         </div>
-        <div class="help-text">Already have an account? <a href="/login?next={next}">Sign in</a>.</div>
-      </form>\n    </section>
+      </div>
+      <div class="auth-inline-links" style="justify-content:flex-start;">
+        <span>Already have an account? <a href="/login?next={next}">Sign in</a>.</span>
+      </div>
+    </form>
     <script>
       (function() {{
         var btn=document.querySelector('.pw-toggle');
@@ -168,7 +169,7 @@ async def signup_form(request: Request, next: str = "/"):
       }})();
     </script>
     """
-    resp = HTMLResponse(page_shell(body_html, title="Sign up - EasyRFP", user_email=user_email))
+    resp = HTMLResponse(auth_shell(body_html, title="Sign up - EasyRFP", wrapper_class="auth-wrapper-wide", card_class="auth-card-wide"))
     resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax")
     return resp
 
@@ -198,18 +199,15 @@ async def signup_submit(
     existing = await _load_user_by_email(email_clean)
     if existing:
         return HTMLResponse(
-            page_shell(
+            auth_shell(
                 f"""
-                <section class="card">
-                  <h2 class="section-heading">Account already exists</h2>
-                  <p class="subtext">We found an account for <b>{email_clean}</b>. Please sign in instead of creating a new one.</p>
-                  <div class="form-actions" style="margin-top:10px;">
-                    <a class="button-primary" href="/login?next={next}">Go to login</a>
-                  </div>
-                </section>
+                <h1 class="auth-title">Account already exists</h1>
+                <div class="auth-alert" style="color:#b91c1c; background:#fef2f2; border-color:#fca5a5;">We found an account for <b>{email_clean}</b>. Please sign in instead of creating a new one.</div>
+                <div class="auth-inline-links"><a href="/login?next={next}">Go to login</a></div>
                 """,
                 title="Account exists",
-                user_email=None,
+                wrapper_class="auth-wrapper-wide",
+                card_class="auth-card-wide",
             ),
             status_code=400,
         )
@@ -260,36 +258,36 @@ async def signup_submit(
 # --- login/logout ----------------------------------------------------
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_form(request: Request, next: str = "/"):
+async def login_form(request: Request, next: str = "/tracker/dashboard"):
     # Do NOT redirect from here; show the form to avoid loops.
     user_email = get_current_user_email(request)
     csrf_cookie = request.cookies.get("csrftoken") or secrets.token_urlsafe(32)
     body_html = f"""
-    <section class="card">
-      <h2 class="section-heading">Sign in</h2>
-      <p class="subtext">Access your dashboard and alert settings.</p>
-
-      <form method="POST" action="/login">\n        <input type="hidden" name="csrf_token" id="csrf_login" value="{csrf_cookie}">
-        <input type="hidden" name="next" value="{next}">
-        <div class="form-row">
-          <div class="form-col">
-            <label class="label-small">Email</label>
-            <input type="email" name="email" placeholder="you@company.com" required />
-          </div>
-          <div class="form-col">
-            <label class="label-small">Password</label>
-            <div class="input-with-toggle">
-              <input id="login-password" type="password" name="password" placeholder="Your password" required />
-              <button type="button" class="pw-toggle" aria-controls="login-password" aria-label="Show password">Show</button>
-            </div>
-          </div>
+    <h1 class="auth-title">Log in to your account</h1>
+    <p class="auth-subtext">Access your dashboard and alerts.</p>
+    <form class="auth-form" method="POST" action="/login">
+      <input type="hidden" name="csrf_token" id="csrf_login" value="{csrf_cookie}">
+      <input type="hidden" name="next" value="{next}">
+      <div class="auth-field">
+        <label class="auth-label">Email address</label>
+        <input class="auth-input" type="email" name="email" placeholder="you@company.com" required />
+      </div>
+      <div class="auth-field">
+        <label class="auth-label">Password</label>
+        <div class="input-with-toggle">
+          <input class="auth-input" id="login-password" type="password" name="password" placeholder="Your password" required />
+          <button type="button" class="pw-toggle" aria-controls="login-password" aria-label="Show password">Show</button>
         </div>
-        <div class="form-actions">
-          <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
-          <button class="button-primary" type="submit">Sign in</button>
-        </div>
-        <div class="help-text">No account yet? <a href="/signup?next={next}">Create one</a>.</div>
-      </form>\n    </section>
+      </div>
+      <div class="auth-actions">
+        <label class="auth-remember"><input type="checkbox" name="remember"> Keep me signed in</label>
+        <button class="auth-submit" type="submit">Log in</button>
+      </div>
+      <div class="auth-inline-links">
+        <span>New to EasyRFP? <a href="/signup?next={next}">Sign up</a></span>
+        <a href="/reset">Forgot your password?</a>
+      </div>
+    </form>
     <script>
       (function() {{
         var btn=document.querySelector('.pw-toggle');
@@ -304,7 +302,7 @@ async def login_form(request: Request, next: str = "/"):
       }})();
     </script>
     """
-    resp = HTMLResponse(page_shell(body_html, title="Sign up - EasyRFP", user_email=user_email)); resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax"); return resp
+    resp = HTMLResponse(auth_shell(body_html, title="Log in - EasyRFP")); resp.set_cookie("csrftoken", csrf_cookie, httponly=False, samesite="lax"); return resp
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -318,14 +316,13 @@ async def login_submit(
     row = await _load_user_by_email(email_clean)
     if not row:
         return HTMLResponse(
-            page_shell(
+            auth_shell(
                 """
-          <section class="card"><h2 class="section-heading">Sign in failed</h2>
-          <p class="subtext" style="color:#dc2626;">Invalid email or password.</p>
-          <a class="button-primary" href="/login">Try again</a></section>
+          <h1 class="auth-title">Sign in failed</h1>
+          <div class="auth-alert">Invalid email or password.</div>
+          <div class="auth-inline-links"><a href="/login">Try again</a></div>
                 """,
                 title="Login failed",
-                user_email=None,
             ),
             status_code=401,
         )
@@ -333,33 +330,32 @@ async def login_submit(
     db_email, db_pw_hash, *_rest, is_active = row
     if not is_active:
         return HTMLResponse(
-            page_shell(
+            auth_shell(
                 """
-          <section class="card"><h2 class="section-heading">Account inactive</h2></section>
+          <h1 class="auth-title">Account inactive</h1>
+          <div class="auth-alert">This account is inactive. Contact support.</div>
                 """,
                 title="Inactive",
-                user_email=None,
             ),
             status_code=403,
         )
 
     if not verify_password(password, db_pw_hash):
         return HTMLResponse(
-            page_shell(
+            auth_shell(
                 """
-          <section class="card"><h2 class="section-heading">Sign in failed</h2>
-          <p class="subtext" style="color:#dc2626;">Invalid email or password.</p>
-          <a class="button-primary" href="/login">Try again</a></section>
+          <h1 class="auth-title">Sign in failed</h1>
+          <div class="auth-alert">Invalid email or password.</div>
+          <div class="auth-inline-links"><a href="/login">Try again</a></div>
                 """,
                 title="Login failed",
-                user_email=None,
             ),
             status_code=401,
         )
 
     # Set cookie and redirect
     token = create_session_token(email_clean)
-    redirect_to = next if (next and not next.startswith("/login")) else "/account"
+    redirect_to = next if (next and not next.startswith("/login")) else "/tracker/dashboard"
     resp = RedirectResponse(url=redirect_to, status_code=303)
 
     is_prod = settings.ENV.lower() == "production"

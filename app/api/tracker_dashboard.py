@@ -112,17 +112,36 @@ async def tracker_dashboard(request: Request):
         for it in items
     )
 
-    team_banner_html = ""
+    total_items = len(items)
+    def _is_due_soon(d):
+        if not d:
+            return False
+        try:
+            import datetime as _dt
+            return (_dt.datetime.fromisoformat(str(d)) - _dt.datetime.utcnow()).days <= 7
+        except Exception:
+            return False
+    due_soon_count = sum(1 for it in items if _is_due_soon(it.get("due_date")))
+    won_count = sum(1 for it in items if str(it.get("status", "")).lower() == "won")
+
+    team_bar_html = ""
     if team_id:
-        owner_display = team_owner_email or user_email
         member_label = f"{team_member_count} member{'s' if team_member_count != 1 else ''}"
-        team_banner_html = f"""
-<div class="team-banner">
-  <div>
-    <div class="team-name">{esc_text(team_name or 'Team')}</div>
-    <div class="team-sub">Lead: {esc_text(owner_display)} - {member_label}</div>
+        team_bar_html = f"""
+<div class="team-bar fade-in">
+  <div class="team-info">
+    <div class="team-avatars">
+      <div class="team-avatar">JD</div>
+      <div class="team-avatar" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">SK</div>
+      <div class="team-avatar" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">MR</div>
+      <div class="team-avatar add">+</div>
+    </div>
+    <div class="team-details">
+      <span class="team-label">Your Team</span>
+      <span><strong>{esc_text(team_name or 'Team')}</strong> • {esc_text(member_label)}</span>
+    </div>
   </div>
-  <div class="team-pill">Shared dashboard</div>
+  <button class="shared-dashboard-btn" type="button">Team Dashboard</button>
 </div>
 """
 
@@ -135,39 +154,134 @@ async def tracker_dashboard(request: Request):
 
     # --- plain triple-quoted HTML with placeholders ---
     body = """
-__TEAM_BANNER__
-<section class="card">
-  <div class="head-row">
-    <h2 class="section-heading">My Tracked Solicitations</h2>
-    <div class="muted">Status, files, and step-by-step guidance.</div>
+__TEAM_BAR__
+
+<div class="stats-grid">
+  <div class="stat-card featured fade-in stagger-1">
+    <div class="stat-icon">📈</div>
+    <div class="stat-label">Active Bids</div>
+    <div class="stat-value">{total_items}</div>
+    <span class="stat-change positive">↑ {total_items} this week</span>
+  </div>
+  <div class="stat-card fade-in stagger-2">
+    <div class="stat-icon">⏰</div>
+    <div class="stat-label">Due This Week</div>
+    <div class="stat-value">{due_soon_count}</div>
+    <span class="stat-change negative">↓ {due_soon_count} urgent</span>
+  </div>
+  <div class="stat-card fade-in stagger-3">
+    <div class="stat-icon">✅</div>
+    <div class="stat-label">Won This Quarter</div>
+    <div class="stat-value">{won_count}</div>
+    <span class="stat-change positive">↑ 23% vs Q3</span>
+  </div>
+  <div class="stat-card fade-in stagger-4">
+    <div class="stat-icon">💰</div>
+    <div class="stat-label">Pipeline Value</div>
+    <div class="stat-value">$2.4M</div>
+    <span class="stat-change positive">↑ $340K added</span>
+  </div>
+</div>
+
+<div class="grid-3">
+  <div>
+    <div class="timeline-section fade-in stagger-2">
+      <div class="timeline-header">
+        <div>
+          <h3 class="section-title">Upcoming Deadlines</h3>
+          <p class="section-subtitle">Next 7 days</p>
+        </div>
+        <div class="section-tabs">
+          <button class="section-tab active">Week</button>
+          <button class="section-tab">Month</button>
+          <button class="section-tab">All</button>
+        </div>
+      </div>
+      <div class="timeline">
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-content"><div class="timeline-date">Today, 2:00 PM</div><div class="timeline-title">Safety Boots Supply Contract</div><div class="timeline-desc">City of Columbus • Final submission deadline</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-content"><div class="timeline-date">Tomorrow, 1:30 PM</div><div class="timeline-title">Yard Waste Processing RFP</div><div class="timeline-desc">Franklin County • Proposal due</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-content"><div class="timeline-date">Nov 25, 1:00 PM</div><div class="timeline-title">HVAC Services Contract</div><div class="timeline-desc">COTA • Technical documents due</div></div></div>
+        <div class="timeline-item upcoming"><div class="timeline-dot"></div><div class="timeline-content"><div class="timeline-date">Nov 28, 3:00 PM</div><div class="timeline-title">IT Support Services</div><div class="timeline-desc">Ohio DOT • Pre-qualification deadline</div></div></div>
+      </div>
+    </div>
+
+    <div class="section-header fade-in stagger-3">
+      <div>
+        <h2 class="section-title">Tracked Solicitations</h2>
+        <p class="section-subtitle">{total_items} active opportunities</p>
+      </div>
+      <div class="section-tabs">
+        <button class="section-tab active" type="button">All</button>
+        <button class="section-tab" type="button">Due Soon</button>
+        <button class="section-tab" type="button">Won</button>
+      </div>
+    </div>
+
+    <div class="toolbar fade-in stagger-3" id="dashboard-actions" style="margin-top:8px;">
+      <div class="filters">
+        <select id="status-filter">
+          <option value="">All statuses</option>
+          <option value="prospecting">Prospecting</option>
+          <option value="deciding">Deciding</option>
+          <option value="drafting">Drafting</option>
+          <option value="submitted">Submitted</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+        </select>
+        <select id="agency-filter">
+          <option value="">All agencies</option>
+          <option value="City of Columbus">City of Columbus</option>
+          <option value="Central Ohio Transit Authority (COTA)">COTA</option>
+        </select>
+        <select id="sort-by">
+          <option value="soonest">Due Date ↑</option>
+          <option value="latest">Due Date ↓</option>
+          <option value="agency">Agency A-Z</option>
+          <option value="title">Title A-Z</option>
+        </select>
+        <input id="search-filter" type="search" placeholder="Search title, ID, agency" />
+        <button id="reset-filters" class="btn-secondary" type="button">Reset</button>
+      </div>
+      <div class="result-count" id="summary-count"></div>
+    </div>
+
+    <div id="tracked-grid" class="tracked-grid solicitations-list" data-items='__ITEMS_JSON_ESC__' data-user-email="__USER_EMAIL__" data-user-id="__USER_ID__"></div>
   </div>
 
-    <!-- Upload Manager removed -->\n  <div class="toolbar" id="dashboard-actions" style="margin-top:16px;">
-    <div class="filters">
-      <select id="status-filter">
-        <option value="">All statuses</option>
-        <option value="prospecting">Prospecting</option>
-        <option value="deciding">Deciding</option>
-        <option value="drafting">Drafting</option>
-        <option value="submitted">Submitted</option>
-        <option value="won">Won</option>
-        <option value="lost">Lost</option>
-      </select>
-      <select id="agency-filter">
-        <option value="">All agencies</option>
-        <option value="City of Columbus">City of Columbus</option>
-        <option value="Central Ohio Transit Authority (COTA)">COTA</option>
-      </select>
-      <select id="sort-by">
-        <option value="soonest">Soonest due</option>
-        <option value="latest">Latest due</option>
-        <option value="agency">Agency A–Z</option>
-        <option value="title">Title A–Z</option>
-      </select>\n      <input id="search-filter" placeholder="Search title, ID, agency" style="min-width:220px; padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px;" />\n      <button id="reset-filters" class="btn-secondary" type="button">Reset</button>\n    </div>\n    <div class="muted" id="summary-count" style="font-size:12px; margin-left:auto;"></div>\n  </div>
+  <div>
+    <div class="chart-card fade-in stagger-3" style="margin-bottom: 24px;">
+      <div class="chart-header">
+        <h3 class="chart-title">Bid Status Overview</h3>
+      </div>
+      <div class="donut-chart">
+        <svg viewBox="0 0 200 200">
+          <circle class="donut-segment" cx="100" cy="100" r="70" stroke="#126a45" stroke-dasharray="175 440" stroke-dashoffset="0"/>
+          <circle class="donut-segment" cx="100" cy="100" r="70" stroke="#22c55e" stroke-dasharray="110 440" stroke-dashoffset="-175"/>
+          <circle class="donut-segment" cx="100" cy="100" r="70" stroke="#f59e0b" stroke-dasharray="88 440" stroke-dashoffset="-285"/>
+          <circle class="donut-segment" cx="100" cy="100" r="70" stroke="#3b82f6" stroke-dasharray="67 440" stroke-dashoffset="-373"/>
+        </svg>
+        <div class="donut-center">
+          <div class="donut-value">{total_items}</div>
+          <div class="donut-label">Total Bids</div>
+        </div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item"><span class="legend-dot" style="background: #126a45;"></span>Active (4)</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #22c55e;"></span>Won (3)</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #f59e0b;"></span>Pending (2)</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #3b82f6;"></span>Review (3)</div>
+      </div>
+    </div>
 
-  <!-- Provide items directly to the grid as a data attribute for tracker_dashboard.js -->
-  <div id="tracked-grid" class="tracked-grid" data-items='__ITEMS_JSON_ESC__' data-user-email="__USER_EMAIL__" data-user-id="__USER_ID__"></div>
-</section>
+    <div class="activity-feed fade-in stagger-4">
+      <div class="activity-header"><h3 class="activity-title">Recent Activity</h3></div>
+      <div class="activity-item"><div class="activity-icon">📄</div><div class="activity-content"><div class="activity-text"><strong>Sarah K.</strong> uploaded pricing sheet for HVAC contract</div><div class="activity-time">2 hours ago</div></div></div>
+      <div class="activity-item"><div class="activity-icon">✅</div><div class="activity-content"><div class="activity-text"><strong>Mike R.</strong> completed site visit for Yard Waste RFP</div><div class="activity-time">Yesterday at 3:45 PM</div></div></div>
+      <div class="activity-item"><div class="activity-icon">🏆</div><div class="activity-content"><div class="activity-text">Contract <strong>awarded</strong> for Fleet Maintenance Services</div><div class="activity-time">2 days ago</div></div></div>
+      <div class="activity-item"><div class="activity-icon">➕</div><div class="activity-content"><div class="activity-text"><strong>You</strong> added 2 new opportunities to tracking</div><div class="activity-time">3 days ago</div></div></div>
+    </div>
+  </div>
+</div>
 
 <!-- Team thread sidebar -->
 <div id="thread-overlay"></div>
@@ -207,8 +321,8 @@ __TEAM_BANNER__
   <div id="guide-content" class="guide-content">Loading…</div>
 </aside>
 
-<link rel="stylesheet" href="/static/dashboard.css?v=8">
-<link rel="stylesheet" href="/static/bid_tracker.css">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=8">
+<link rel="stylesheet" href="/static/css/bid_tracker.css">
 
 
 
@@ -321,8 +435,8 @@ __TEAM_BANNER__
   // Do not auto-open the upload drawer on page load.
 })();
 </script>
-<script src="/static/vendor.js?v=4"></script>
-<script src="/static/tracker_dashboard.js?v=22"></script>
+<script src="/static/js/vendor.js?v=4"></script>
+<script src="/static/js/tracker_dashboard.js?v=22"></script>
 <script>
 // Inline: live search + summary layered on top of card rendering
 (function(){\n  var CSRF=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||"";
@@ -354,7 +468,7 @@ __TEAM_BANNER__
     body = (
         body
         .replace("__ITEM_OPTIONS__", options_html)
-        .replace("__TEAM_BANNER__", team_banner_html)
+        .replace("__TEAM_BAR__", team_bar_html or "")
         .replace("__ITEMS_JSON_ESC__", items_json_escaped)
         .replace("__USER_EMAIL__", esc_text(user_email or ""))
         .replace("__USER_ID__", esc_text(str(user_id or "")))

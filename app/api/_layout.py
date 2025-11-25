@@ -9,16 +9,16 @@ from app.core.settings import settings
 def _nav_links_html(user_email: Optional[str]) -> str:
     if user_email:
         return """
-        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-overview.png" alt=""></span><span class="nav-text">Overview</span></a>
-        <a href="/opportunities" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-opportunities.png" alt=""></span><span class="nav-text">Open Opportunities</span></a>
-        <a href="/tracker/dashboard" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-dashboard.png" alt=""></span><span class="nav-text">My Dashboard</span></a>
-        <a href="/account" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-account.png" alt=""></span><span class="nav-text">My Account</span></a>
+        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-overview.png" alt=""></span><span class="nav-text">Overview</span></a>
+        <a href="/opportunities" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-opportunities.png" alt=""></span><span class="nav-text">Open Opportunities</span></a>
+        <a href="/tracker/dashboard" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-dashboard.png" alt=""></span><span class="nav-text">My Dashboard</span></a>
+        <a href="/account" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-account.png" alt=""></span><span class="nav-text">My Account</span></a>
         """
     else:
         return """
-        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-home.png" alt=""></span><span class="nav-text">Home</span></a>
-        <a href="/signup" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-signup.png" alt=""></span><span class="nav-text">Sign up</span></a>
-        <a href="/login" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/nav-login.png" alt=""></span><span class="nav-text">Sign in</span></a>
+        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-home.png" alt=""></span><span class="nav-text">Home</span></a>
+        <a href="/signup" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-signup.png" alt=""></span><span class="nav-text">Sign up</span></a>
+        <a href="/login" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-login.png" alt=""></span><span class="nav-text">Sign in</span></a>
         """
 
 
@@ -290,14 +290,14 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
-<link rel="stylesheet" href="/static/base.css">
-<link rel="stylesheet" href="/static/pages.css">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/pages.css">
 </head>
 <body>
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <img src="/static/logo.svg" alt="EasyRFP" />
+            <img src="/static/img/logo.svg" alt="EasyRFP" />
             <span></span>
         </div>
         <div class="nav-label">Navigation</div>
@@ -319,7 +319,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     </div>
     <div class="topbar-right">
         <button class="icon-btn" type="button" aria-label="Notifications" id="notif-btn">
-            <img src="/static/bell.png" alt="" class="icon-img"><span class="notif-dot" aria-hidden="true"></span>
+            <img src="/static/img/bell.png" alt="" class="icon-img"><span class="notif-dot" aria-hidden="true"></span>
         </button>
         <div class="top-dropdown">
             <button class="icon-btn" type="button" aria-label="Help" id="help-btn">?</button>
@@ -431,3 +431,153 @@ __NOTIF_JS__
         .replace("__NOTIF_JS__", notif_js)
     )
     return html
+
+
+def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
+    """
+    Lightweight landing-page shell (no sidebar) styled by marketing.css.
+    """
+    # Always send primary CTA to signup to avoid jumping users past the flow.
+    cta_url = "/signup"
+    login_url = "/login?next=/tracker/dashboard"  # always go to login first
+    hero_cta = "Sign Up"
+    template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>__TITLE__</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/marketing.css">
+</head>
+<body class="marketing-body">
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="10" fill="url(#gradient)"/>
+          <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#126a45"/>
+              <stop offset="100%" stop-color="#0f8b5a"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="brand-text">EasyRFP</span>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#coverage" class="nav-link">Coverage</a>
+        <a href="#pricing" class="nav-link">Pricing <span class="dropdown-arrow">∨</span></a>
+        <a href="#details" class="nav-link">Resources</a>
+        <a href="#contact" class="nav-link">Help</a>
+      </div>
+      <div class="nav-actions">
+        <a href="__LOGIN_URL__" class="btn-ghost">Log In</a>
+        <a href="__CTA_URL__" class="btn-primary">__HERO_CTA__</a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    __BODY__
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="10" fill="url(#gradient2)"/>
+            <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="gradient2" x1="0" y1="0" x2="40" y2="40">
+                <stop offset="0%" stop-color="#126a45"/>
+                <stop offset="100%" stop-color="#0f8b5a"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="brand-text">EasyRFP</span>
+        </div>
+        <div class="footer-links">
+          <a href="/privacy" class="footer-link">Privacy</a>
+          <span class="footer-dot">&middot;</span>
+          <a href="/terms" class="footer-link">Terms</a>
+          <span class="footer-dot">&middot;</span>
+          <a href="#contact" class="footer-link">Contact</a>
+          <span class="footer-dot">&middot;</span>
+          <a href="#coverage" class="footer-link">Request Portal</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/marketing.js"></script>
+</body>
+</html>
+    """
+    return (
+        template.replace("__TITLE__", title)
+        .replace("__BODY__", body_html)
+        .replace("__CTA_URL__", cta_url)
+        .replace("__LOGIN_URL__", login_url)
+        .replace("__HERO_CTA__", hero_cta)
+    )
+
+
+def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: str = "") -> str:
+    """
+    Minimal shell for auth pages (no sidebar/top nav), keeps brand.
+    """
+    wrapper_cls = f"auth-wrapper {wrapper_class}".strip()
+    card_cls = f"auth-card {card_class}".strip()
+    template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>__TITLE__</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/auth.css">
+</head>
+<body class="auth-body">
+  <div class="__WRAPPER__">
+    <div class="auth-brand">
+      <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="10" fill="url(#gradient)"/>
+        <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+            <stop offset="0%" stop-color="#126a45"/>
+            <stop offset="100%" stop-color="#0f8b5a"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="brand-text">EasyRFP</span>
+    </div>
+    <div class="__CARD__">
+      __BODY__
+    </div>
+    <div class="auth-footer-links">
+      <a href="/">Back to homepage</a>
+      <span>&middot;</span>
+      <a href="/privacy">Privacy</a>
+      <span>&middot;</span>
+      <a href="/terms">Terms</a>
+    </div>
+  </div>
+</body>
+</html>
+    """
+    return (
+        template.replace("__TITLE__", title)
+        .replace("__BODY__", body_html)
+        .replace("__WRAPPER__", wrapper_cls)
+        .replace("__CARD__", card_cls)
+    )

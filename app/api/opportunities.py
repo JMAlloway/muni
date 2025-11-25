@@ -759,15 +759,15 @@ document.addEventListener('click', async (e) => {
     </div>
 
     {modal_js}
-    <link rel="stylesheet" href="/static/vendor.css">
-    <link rel="stylesheet" href="/static/highlight.css">
-    <link rel="stylesheet" href="/static/bid_tracker.css">
-    <link rel="stylesheet" href="/static/opportunities.css"> 
+    <link rel="stylesheet" href="/static/css/vendor.css">
+    <link rel="stylesheet" href="/static/css/highlight.css">
+    <link rel="stylesheet" href="/static/css/bid_tracker.css">
+    <link rel="stylesheet" href="/static/css/opportunities.css"> 
 
-    <script src="/static/vendor.js"></script>
-    <script src="/static/highlight.js"></script>
-    <script src="/static/rfq_modal.js"></script>
-    <script src="/static/bid_tracker.js"></script>
+    <script src="/static/js/vendor.js"></script>
+    <script src="/static/js/highlight.js"></script>
+    <script src="/static/js/rfq_modal.js"></script>
+    <script src="/static/js/bid_tracker.js"></script>
 
     """
 
