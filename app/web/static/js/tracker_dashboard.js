@@ -1,10 +1,90 @@
 (function () {
   function getCSRF(){ try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || null; } catch(_) { return null; } }
 
+  // Lightweight upload drawer: prompts for files and POSTs to /uploads/add
+  // then refreshes the current view. Exposed globally for reuse.
+  window.openUploadDrawer = window.openUploadDrawer || (it => {
+    const oid = it && it.opportunity_id ? String(it.opportunity_id) : "";
+    if (!oid) {
+      alert("Missing opportunity id for upload.");
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      const fd = new FormData();
+      fd.append("opportunity_id", oid);
+      files.forEach(f => fd.append("files", f, f.name));
+      try {
+        const res = await fetch("/uploads/add", {
+          method: "POST",
+          credentials: "include",
+          headers: { "X-CSRF-Token": getCSRF() || "" },
+          body: fd
+        });
+        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+        // optimistic refresh of files for this card if expanded
+        fileCache[oid] = null; // force refetch on next expand
+        alert("Upload complete.");
+      } catch (err) {
+        console.error(err);
+        alert("Upload failed. Please try again.");
+      }
+    };
+    input.click();
+  });
+
   const grid = document.getElementById("tracked-grid");
   let items = JSON.parse(grid.getAttribute("data-items") || "[]");
   const currentUserEmail = (grid.getAttribute("data-user-email") || "").toLowerCase();
   const currentUserId = parseInt(grid.getAttribute("data-user-id") || "", 10) || null;
+  const checklistKey = (oid) => `checklist_${oid}`;
+  const checklistSteps = [
+    "Downloaded RFP documents",
+    "Reviewed requirements",
+    "Prepared pricing sheet",
+    "Final review & submit"
+  ];
+  const checklistState = {};
+  const fileCache = {};
+
+  function loadChecklist(oid){
+    if (checklistState[oid]) return checklistState[oid];
+    try {
+      const raw = localStorage.getItem(checklistKey(oid));
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length === checklistSteps.length) {
+          checklistState[oid] = arr.map(v=>!!v);
+          return checklistState[oid];
+        }
+      }
+    } catch(_){}
+    checklistState[oid] = Array(checklistSteps.length).fill(false);
+    return checklistState[oid];
+  }
+  function saveChecklist(oid, state){
+    checklistState[oid] = state.slice();
+    try { localStorage.setItem(checklistKey(oid), JSON.stringify(state)); } catch(_){}
+  }
+
+  async function fetchFilesList(oid){
+    if (!oid) return [];
+    if (fileCache[oid]) return fileCache[oid];
+    try {
+      const res = await fetch(`/uploads/list/${oid}`, { credentials:'include' });
+      if (res.ok) {
+        const data = await res.json();
+        fileCache[oid] = Array.isArray(data) ? data : [];
+        return fileCache[oid];
+      }
+    } catch(_){}
+    fileCache[oid] = [];
+    return [];
+  }
 
   const selStatus = document.getElementById("status-filter");
   const selAgency = document.getElementById("agency-filter");
@@ -115,7 +195,9 @@
     try { return new Date(iso).toLocaleString(undefined,{month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}); } catch(_) { return ""; }
   }
   function escHtml(str){
-    return (str||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c));
+    return (str||"").replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c;
+    });
   }
   function highlightMentions(str){
     return escHtml(str).replace(/@([a-zA-Z0-9._-]+)/g, '<span class="mention">@$1</span>');
@@ -248,22 +330,30 @@
   if (closeThreadBtn) closeThreadBtn.addEventListener('click', closeThread);
 
   function openUploads(it){
+    // Preferred: right-hand drawer exposed by the app shell
     if (window.openUploadDrawer) return window.openUploadDrawer(it);
-    // legacy fallback if drawer not present (kept for safety)
+
+    // Legacy fallback: try to target the existing upload form if present
     const labels = Array.from(document.querySelectorAll('.label'));
-    const lbl = labels.find(el => /Upload files to a tracked solicitation/i.test(el.textContent||''));
+    const lbl = labels.find(el => /Upload files to a tracked solicitation/i.test((el.textContent||'')));
     const card = lbl ? lbl.closest('.card') : null;
     const sel = document.getElementById('upload-target');
     if (card && sel) {
       card.style.display = '';
-      const oid = String(it.opportunity_id || '');
+      const oid = String(it?.opportunity_id || '');
       sel.value = oid;
       try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch(_) {}
       const dz = document.getElementById('dz');
       if (dz && dz.scrollIntoView) dz.scrollIntoView({ behavior:'smooth', block:'start' });
       return;
     }
-    if (window.trackAndOpenUploads) return window.trackAndOpenUploads(it.opportunity_id);
+
+    // Final fallback: open uploads list in same tab so auth/session is preserved
+    const oid = it && it.opportunity_id ? it.opportunity_id : null;
+    if (oid) {
+      window.location.href = `/uploads/list/${encodeURIComponent(oid)}`;
+      return;
+    }
     alert("Upload manager not available.");
   }
 
@@ -441,7 +531,10 @@
     sortItems(view);
     if (selSort.value === 'manual') applyManualOrder(view);
     const out = view.map(it=>{
-      const prog = computeProgress(it);
+      const checklist = loadChecklist(it.opportunity_id);
+      const completed = checklist.filter(Boolean).length;
+      const checklistProgress = Math.round((completed / checklistSteps.length) * 100);
+      const prog = checklistProgress;
       const filesLabel = (it.file_count||0) === 1 ? "1 file" : `${it.file_count||0} files`;
       const dueMs = it.due_date ? (new Date(it.due_date).getTime() - Date.now()) : null;
       const dueSoon = (dueMs !== null) && (dueMs < 7*24*60*60*1000) && (dueMs >= 0);
@@ -500,18 +593,22 @@
               <div class="detail-section checklist">
                 <h4>Checklist Progress</h4>
                 <ul class="checklist">
-                  <li class="done"><span class="check-icon">✓</span>Downloaded RFP documents</li>
-                  <li class="done"><span class="check-icon">✓</span>Reviewed requirements</li>
-                  <li class="done"><span class="check-icon">✓</span>Prepared pricing sheet</li>
-                  <li class="pending"><span class="check-icon">○</span>Final review & submit</li>
+                  ${checklistSteps.map((step, idx) => {
+                    const done = checklist[idx];
+                    return `<li class="${done ? 'done' : 'pending'}" data-action="toggle-step" data-oid="${it.opportunity_id}" data-step="${idx}">
+                      <span class="check-icon">${done ? '✓' : '○'}</span>${escHtml(step)}
+                    </li>`;
+                  }).join("")}
                 </ul>
               </div>
               <div class="detail-section files">
                 <h4>Attached Files</h4>
-                <div class="file-chips">
-                  <a class="file-chip" href="${it.source_url || "#"}" target="_blank">RFP_Document.pdf</a>
-                  <a class="file-chip" href="${it.source_url || "#"}" target="_blank">Pricing_Sheet.xlsx</a>
-                  <a class="file-chip" href="${it.source_url || "#"}" target="_blank">Technical_Proposal.docx</a>
+                <div class="file-chips" data-files-for="${it.opportunity_id}">
+                  ${(fileCache[it.opportunity_id] || []).slice(0,4).map(f=>{
+                    const name = escHtml(f.filename || f.name || 'File');
+                    const url = escHtml(f.download_url || f.url || '#');
+                    return `<a class="file-chip" href="${url}" target="_blank">${name}</a>`;
+                  }).join("") || '<div class="muted">No files yet.</div>'}
                 </div>
               </div>
               <div class="detail-section actions">
@@ -521,6 +618,7 @@
                   <button class="action-btn" data-action="upload" data-oid="${it.opportunity_id}">Upload Document</button>
                   <button class="action-btn" data-action="guide" data-oid="${it.opportunity_id}">View Requirements</button>
                   <button class="action-btn" data-action="open-thread" data-oid="${it.opportunity_id}">Team Thread</button>
+                  <button class="action-btn" data-action="remove" data-oid="${it.opportunity_id}">Archive</button>
                 </div>
               </div>
             </div>
@@ -531,6 +629,21 @@
 
     grid.innerHTML = out.length ? out.join("") : `<div class="muted">Nothing tracked yet. Go to <a href="/opportunities">Opportunities</a> and click "Track".</div>`;
     updateSummary(view);
+    // load files for expanded cards
+    view.forEach(it=>{
+      if (expandedState[it.opportunity_id] && !fileCache[it.opportunity_id]) {
+        fetchFilesList(it.opportunity_id).then((files)=>{
+          const wrap = document.querySelector(`[data-files-for="${it.opportunity_id}"]`);
+          if (wrap) {
+            wrap.innerHTML = (files || []).slice(0,4).map(f=>{
+              const name = escHtml(f.filename || f.name || 'File');
+              const url = escHtml(f.download_url || f.url || '#');
+              return `<a class="file-chip" href="${url}" target="_blank">${name}</a>`;
+            }).join("") || '<div class="muted">No files yet.</div>';
+          }
+        }).catch(()=>{});
+      }
+    });
   }
 
   selStatus.addEventListener("change", render);
@@ -669,6 +782,14 @@
     if (action === 'remove') return removeTracker(it);
     if (action === 'upload') return openUploads(it);
     if (action === 'guide') return openGuide(it);
+    if (action === 'toggle-step') {
+      const stepIdx = parseInt(btn.getAttribute('data-step'), 10);
+      if (isNaN(stepIdx)) return;
+      const state = loadChecklist(oid).slice();
+      state[stepIdx] = !state[stepIdx];
+      saveChecklist(oid, state);
+      return render();
+    }
   });
 
   grid.addEventListener("change", function(e){

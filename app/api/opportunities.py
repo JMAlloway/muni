@@ -264,51 +264,47 @@ async def opportunities(request: Request):
 
     # -------- build HTML table rows --------
     table_rows_html = []
+    source_icon = """
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+  <polyline points="15 3 21 3 21 9"/>
+  <line x1="10" y1="14" x2="21" y2="3"/>
+</svg>
+""".strip()
+    track_icon = """
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+</svg>
+""".strip()
 
     for opp_id, external_id, title, agency, due, url, status, category, date_added in rows:
-        # format due date (human-friendly and color-coded)
-        # format due date (human-friendly and color-coded)
-        due_str = "-"
+        due_date_str = "-"
+        due_time_str = ""
+        due_cell_class = "due-cell"
         if due:
             try:
-                # Normalize to datetime
                 if hasattr(due, "strftime"):
                     d = due
                 else:
                     d = dt.datetime.fromisoformat(str(due).split(".")[0].replace("Z", ""))
-
-                # Build readable string
-                date_part = d.strftime("%a, %b %d")
+                due_date_str = d.strftime("%a, %b %d")
                 show_time = not (getattr(d, "hour", 0) == 0 and getattr(d, "minute", 0) == 0)
                 if show_time:
-                    time_part = d.strftime("%I:%M %p").lstrip("0")
-                    due_str = f"{date_part} - {time_part}"
-                else:
-                    due_str = date_part
-
-                # Urgency class
+                    due_time_str = d.strftime("%I:%M %p").lstrip("0")
                 today = dt.datetime.utcnow().date()
                 days = (d.date() - today).days
-                if days < 0:
-                    due_class = "due-past"
-                elif days == 0:
-                    due_class = "due-today"
-                elif days <= 7:
-                    due_class = "due-soon"
-                else:
-                    due_class = "due-later"
+                if days <= 7:
+                    due_cell_class += " urgent"
             except Exception:
-                # Fallback to raw
-                due_str = str(due)
-                due_class = "due-later"
+                due_date_str = _esc_attr(str(due))
+                due_time_str = ""
 
-        # date_added short
+        date_added_str = "-"
         if date_added:
             try:
                 if hasattr(date_added, "strftime"):
                     date_added_str = date_added.strftime("%b %d")
                 else:
-        # Track button: use data-* (no inline JS)
                     try:
                         da = dt.datetime.fromisoformat(str(date_added).split(".")[0].replace("Z", ""))
                         date_added_str = da.strftime("%b %d")
@@ -317,7 +313,6 @@ async def opportunities(request: Request):
             except Exception:
                 date_added_str = "-"
         
-        # fallback URL logic (you already have this dict higher up)
         fallback_url = agency_fallback_urls.get(agency or "")
 
         def is_bad(u: str) -> bool:
@@ -329,71 +324,68 @@ async def opportunities(request: Request):
             return (u.startswith("javascript:") or u == "#" or u == "about:blank")
 
         if url and not is_bad(url):
-            link_html = (
-                f"<a href='{_esc_attr(url)}' target='_blank' "
-                "style='color:var(--accent-text);text-decoration:underline;'>Open</a>"
-            )
+            action_link = f"<a class='action-link' href='{_esc_attr(url)}' target='_blank' title='View source'>{source_icon}</a>"
         elif fallback_url:
-            label = (
-                f"Open list (find {_esc_attr(external_id)})"
-                if (agency or "").lower().find("cota") >= 0 and external_id
-                else "Open list"
-            )
-            link_html = (
-                f"<a href='{_esc_attr(fallback_url)}' target='_blank' "
-                f"style='color:var(--accent-text);text-decoration:underline;'>{label}</a>"
-            )
+            action_link = f"<a class='action-link' href='{_esc_attr(fallback_url)}' target='_blank' title='Open source list'>{source_icon}</a>"
         else:
-            link_html = "-"
-        # RFQ detail trigger: use data-* (no inline JS)
-        if external_id:
-            rfq_html = (
-                "<button class='rfq-btn' "
-                f"data-ext='{_esc_attr(external_id)}' "
-                f"data-agency='{_esc_attr(agency or '')}' "
-                "style=\"all:unset; cursor:pointer; color:var(--accent-text); "
-                "text-decoration:underline; font-weight:500;\">"
-                f"{_esc_attr(external_id)} &#8595;</button>"
-            )
-        else:
-            rfq_html = "-"
-        # vendor guide (keep for Columbus)
-        vendor_html = ""
-        if agency == "City of Columbus":
-            vendor_html = (
-                "<button class='vendor-guide-btn' data-agency='city-of-columbus' "
-                "style=\"all:unset; cursor:pointer; color:var(--accent-text); text-decoration:underline;\">"
-                "How to bid</button>"
-            )
+            action_link = "<span class='action-link' style='opacity:.4;cursor:not-allowed;'>?</span>"
 
-        # Ã¢Å“... Track button: use data-* (no inline JS)
-        # Track button: use data-* (no inline JS)
+        if external_id:
+            solicitation_html = (
+                "<button class='rfq-btn solicitation-id' "
+                f"data-ext='{_esc_attr(external_id)}' "
+                f"data-agency='{_esc_attr(agency or '')}'>"
+                f"{_esc_attr(external_id)}</button>"
+            )
+        else:
+            solicitation_html = "<span class='solicitation-id'>-</span>"
+
         track_btn_html = (
             "<button class='track-btn' "
             f"data-opp-id='{opp_id}' "
             f"data-ext='{_esc_attr(external_id or '')}' "
-            "style='background:#2563eb;color:#fff;border:0;padding:6px 10px;"
-            "border-radius:6px;cursor:pointer;'>Track</button>"
+            "title='Track this bid'>"
+            f"{track_icon}</button>"
         )
-        # build row
-        row_html = (
-            f"<tr data-opp-id='{opp_id}' data-external-id='{_esc_attr(external_id or '')}' data-agency='{_esc_attr(agency or '')}'>"
-            f"<td class='w-140'><span style='font-weight:500;'>{rfq_html}</span></td>"
-            f"<td class='w-280'><a href='/opportunity/{opp_id}' style='color:var(--accent-text);text-decoration:none;'>{_esc_attr(title or '')}</a></td>"
-            f"<td class='w-160 muted'>{_esc_attr(agency or '')}</td>"
-            f"<td class='w-140 muted'>{date_added_str}</td>"
-            f"<td class='w-140'><span class='due-badge {due_class}'>{due_str}</span></td>"
-            f"<td><span class='pill'>{_esc_attr(_norm_status(status))}</span></td>"
-            f"<td class='w-120'>{link_html}</td>"
-            f"<td class='w-140'>{track_btn_html}</td>"
-            "</tr>"
-        )
+
+        status_txt = _norm_status(status)
+        status_class = "open" if status_txt.lower().startswith("open") else "closed"
+
+        row_html = f"""
+        <tr class="row-animate" data-opp-id="{opp_id}" data-external-id="{_esc_attr(external_id or '')}" data-agency="{_esc_attr(agency or '')}">
+          <td class="col-solicitation">{solicitation_html}</td>
+          <td class="col-title">
+            <div class="title-cell">
+              <a class="title-text" href="/opportunity/{opp_id}">{_esc_attr(title or '')}</a>
+              <span class="title-meta">{_esc_attr(category or '')}</span>
+            </div>
+          </td>
+          <td class="col-agency">
+            <div class="agency-cell">
+              <span class="agency-name">{_esc_attr(agency or '')}</span>
+            </div>
+          </td>
+          <td class="col-added">{date_added_str}</td>
+          <td class="col-due">
+            <div class="{due_cell_class}">
+              <span class="due-date">{due_date_str}</span>
+              <span class="due-time">{due_time_str}</span>
+            </div>
+          </td>
+          <td class="col-status">
+            <span class="status-badge {status_class}">{_esc_attr(status_txt)}</span>
+          </td>
+          <td class="col-actions">
+            <div class="action-buttons">
+              {action_link}
+              {track_btn_html}
+            </div>
+          </td>
+        </tr>
+        """
 
         table_rows_html.append(row_html)
-
-
-
-    # -------- filter form HTML --------
+# -------- filter form HTML --------
     agency_options_html = [
         f"<option value='' {'selected' if not agency_filter else ''}>All agencies</option>"
     ]
@@ -514,7 +506,7 @@ async def opportunities(request: Request):
             parts.append(f"due_within={due_within}")
         if sort_by:
             parts.append(f"sort_by={sort_by}")
-        if 'status_filter' in locals() and status_filter:
+        if status_filter:
             parts.append(f"status={status_filter}")
         return "/opportunities?" + "&".join(parts)
 
@@ -522,47 +514,208 @@ async def opportunities(request: Request):
     start_page = max(1, page - window_radius)
     end_page = min(total_pages, page + window_radius)
 
-    page_links_html_parts = []
-
-    # prev
+    # new pagination buttons (styled)
+    pagination_btns = []
     if page > 1:
-        page_links_html_parts.append(
-            f"<a class='page-link' href='{page_href(page-1)}'>&larr; Prev</a>"
-        )
+        pagination_btns.append(f'<button class="page-btn" onclick="window.location=\'{page_href(page-1)}\'">Prev</button>')
     else:
-        page_links_html_parts.append(
-            "<span class='page-link disabled'>&larr; Prev</span>"
-        )
+        pagination_btns.append('<button class="page-btn" disabled>Prev</button>')
 
-    # page nums
-    for p in range(start_page, end_page + 1):
-        if p == page:
-            page_links_html_parts.append(
-                f"<span class='page-link current'>{p}</span>"
-            )
+    for pnum in range(start_page, end_page + 1):
+        if pnum == page:
+            pagination_btns.append(f'<button class="page-btn active" disabled>{pnum}</button>')
         else:
-            page_links_html_parts.append(
-                f"<a class='page-link' href='{page_href(p)}'>{p}</a>"
-            )
+            pagination_btns.append(f'<button class="page-btn" onclick="window.location=\'{page_href(pnum)}\'">{pnum}</button>')
 
-    # next
     if page < total_pages:
-        page_links_html_parts.append(
-            f"<a class='page-link' href='{page_href(page+1)}'>Next &rarr;</a>"
-        )
+        pagination_btns.append(f'<button class="page-btn" onclick="window.location=\'{page_href(page+1)}\'">Next</button>')
     else:
-        page_links_html_parts.append(
-            "<span class='page-link disabled'>Next &rarr;</span>"
-        )
+        pagination_btns.append('<button class="page-btn" disabled>Next</button>')
 
-    pagination_bar_html = (
-        "<div class='pagination-bar'>"
-        + "".join(page_links_html_parts)
-        + f"<span class='muted' style='margin-left:auto;'>"
-        f"Page {page} of {total_pages} &middot; {total_count} total"
-        f"</span>"
-        + "</div>"
-    )
+    pagination_html = "<div class='pagination'>" + "".join(pagination_btns) + "</div>"
+
+    # --- redesigned stats + filters + table markup ---
+    tracking_count = len(rows)
+    stats_html = f"""
+    <div class="stats-row fade-in">
+      <div class="stat-card">
+        <div class="stat-icon open">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{open_count}</span>
+          <span class="stat-label">Open Bids</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon agencies">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 21h18"/>
+            <path d="M5 21V7l8-4v18"/>
+            <path d="M19 21V11l-6-4"/>
+            <path d="M9 9v.01"/>
+            <path d="M9 12v.01"/>
+            <path d="M9 15v.01"/>
+            <path d="M9 18v.01"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{agency_count}</span>
+          <span class="stat-label">Agencies</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon deadline">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value date">{next_due_str}</span>
+          <span class="stat-label">Next Due Date</span>
+        </div>
+      </div>
+      <div class="stat-card featured">
+        <div class="stat-icon tracking">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{tracking_count}</span>
+          <span class="stat-label">Tracking</span>
+        </div>
+      </div>
+    </div>
+    """
+
+    filters_html = f"""
+    <div class="filters-card fade-in">
+      <div class="filters-header">
+        <h3 class="filters-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Filters
+        </h3>
+        <a class="reset-btn" href="/opportunities">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+          Reset
+        </a>
+      </div>
+      <form method="GET" action="/opportunities">
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label class="filter-label">Agency</label>
+            <div class="select-wrapper">
+              <select class="filter-select" name="agency">{''.join(agency_options_html)}</select>
+              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Search title</label>
+            <div class="search-wrapper">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input class="filter-input" type="text" name="search" value="{_esc_attr(search_filter)}" placeholder="e.g. HVAC, roofing, IT services..." />
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Specialties</label>
+            <div class="select-wrapper">
+              <input class="filter-input" type="text" name="tags" value="{_esc_attr(tags_value)}" placeholder="hvac, paving, it" />
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Due within</label>
+            <div class="select-wrapper">
+              <select class="filter-select" name="due_within">{''.join(duewithin_options_html)}</select>
+              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="filters-footer">
+          <div class="status-toggle">
+            <label class="toggle-label">
+              <input type="checkbox" name="status" value="open" {'checked' if status_filter=='open' else ''}/>
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">Open only</span>
+            </label>
+          </div>
+          <div class="sort-group">
+            <span class="filter-label">Sort by</span>
+            <div class="select-wrapper small">
+              <select class="filter-select" name="sort_by">{''.join(sort_options_html)}</select>
+              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+          <button class="apply-btn" type="submit">
+            Apply filters
+          </button>
+        </div>
+      </form>
+    </div>
+    """
+
+    showing_start = offset + 1 if rows else 0
+    showing_end = offset + len(rows)
+
+    table_html = f"""
+    <div class="table-card fade-in">
+      <div class="table-header">
+        <div class="results-count">Showing <strong>{showing_start}-{showing_end}</strong> of {total_count} results</div>
+        <div class="table-actions">
+          <button class="table-action-btn" type="button" onclick="window.location='/opportunities/export'" aria-label="Export results">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14"/><path d="M5 12l7 7 7-7"/><path d="M5 5h14"/>
+            </svg>
+            Export
+          </button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="opportunities-table">
+          <thead>
+            <tr>
+              <th>Solicitation #</th>
+              <th>Title</th>
+              <th>Agency</th>
+              <th>Date Added</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='7' class='muted'>No results found.</td></tr>"}
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <div class="pagination-info">Page {page} of {total_pages}</div>
+        {pagination_html}
+      </div>
+    </div>
+    """
+
     # -------- modal HTML + JS --------
     # NOTE: this is a plain triple-quoted string, not an f-string,
     # so we can safely use JS template literals (${...}) inside it.
@@ -615,7 +768,7 @@ async def opportunities(request: Request):
 <div id="rfq-modal-overlay" style="display:none;">
   <div id="rfq-modal-card">
     <button onclick="closeDetailModal()" id="rfq-close">&times;</button>
-    <div id="rfq-modal-content">Loading…</div>
+    <div id="rfq-modal-content">Loading.</div>
   </div>
 </div>
 
@@ -642,17 +795,14 @@ async function openTrackerDrawer(oppId, extId) {
   document.getElementById('tracker-save-msg').textContent = '';
 
   try {
-    // 1) ensure row exists (idempotent)
     await api(`/tracker/${oppId}/track`, { method: 'POST' });
-
-    // 2) load existing values (now guaranteed to exist)
     const res = await api(`/tracker/${oppId}`);
     if (res.ok) {
       const t = await res.json();
       document.getElementById('tracker-status').value = t.status || 'prospecting';
       document.getElementById('tracker-notes').value  = t.notes  || '';
     }
-  } catch (_) { return; } // redirected if 401
+  } catch (_) { return; }
 
   document.getElementById('bid-drawer').classList.remove('hidden');
 }
@@ -670,7 +820,6 @@ document.addEventListener('click', async (e) => {
   }
   const track = e.target.closest('.track-btn');
   if (track) {
-    // Open the original tracker sidebar so users can set status/notes first
     openTrackerDrawer(track.dataset.oppId, track.dataset.ext || '');
     return;
   }
@@ -694,82 +843,45 @@ document.addEventListener('click', async (e) => {
 </script>
 
 """
-    # -------- final page HTML --------
+
     body_html = f"""
-    <div style="display:flex; gap:18px; align-items:flex-start;">
-        <!-- LEFT: main content -->
-        <div style="flex:1 1 auto; min-width:0;">
-            <section class="card">
-                <h2 class="section-heading">Open Opportunities</h2>
-                <p class="subtext">
-                    Live feed from municipal procurement portals. Sorted by soonest due date.
-                    Updated automatically every few hours.
-                </p>
-
-                {stats_html}
-                {body_filter_html}
-
-                <div class="table-wrap">
-                    <table>
-                    <thead>
-                        <tr>
-                            <th class="w-140">Solicitation #</th>
-                            <th class="w-280">Title</th>
-                            <th class="w-160">Agency</th>
-                            <th class="w-140">Date Added</th>
-                            <th class="w-140">Due Date</th>
-                            <th class="w-80">Status</th>
-                            <th class="w-120">Source Link</th>
-                            <th class="w-140">Track</th>
-                        </tr>
-                        </thead>
-
-                    <tbody>
-                        {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='8' class='muted'>No results found.</td></tr>"
-}
-                    </tbody>
-                </table>
-                </div>
-
-                {pagination_bar_html}
-            </section>
-
-            <section class="card">
-                <div class="mini-head">Coverage (pilot)</div>
-                <div class="mini-desc">
-                    City of Columbus, COTA, Gahanna, Grove City, and Delaware County sources are live.
-                    You can filter, sort, and target deadlines.
-                </div>
-            </section>
-        </div>
+<main class="page">
+  <div class="page-header fade-in">
+    <div class="page-title-section">
+      <h1 class="page-title">Open Opportunities</h1>
+      <p class="page-subtitle">Live feed from municipal procurement portals. Updated automatically every few hours.</p>
     </div>
+  </div>
+  {stats_html}
+  {filters_html}
+  {table_html}
+</main>
 
-    
-    <!-- vendor sidebar markup -->
-    <div id="vendor-overlay" onclick="closeVendorGuide()"></div>
-    <div id="vendor-guide-panel">
-      <div id="vendor-guide-header">
-        <div>
-          <h2>How to bid</h2>
-          <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
-        </div>
-        <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">Ãƒâ€”</button>
-        <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">&times;</button>
-      <div id="vendor-guide-content">Loading…</div>
+<!-- vendor sidebar markup -->
+<div id="vendor-overlay" onclick="closeVendorGuide()"></div>
+<div id="vendor-guide-panel">
+  <div id="vendor-guide-header">
+    <div>
+      <h2>How to bid</h2>
+      <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
     </div>
+    <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">&times;</button>
+  </div>
+  <div id="vendor-guide-content">Loading...</div>
+</div>
 
-    {modal_js}
-    <link rel="stylesheet" href="/static/css/vendor.css">
-    <link rel="stylesheet" href="/static/css/highlight.css">
-    <link rel="stylesheet" href="/static/css/bid_tracker.css">
-    <link rel="stylesheet" href="/static/css/opportunities.css"> 
+{modal_js}
+<link rel="stylesheet" href="/static/css/vendor.css"> 
+<link rel="stylesheet" href="/static/css/highlight.css"> 
+<link rel="stylesheet" href="/static/css/bid_tracker.css"> 
+<link rel="stylesheet" href="/static/css/opportunities.css?v=2"> 
 
-    <script src="/static/js/vendor.js"></script>
-    <script src="/static/js/highlight.js"></script>
-    <script src="/static/js/rfq_modal.js"></script>
-    <script src="/static/js/bid_tracker.js"></script>
+<script src="/static/js/vendor.js"></script>
+<script src="/static/js/highlight.js"></script>
+<script src="/static/js/rfq_modal.js"></script>
+<script src="/static/js/bid_tracker.js"></script>
 
-    """
+"""
 
     return HTMLResponse(
         page_shell(
@@ -778,19 +890,3 @@ document.addEventListener('click', async (e) => {
             user_email=user_email,
         )
     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

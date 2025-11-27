@@ -199,6 +199,7 @@ from app.api import (
     admin,
     billing,
     columbus_detail,
+    documents,
     cota_detail,
     gahanna_detail,
     columbus_airports_detail,
@@ -232,6 +233,7 @@ app.include_router(zip_router)
 app.include_router(opportunity_web.router)
 app.include_router(notifications.router)
 app.include_router(calendar.router)
+app.include_router(documents.router)
 app.include_router(unsubscribe.router)
 app.include_router(columbus_detail.router)
 app.include_router(cota_detail.router)

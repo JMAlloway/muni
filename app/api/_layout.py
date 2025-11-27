@@ -9,18 +9,29 @@ from app.core.settings import settings
 def _nav_links_html(user_email: Optional[str]) -> str:
     if user_email:
         return """
-        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-overview.png" alt=""></span><span class="nav-text">Overview</span></a>
-        <a href="/opportunities" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-opportunities.png" alt=""></span><span class="nav-text">Open Opportunities</span></a>
-        <a href="/tracker/dashboard" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-dashboard.png" alt=""></span><span class="nav-text">My Dashboard</span></a>
-        <a href="/account" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-account.png" alt=""></span><span class="nav-text">My Account</span></a>
+        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true">🏠</span><span class="nav-text">Overview</span></a>
+        <a href="/opportunities" class="nav-link"><span class="nav-icon" aria-hidden="true">🧭</span><span class="nav-text">Open Opportunities</span></a>
+        <a href="/tracker/dashboard" class="nav-link"><span class="nav-icon" aria-hidden="true">📊</span><span class="nav-text">My Dashboard</span></a>
+        <a href="/documents" class="nav-link"><span class="nav-icon" aria-hidden="true">📁</span><span class="nav-text">Documents</span></a>
+        <a href="/calendar" class="nav-link"><span class="nav-icon" aria-hidden="true">🗓️</span><span class="nav-text">Calendar</span></a>
+        <a href="/account" class="nav-link"><span class="nav-icon" aria-hidden="true">👤</span><span class="nav-text">My Account</span></a>
         """
     else:
         return """
-        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-home.png" alt=""></span><span class="nav-text">Home</span></a>
-        <a href="/signup" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-signup.png" alt=""></span><span class="nav-text">Sign up</span></a>
-        <a href="/login" class="nav-link"><span class="nav-icon" aria-hidden="true"><img src="/static/img/nav-login.png" alt=""></span><span class="nav-text">Sign in</span></a>
+        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true">🏠</span><span class="nav-text">Home</span></a>
+        <a href="/signup" class="nav-link"><span class="nav-icon" aria-hidden="true">✨</span><span class="nav-text">Sign up</span></a>
+        <a href="/login" class="nav-link"><span class="nav-icon" aria-hidden="true">🔐</span><span class="nav-text">Sign in</span></a>
         """
 
+
+def _account_links_html() -> str:
+    return """
+        <div class="nav-label" style="margin-top: 24px;">Account</div>
+        <nav class="navlinks">
+            <a href="/account/settings" class="nav-link"><span class="nav-icon" aria-hidden="true">⚙️</span><span class="nav-text">Settings</span></a>
+            <a href="/support" class="nav-link"><span class="nav-icon" aria-hidden="true">💬</span><span class="nav-text">Support</span></a>
+        </nav>
+    """
 
 _TIER_ORDER = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
 
@@ -297,13 +308,23 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <img src="/static/img/logo.svg" alt="EasyRFP" />
-            <span></span>
+            <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+              <rect width="40" height="40" rx="12" fill="url(#grad1)"/>
+              <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <defs>
+                <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="40">
+                  <stop offset="0%" stop-color="#126a45"/>
+                  <stop offset="100%" stop-color="#22c55e"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <span>EasyRFP</span>
         </div>
-        <div class="nav-label">Navigation</div>
+        <div class="nav-label">Main Menu</div>
         <nav class="navlinks">
             __NAV__
         </nav>
+        __ACCOUNT__
     </aside>
     <div class="content">
         <div class="topbar" role="banner">
@@ -424,6 +445,7 @@ __NOTIF_JS__
     html = (
         template.replace("__TITLE__", title)
         .replace("__NAV__", nav_links)
+        .replace("__ACCOUNT__", _account_links_html())
         .replace("__TIER__", user_tier)
         .replace("__TEAM_BADGE__", team_badge)
         .replace("__AVATAR__", (user_email or "U")[:2].upper())

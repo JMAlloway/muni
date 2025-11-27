@@ -198,6 +198,245 @@ body.sidebar-collapsed .sidebar nav a.nav-link .nav-icon { margin-right:0; }
     color:#000;
 }
 
+/* --- Sidebar redesign to match homepage dashboard style --- */
+:root {
+    --nav-primary: #126a45;
+    --nav-primary-light: #1a8f5c;
+    --nav-primary-gradient: linear-gradient(135deg, #126a45 0%, #1a8f5c 50%, #22c55e 100%);
+    --nav-bg: #f5f9f6;
+    --nav-hover: rgba(18, 106, 69, 0.06);
+    --nav-border: #e2e8f0;
+    --nav-text: #000000;
+    --nav-text-dim: #1f2937;
+}
+
+.sidebar {
+    width: 260px;
+    background: var(--nav-bg);
+    border-right: 1px solid var(--nav-border);
+    padding: 24px 16px 28px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    box-shadow: inset -1px 0 0 rgba(255,255,255,0.6);
+}
+
+.sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, rgba(18,106,69,0.12), transparent);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.sidebar:hover::before { opacity: 1; }
+
+.sidebar .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 28px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 14px 30px rgba(12, 42, 32, 0.18);
+}
+
+.sidebar .brand svg {
+    flex-shrink: 0;
+    filter: drop-shadow(0 4px 12px rgba(18, 106, 69, 0.28));
+}
+
+.sidebar .brand span {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--nav-primary);
+    letter-spacing: -0.3px;
+}
+
+.nav-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.1px;
+    color: #94a3b8;
+    padding: 0 12px;
+    margin-bottom: 12px;
+}
+
+.navlinks {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    color: var(--nav-text);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.18s ease;
+    position: relative;
+    overflow: hidden;
+    border: none;
+    background: transparent;
+}
+
+.nav-link::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 4px;
+    height: 26px;
+    background: var(--nav-primary-gradient);
+    border-radius: 4px;
+    transition: transform 0.25s ease;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(18,106,69,0.12);
+    opacity: 0;
+    border-radius: 14px;
+    transition: opacity 0.15s ease;
+}
+
+.nav-link:hover {
+    color: var(--nav-text);
+    background: var(--nav-hover);
+}
+
+.nav-link.active,
+.nav-link.is-active {
+    color: var(--nav-primary);
+    font-weight: 700;
+    background: linear-gradient(90deg, rgba(18,106,69,0.18), rgba(18,106,69,0.08));
+    box-shadow: 0 10px 20px rgba(12, 42, 32, 0.12);
+}
+
+.nav-link.active::before,
+.nav-link.is-active::before {
+    transform: translateY(-50%) scaleY(1);
+}
+
+.nav-link.active::after,
+.nav-link.is-active::after {
+    opacity: 1;
+}
+
+.nav-icon {
+    font-size: 18px;
+    width: 24px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.nav-link img.nav-icon,
+.nav-link .nav-icon img {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    display: block;
+}
+
+.nav-link .nav-icon {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0;
+    color: inherit;
+}
+
+.nav-link.is-active {
+    color: var(--nav-primary);
+    font-weight: 700;
+}
+
+.nav-link.is-active::before {
+    transform: translateY(-50%) scaleY(1);
+}
+
+.nav-link.is-active::after {
+    opacity: 1;
+}
+
+.nav-text {
+    position: relative;
+    z-index: 1;
+}
+
+/* Override legacy sidebar link styling with the new palette */
+.sidebar nav a.nav-link {
+    color: var(--nav-text);
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.sidebar nav a.nav-link:hover {
+    color: var(--nav-text);
+    border: none;
+    box-shadow: none;
+}
+
+.sidebar nav a.nav-link.is-active,
+.sidebar nav a.nav-link.active {
+    color: var(--nav-primary);
+}
+
+.content {
+    margin-left: 260px;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 64px;
+    padding: 14px 8px;
+}
+
+body.sidebar-collapsed .sidebar .brand span,
+body.sidebar-collapsed .sidebar .nav-label,
+body.sidebar-collapsed .sidebar .nav-text {
+    display: none;
+}
+
+body.sidebar-collapsed .sidebar .brand {
+    justify-content: center;
+}
+
+body.sidebar-collapsed .sidebar nav a.nav-link {
+    justify-content: center;
+}
+
+body.sidebar-collapsed .sidebar nav a.nav-link .nav-icon {
+    margin-right: 0;
+}
+
+body.sidebar-collapsed .content {
+    margin-left: 64px;
+}
+
 .sidebar .nav-label {
     font-size:11px;
     letter-spacing:0.08em;
