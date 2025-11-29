@@ -329,15 +329,51 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
             log.error("Offline skeleton detected – no RFQ data available")
             return result
 
-        # Wait for modal to appear - use proper PowerApps modal selector
+        # Wait for modal to appear - try multiple selectors
         log.info("Waiting for modal to appear...")
-        modal = wait.until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, "div[role='dialog'], div[aria-modal='true']"))
-        )
-        log.info("Modal found and visible!")
+        modal = None
 
-        # Wait a bit for async content to populate
-        time.sleep(1.5)
+        # Try multiple selectors in order of preference
+        selectors = [
+            "div[role='dialog']",
+            "div[aria-modal='true']",
+            "#myModal",
+            ".modal[style*='display: block']",
+            ".modal.show",
+            "div.modal",
+        ]
+
+        for selector in selectors:
+            try:
+                log.info(f"Trying modal selector: {selector}")
+                modal = WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                )
+                log.info(f"Modal found with selector: {selector}")
+                break
+            except Exception as e:
+                log.info(f"Selector {selector} failed: {e}")
+                continue
+
+        if not modal:
+            log.error("Could not find modal with any selector")
+
+            # Debug: log all divs with class containing 'modal' or 'dialog'
+            try:
+                all_divs = driver.find_elements(By.CSS_SELECTOR, "div[class*='modal'], div[class*='dialog'], div[id*='modal'], div[id*='dialog']")
+                log.info(f"Found {len(all_divs)} divs with 'modal' or 'dialog' in class/id:")
+                for div in all_divs[:10]:  # Log first 10
+                    div_id = div.get_attribute("id") or "(no id)"
+                    div_class = div.get_attribute("class") or "(no class)"
+                    div_style = div.get_attribute("style") or "(no style)"
+                    log.info(f"  - id={div_id}, class={div_class}, style={div_style[:100]}")
+            except Exception as e:
+                log.warning(f"Could not list modal-like divs: {e}")
+
+            return result
+
+        log.info("Modal element located, waiting for content to load...")
+        time.sleep(2.0)  # Wait for async content to populate
 
         # DEBUG: Dump modal HTML to see what we're actually working with
         try:
@@ -349,6 +385,14 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
                     f.write(modal_html)
                     f.write("\n</body></html>")
                 log.info(f"Saved modal HTML to {debug_html_path}")
+            else:
+                log.warning("Modal element found but outerHTML is empty")
+
+                # Dump entire page source to help debug
+                page_html_path = os.path.join(SHOT_DIR, f"page_{int(time.time())}.html")
+                with open(page_html_path, "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+                log.info(f"Saved page source to {page_html_path}")
         except Exception as e:
             log.warning(f"Could not dump modal HTML: {e}")
 
@@ -442,7 +486,15 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
         driver.execute_script("arguments[0].scrollIntoView({block:'center'});", row_element)
         time.sleep(0.2)
         row_element.click()
-        time.sleep(0.5)  # Increased wait time for modal to appear
+        time.sleep(1.0)  # Wait for modal to appear
+
+        # DEBUG: Take screenshot after clicking
+        try:
+            shot_path = os.path.join(SHOT_DIR, f"after_click_{int(time.time())}.png")
+            driver.save_screenshot(shot_path)
+            log.info(f"Saved screenshot after click: {shot_path}")
+        except Exception:
+            pass
 
         # Extract modal data
         log.info("Extracting modal data...")
@@ -456,12 +508,8 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
             from selenium.webdriver.common.action_chains import ActionChains
             actions = ActionChains(driver)
             actions.send_keys(Keys.ESCAPE).perform()
-
-            # Wait for modal to disappear
-            WebDriverWait(driver, 5).until(
-                EC.invisibility_of_element((By.CSS_SELECTOR, "div[role='dialog'], div[aria-modal='true']"))
-            )
-            log.info("Modal closed successfully with ESC key")
+            time.sleep(0.5)  # Give modal time to close
+            log.info("Modal closed with ESC key")
         except Exception as e:
             log.warning(f"Could not close modal: {e}")
 
