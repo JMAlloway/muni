@@ -35,6 +35,7 @@ LOCATION       = "Franklin County, OH"
 
 HEADFUL_DEBUG  = False    # show browser while stabilizing; set False in prod
 FORCE_SELENIUM = True     # keep True for reliability on this portal; flip False if you want UC
+ENABLE_MODAL_EXTRACTION = True  # Set to False to skip modal clicking (faster, but less data)
 PAGE_TIMEOUT_S = 60
 WAIT_TIMEOUT_S = 15
 GLOBAL_HARD_STOP_S = 90
@@ -305,15 +306,18 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
 
     try:
         # Wait for modal to appear
+        log.info("Waiting for modal to appear...")
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal")))
+        log.info("Modal found!")
         time.sleep(0.5)  # Small delay for content to load
 
         # Extract General Details
         try:
             sol_type_elem = driver.find_element(By.ID, "SolicitationType")
             result["solicitation_type"] = sol_type_elem.text.strip()
-        except Exception:
-            pass
+            log.info(f"Found solicitation type: {result['solicitation_type']}")
+        except Exception as e:
+            log.warning(f"Could not find SolicitationType: {e}")
 
         try:
             delivery_date_elem = driver.find_element(By.ID, "delivery")
@@ -370,31 +374,39 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
     """
     try:
         # Click the row to open modal
+        log.info("Attempting to click row to open modal...")
         driver.execute_script("arguments[0].scrollIntoView({block:'center'});", row_element)
         time.sleep(0.2)
         row_element.click()
-        time.sleep(0.3)
+        time.sleep(0.5)  # Increased wait time for modal to appear
 
         # Extract modal data
+        log.info("Extracting modal data...")
         modal_data = _extract_modal_data(driver, wait)
+
+        # Log what we extracted
+        log.info(f"Modal extraction result - Description length: {len(modal_data['description'])}, Attachments: {len(modal_data['attachments'])}")
 
         # Close modal
         try:
             close_btn = driver.find_element(By.CSS_SELECTOR, ".modal .close")
             close_btn.click()
             time.sleep(0.3)
-        except Exception:
+            log.info("Modal closed successfully")
+        except Exception as e:
+            log.warning(f"Could not find close button: {e}")
             # Try clicking outside modal or pressing ESC
             try:
                 driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
                 time.sleep(0.3)
+                log.info("Modal closed with ESC key")
             except Exception:
-                pass
+                log.warning("Could not close modal with ESC")
 
         return modal_data
 
     except Exception as e:
-        log.warning(f"Failed to extract modal data: {e}")
+        log.error(f"Failed to extract modal data: {e}", exc_info=True)
         return {
             "description": "",
             "attachments": [],
@@ -495,8 +507,19 @@ def fetch_sync() -> List[RawOpportunity]:
                         if rfq_id:
                             seen_ids.add(rfq_id)
 
-                        # Click row to extract modal data
-                        modal_data = _click_row_and_extract_modal(driver, wait, r)
+                        # Click row to extract modal data (if enabled)
+                        if ENABLE_MODAL_EXTRACTION:
+                            modal_data = _click_row_and_extract_modal(driver, wait, r)
+                        else:
+                            log.info("Modal extraction disabled - using table data only")
+                            modal_data = {
+                                "description": "",
+                                "attachments": [],
+                                "delivery_date": None,
+                                "delivery_name": "",
+                                "delivery_address": "",
+                                "solicitation_type": "",
+                            }
 
                         # Build the "link" we surface in the UI. PowerApps doesn't give us a public
                         # per-RFQ page, so we deep-link to the main list with a hash.
