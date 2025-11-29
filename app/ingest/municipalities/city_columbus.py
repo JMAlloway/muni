@@ -309,13 +309,50 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
         log.info("Waiting for modal to appear...")
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal")))
         log.info("Modal found!")
-        time.sleep(0.5)  # Small delay for content to load
+
+        # Wait for modal to be visible (not just present)
+        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#myModal")))
+        log.info("Modal is visible!")
+
+        # Additional wait for content to load - look for modal body
+        try:
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal .modal-body")))
+            log.info("Modal body found!")
+        except Exception:
+            log.warning("Modal body not found with expected selector")
+
+        time.sleep(2.0)  # Extra wait for any async content/JavaScript to populate fields
+
+        # DEBUG: Dump modal HTML to see what we're actually working with
+        try:
+            modal_elem = driver.find_element(By.CSS_SELECTOR, "#myModal")
+            modal_html = modal_elem.get_attribute("outerHTML")
+            debug_html_path = os.path.join(SHOT_DIR, f"modal_{int(time.time())}.html")
+            with open(debug_html_path, "w", encoding="utf-8") as f:
+                f.write("<!DOCTYPE html>\n<html><head><meta charset='utf-8'></head><body>\n")
+                f.write(modal_html)
+                f.write("\n</body></html>")
+            log.info(f"Saved modal HTML to {debug_html_path}")
+
+            # Also log all elements with IDs in the modal for debugging
+            try:
+                id_elements = driver.find_elements(By.CSS_SELECTOR, "#myModal [id]")
+                log.info(f"Found {len(id_elements)} elements with IDs in modal:")
+                for elem in id_elements[:20]:  # Log first 20
+                    elem_id = elem.get_attribute("id")
+                    elem_tag = elem.tag_name
+                    elem_text = elem.text[:50] if elem.text else "(empty)"
+                    log.info(f"  - <{elem_tag} id='{elem_id}'>: {elem_text}")
+            except Exception as e2:
+                log.warning(f"Could not list modal IDs: {e2}")
+        except Exception as e:
+            log.warning(f"Could not dump modal HTML: {e}")
 
         # Extract General Details
         try:
             sol_type_elem = driver.find_element(By.ID, "SolicitationType")
             result["solicitation_type"] = sol_type_elem.text.strip()
-            log.info(f"Found solicitation type: {result['solicitation_type']}")
+            log.info(f"Found solicitation type: '{result['solicitation_type']}'")
         except Exception as e:
             log.warning(f"Could not find SolicitationType: {e}")
 
@@ -337,16 +374,32 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
         except Exception:
             pass
 
-        # Extract Description
+        # Extract Description - try multiple selectors
         try:
             desc_elem = driver.find_element(By.ID, "description")
             result["description"] = desc_elem.text.strip()
-        except Exception:
-            pass
+            log.info(f"Found description by ID, length: {len(result['description'])}")
+        except Exception as e:
+            log.warning(f"Could not find description by ID 'description': {e}")
+            # Try alternative selectors
+            try:
+                desc_elem = driver.find_element(By.CSS_SELECTOR, "#myModal textarea[id*='description' i]")
+                result["description"] = desc_elem.get_attribute("value") or desc_elem.text.strip()
+                log.info(f"Found description by alternative selector, length: {len(result['description'])}")
+            except Exception as e2:
+                log.warning(f"Could not find description by alternative selectors: {e2}")
+                # Try finding any textarea in modal
+                try:
+                    desc_elem = driver.find_element(By.CSS_SELECTOR, "#myModal textarea")
+                    result["description"] = desc_elem.get_attribute("value") or desc_elem.text.strip()
+                    log.info(f"Found description as first textarea, length: {len(result['description'])}")
+                except Exception as e3:
+                    log.warning(f"No textarea found in modal: {e3}")
 
         # Extract Attachments
         try:
             attachment_rows = driver.find_elements(By.CSS_SELECTOR, "#AttachmentTable tbody tr#AttachmentRow")
+            log.info(f"Found {len(attachment_rows)} attachment row(s) with primary selector")
             for row in attachment_rows:
                 try:
                     tds = row.find_elements(By.TAG_NAME, "td")
@@ -356,10 +409,29 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
                         file_url = link_elem.get_attribute("href")
                         if file_url:
                             result["attachments"].append(file_url)
-                except Exception:
+                            log.info(f"Added attachment: {file_name} -> {file_url[:100]}")
+                except Exception as e:
+                    log.warning(f"Failed to extract attachment row: {e}")
                     continue
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning(f"Could not find attachment table with primary selector: {e}")
+            # Try alternative selectors
+            try:
+                # Look for any table with "attachment" in ID or class
+                attachment_rows = driver.find_elements(By.CSS_SELECTOR, "#myModal table[id*='ttachment' i] tbody tr, #myModal table[class*='ttachment' i] tbody tr")
+                log.info(f"Found {len(attachment_rows)} attachment row(s) with alternative selector")
+                for row in attachment_rows:
+                    try:
+                        links = row.find_elements(By.TAG_NAME, "a")
+                        for link in links:
+                            file_url = link.get_attribute("href")
+                            if file_url and "blob.core.windows.net" in file_url:
+                                result["attachments"].append(file_url)
+                                log.info(f"Added attachment from alt selector: {file_url[:100]}")
+                    except Exception as e2:
+                        continue
+            except Exception as e3:
+                log.warning(f"Could not find attachments with alternative selectors: {e3}")
 
     except Exception as e:
         log.warning(f"Modal extraction error: {e}")
@@ -650,3 +722,15 @@ def fetch_sync() -> List[RawOpportunity]:
 async def fetch() -> List[RawOpportunity]:
     """Async wrapper to match your ingest framework."""
     return await asyncio.to_thread(fetch_sync)
+
+
+if __name__ == "__main__":
+    """Standalone test mode."""
+    log.info("Running City of Columbus scraper in standalone mode...")
+    results = fetch_sync()
+    log.info(f"Completed: scraped {len(results)} opportunities")
+    for i, opp in enumerate(results[:3], 1):
+        log.info(f"\nSample {i}:")
+        log.info(f"  Title: {opp.title}")
+        log.info(f"  Description: {opp.description[:100]}...")
+        log.info(f"  Attachments: {len(opp.attachments) if opp.attachments else 0}")
