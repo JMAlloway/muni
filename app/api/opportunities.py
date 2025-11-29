@@ -11,6 +11,7 @@ from app.core.db_core import engine
 from app.api._layout import page_shell
 from app.auth.auth_utils import require_login
 from app.data.agencies import AGENCIES
+from app.core.cache_bust import versioned_static
 
 router = APIRouter(tags=["opportunities"])
 
@@ -871,15 +872,15 @@ document.addEventListener('click', async (e) => {
 </div>
 
 {modal_js}
-<link rel="stylesheet" href="/static/css/vendor.css"> 
-<link rel="stylesheet" href="/static/css/highlight.css"> 
-<link rel="stylesheet" href="/static/css/bid_tracker.css"> 
-<link rel="stylesheet" href="/static/css/opportunities.css?v=2"> 
+<link rel="stylesheet" href="{versioned_static('css/vendor.css')}">
+<link rel="stylesheet" href="{versioned_static('css/highlight.css')}">
+<link rel="stylesheet" href="{versioned_static('css/bid_tracker.css')}">
+<link rel="stylesheet" href="{versioned_static('css/opportunities.css')}">
 
-<script src="/static/js/vendor.js"></script>
-<script src="/static/js/highlight.js"></script>
-<script src="/static/js/rfq_modal.js"></script>
-<script src="/static/js/bid_tracker.js"></script>
+<script src="{versioned_static('js/vendor.js')}"></script>
+<script src="{versioned_static('js/highlight.js')}"></script>
+<script src="{versioned_static('js/rfq_modal.js')}"></script>
+<script src="{versioned_static('js/bid_tracker.js')}"></script>
 
 """
 

@@ -5,6 +5,7 @@ import sqlite3
 import os
 from urllib.parse import urlparse
 from app.core.settings import settings
+from app.core.cache_bust import versioned_static
 
 def _nav_links_html(user_email: Optional[str]) -> str:
     if user_email:
@@ -301,8 +302,8 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
-<link rel="stylesheet" href="/static/css/base.css">
-<link rel="stylesheet" href="/static/css/pages.css">
+<link rel="stylesheet" href="__BASE_CSS__">
+<link rel="stylesheet" href="__PAGES_CSS__">
 </head>
 <body>
 <div class="app-shell">
@@ -451,6 +452,8 @@ __NOTIF_JS__
         .replace("__AVATAR__", (user_email or "U")[:2].upper())
         .replace("__BODY__", body_html)
         .replace("__NOTIF_JS__", notif_js)
+        .replace("__BASE_CSS__", versioned_static("css/base.css"))
+        .replace("__PAGES_CSS__", versioned_static("css/pages.css"))
     )
     return html
 
@@ -470,8 +473,8 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>__TITLE__</title>
-  <link rel="stylesheet" href="/static/css/base.css">
-  <link rel="stylesheet" href="/static/css/marketing.css">
+  <link rel="stylesheet" href="__BASE_CSS__">
+  <link rel="stylesheet" href="__MARKETING_CSS__">
 </head>
 <body class="marketing-body">
   <nav class="navbar">
@@ -539,7 +542,7 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
     </div>
   </footer>
 
-  <script src="/static/js/marketing.js"></script>
+  <script src="__MARKETING_JS__"></script>
 </body>
 </html>
     """
@@ -549,6 +552,9 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
         .replace("__CTA_URL__", cta_url)
         .replace("__LOGIN_URL__", login_url)
         .replace("__HERO_CTA__", hero_cta)
+        .replace("__BASE_CSS__", versioned_static("css/base.css"))
+        .replace("__MARKETING_CSS__", versioned_static("css/marketing.css"))
+        .replace("__MARKETING_JS__", versioned_static("js/marketing.js"))
     )
 
 
@@ -565,8 +571,8 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>__TITLE__</title>
-  <link rel="stylesheet" href="/static/css/base.css">
-  <link rel="stylesheet" href="/static/css/auth.css">
+  <link rel="stylesheet" href="__BASE_CSS__">
+  <link rel="stylesheet" href="__AUTH_CSS__">
 </head>
 <body class="auth-body">
   <div class="__WRAPPER__">
@@ -602,4 +608,6 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
         .replace("__BODY__", body_html)
         .replace("__WRAPPER__", wrapper_cls)
         .replace("__CARD__", card_cls)
+        .replace("__BASE_CSS__", versioned_static("css/base.css"))
+        .replace("__AUTH_CSS__", versioned_static("css/auth.css"))
     )

@@ -14,6 +14,7 @@ from sqlalchemy import text
 from app.auth.session import get_current_user_email
 from app.core.db_core import engine
 from app.api._layout import page_shell
+from app.core.cache_bust import versioned_static
 
 
 router = APIRouter(prefix="/tracker", tags=["dashboard"])
@@ -493,10 +494,10 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
          data-user-id="{user_id}"></div>
     """
 
-    body_template = """
-    <link rel="stylesheet" href="/static/css/vendor.css?v=9">
-    <link rel="stylesheet" href="/static/css/layout.css?v=9">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=9">
+    body_template = f"""
+    <link rel="stylesheet" href="{versioned_static('css/vendor.css')}">
+    <link rel="stylesheet" href="{versioned_static('css/layout.css')}">
+    <link rel="stylesheet" href="{versioned_static('css/dashboard.css')}">
     <div class="page dashboard-page">
       __TEAM_BAR__
       __STATS__
@@ -607,7 +608,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
         }
       })();
     </script>
-    <script src="/static/js/tracker_dashboard.js?v=24"></script>
+    <script src="{versioned_static('js/tracker_dashboard.js')}"></script>
     """
 
     body = (

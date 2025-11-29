@@ -11,6 +11,7 @@ from app.core.db_core import engine
 from app.core.calendar_token import parse_calendar_token, make_calendar_token
 from app.core.settings import settings
 from app.api._layout import page_shell
+from app.core.cache_bust import versioned_static
 
 router = APIRouter(tags=["calendar"])
 
@@ -111,7 +112,7 @@ async def issue_calendar_token(request: Request):
     return PlainTextResponse(make_calendar_token(email))
 
 
-STATIC_VER = "20251127.3"
+# Cache busting is now handled automatically by versioned_static()
 
 
 @router.get("/calendar", response_class=HTMLResponse)
@@ -120,9 +121,9 @@ async def calendar_page(request: Request):
     Marketing-style calendar page (replica of Homepage_test/calendar.html) rendered in the app shell.
     """
     user_email = get_current_user_email(request)
-    body = """
-<link rel="stylesheet" href="/static/css/dashboard.css?v=__VER__">
-<link rel="stylesheet" href="/static/css/calendar.css?v=__VER__">
+    body = f"""
+<link rel="stylesheet" href="{versioned_static('css/dashboard.css')}">
+<link rel="stylesheet" href="{versioned_static('css/calendar.css')}">
 <main class="page calendar-page">
   <div class="calendar-header fade-in">
     <div class="calendar-title-section">
@@ -363,4 +364,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
     """
-    return page_shell(body.replace("__VER__", STATIC_VER), "Calendar", user_email)
+    return page_shell(body, "Calendar", user_email)
