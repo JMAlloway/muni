@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Iterator
 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -288,8 +289,124 @@ def _make_hash(rfq_id: str, dept: str, title: str, typ: str, due_txt: str) -> st
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
 
 
+def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
+    """
+    Extract data from the RFQ detail modal.
+    Returns dict with: description, attachments, delivery_date, delivery_name, delivery_address, solicitation_type
+    """
+    result = {
+        "description": "",
+        "attachments": [],
+        "delivery_date": None,
+        "delivery_name": "",
+        "delivery_address": "",
+        "solicitation_type": "",
+    }
+
+    try:
+        # Wait for modal to appear
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal")))
+        time.sleep(0.5)  # Small delay for content to load
+
+        # Extract General Details
+        try:
+            sol_type_elem = driver.find_element(By.ID, "SolicitationType")
+            result["solicitation_type"] = sol_type_elem.text.strip()
+        except Exception:
+            pass
+
+        try:
+            delivery_date_elem = driver.find_element(By.ID, "delivery")
+            result["delivery_date"] = _parse_date(delivery_date_elem.text.strip())
+        except Exception:
+            pass
+
+        try:
+            delivery_name_elem = driver.find_element(By.ID, "deliveryname")
+            result["delivery_name"] = delivery_name_elem.text.strip()
+        except Exception:
+            pass
+
+        try:
+            delivery_addr_elem = driver.find_element(By.ID, "deliveryaddress")
+            result["delivery_address"] = delivery_addr_elem.text.strip()
+        except Exception:
+            pass
+
+        # Extract Description
+        try:
+            desc_elem = driver.find_element(By.ID, "description")
+            result["description"] = desc_elem.text.strip()
+        except Exception:
+            pass
+
+        # Extract Attachments
+        try:
+            attachment_rows = driver.find_elements(By.CSS_SELECTOR, "#AttachmentTable tbody tr#AttachmentRow")
+            for row in attachment_rows:
+                try:
+                    tds = row.find_elements(By.TAG_NAME, "td")
+                    if len(tds) >= 2:
+                        file_name = tds[0].text.strip()
+                        link_elem = tds[1].find_element(By.TAG_NAME, "a")
+                        file_url = link_elem.get_attribute("href")
+                        if file_url:
+                            result["attachments"].append(file_url)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+    except Exception as e:
+        log.warning(f"Modal extraction error: {e}")
+
+    return result
+
+
+def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_element) -> dict:
+    """
+    Click a table row to open modal, extract data, then close modal.
+    Returns extracted modal data dict.
+    """
+    try:
+        # Click the row to open modal
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", row_element)
+        time.sleep(0.2)
+        row_element.click()
+        time.sleep(0.3)
+
+        # Extract modal data
+        modal_data = _extract_modal_data(driver, wait)
+
+        # Close modal
+        try:
+            close_btn = driver.find_element(By.CSS_SELECTOR, ".modal .close")
+            close_btn.click()
+            time.sleep(0.3)
+        except Exception:
+            # Try clicking outside modal or pressing ESC
+            try:
+                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                time.sleep(0.3)
+            except Exception:
+                pass
+
+        return modal_data
+
+    except Exception as e:
+        log.warning(f"Failed to extract modal data: {e}")
+        return {
+            "description": "",
+            "attachments": [],
+            "delivery_date": None,
+            "delivery_name": "",
+            "delivery_address": "",
+            "solicitation_type": "",
+        }
+
+
 # ------------------------------------------------------------------------------------
-# Main scraper: parse the table rows directly (no modal clicking)
+# Main scraper: parse table rows and extract detailed data from modals
 # ------------------------------------------------------------------------------------
 def fetch_sync() -> List[RawOpportunity]:
     items: List[RawOpportunity] = []
@@ -378,6 +495,9 @@ def fetch_sync() -> List[RawOpportunity]:
                         if rfq_id:
                             seen_ids.add(rfq_id)
 
+                        # Click row to extract modal data
+                        modal_data = _click_row_and_extract_modal(driver, wait, r)
+
                         # Build the "link" we surface in the UI. PowerApps doesn't give us a public
                         # per-RFQ page, so we deep-link to the main list with a hash.
                         src_url = f"{LIST_URL}#rfq={rfq_id}" if rfq_id else LIST_URL
@@ -385,39 +505,47 @@ def fetch_sync() -> List[RawOpportunity]:
                         # Title fallback
                         final_title = title or rfq_id or "City of Columbus RFQ"
 
-                        # We don't have full description text without hitting the popup's _api.
-                        # For now we'll just reuse title so we at least capture *something* in full_text.
-                        desc_text = final_title  # <<< added
+                        # Use full description from modal
+                        desc_text = modal_data["description"] or final_title
+
+                        # Use solicitation type from modal if available, otherwise table type
+                        final_type = modal_data["solicitation_type"] or typ
+
+                        # Build enhanced summary with delivery info
+                        summary_parts = [dept, final_type]
+                        if modal_data["delivery_name"]:
+                            summary_parts.append(f"Delivery: {modal_data['delivery_name']}")
+                        summary_text = " | ".join(p for p in summary_parts if p)
 
                         # hash_body for diff detection downstream
                         hash_body_val = _make_hash(
                             rfq_id=rfq_id,
                             dept=dept,
                             title=final_title,
-                            typ=typ,
+                            typ=final_type,
                             due_txt=due_txt,
-                        )  # <<< added
+                        )
 
-                        # Build RawOpportunity with new fields
+                        # Build RawOpportunity with enhanced data from modal
                         items.append(
                             RawOpportunity(
                                 source="city_columbus",
                                 source_url=safe_source_url(AGENCY_NAME, src_url, LIST_URL),
                                 title=final_title,
-                                summary=f"{dept} | {typ}".strip(" |"),
-                                description=desc_text,          # <<< added
-                                category=typ,
+                                summary=summary_text,
+                                description=desc_text,
+                                category=final_type,
                                 agency_name=AGENCY_NAME,
-                                location_geo=LOCATION,
-                                posted_date=None,               # not present in row
+                                location_geo=modal_data["delivery_address"] or LOCATION,
+                                posted_date=None,               # not present in modal
                                 due_date=due_dt,
-                                prebid_date=None,               # not present in row
-                                attachments=None,               # we are not scraping attachments yet
+                                prebid_date=modal_data["delivery_date"],  # Use delivery date as prebid placeholder
+                                attachments=modal_data["attachments"] if modal_data["attachments"] else None,
                                 status="open",
-                                hash_body=hash_body_val,        # <<< added
-                                external_id=rfq_id,             # <<< added (Solicitation # / RFQ)
+                                hash_body=hash_body_val,
+                                external_id=rfq_id,
                                 keyword_tag=keyword_tag,
-                                date_added=datetime.now(timezone.utc),  # 👈 NEW
+                                date_added=datetime.now(timezone.utc),
                             )
                         )
                         added += 1
