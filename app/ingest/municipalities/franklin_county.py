@@ -528,7 +528,8 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
         # Mark as closed if:
         # 1. Row explicitly says closed/awarded/cancelled OR
         # 2. Due date is in the past
-        is_past_due = due_dt and due_dt < datetime.now(timezone.utc)
+        # Note: Use timezone-naive datetime.now() since parsed dates are also timezone-naive
+        is_past_due = due_dt and due_dt < datetime.now()
         status = "closed" if (row["is_closed"] or is_past_due) else "open"
 
         out.append(
