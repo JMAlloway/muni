@@ -291,10 +291,27 @@ def _make_hash(rfq_id: str, dept: str, title: str, typ: str, due_txt: str) -> st
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
 
 
+def _get_field_value(modal, label_text: str) -> str:
+    """
+    Extract field value by finding the label element and getting the following value element.
+    PowerApps uses a label → value pattern.
+    """
+    try:
+        label = modal.find_element(
+            By.XPATH,
+            f".//*[normalize-space(text())='{label_text}']"
+        )
+        # Value is usually in the next div after the label
+        value_el = label.find_element(By.XPATH, "./following::div[1]")
+        return value_el.text.strip()
+    except Exception:
+        return ""
+
+
 def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
     """
     Extract data from the RFQ detail modal.
-    Returns dict with: description, attachments, delivery_date, delivery_name, delivery_address, solicitation_type
+    Returns dict with: description, attachments, delivery_date, delivery_name, delivery_address, solicitation_type, line_items
     """
     result = {
         "description": "",
@@ -303,35 +320,28 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
         "delivery_name": "",
         "delivery_address": "",
         "solicitation_type": "",
+        "line_items": [],
     }
 
     try:
-        # Wait for modal to appear
+        # Check for offline skeleton mode
+        if "You're offline. This is a read only version of the page." in driver.page_source:
+            log.error("Offline skeleton detected – no RFQ data available")
+            return result
+
+        # Wait for modal to appear - use proper PowerApps modal selector
         log.info("Waiting for modal to appear...")
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal")))
-        log.info("Modal found!")
+        modal = wait.until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "div[role='dialog'], div[aria-modal='true']"))
+        )
+        log.info("Modal found and visible!")
 
-        # Wait for modal to be visible (not just present)
-        # Make this optional - sometimes modals are "present" but visibility detection fails
-        try:
-            WebDriverWait(driver, 3).until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#myModal")))
-            log.info("Modal is visible!")
-        except Exception as e:
-            log.warning(f"Modal visibility check timed out, but continuing anyway: {e}")
-
-        # Additional wait for content to load - look for modal body
-        try:
-            WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal .modal-body")))
-            log.info("Modal body found!")
-        except Exception:
-            log.warning("Modal body not found with expected selector")
-
-        time.sleep(2.0)  # Extra wait for any async content/JavaScript to populate fields
+        # Wait a bit for async content to populate
+        time.sleep(1.5)
 
         # DEBUG: Dump modal HTML to see what we're actually working with
         try:
-            modal_elem = driver.find_element(By.CSS_SELECTOR, "#myModal")
-            modal_html = modal_elem.get_attribute("outerHTML")
+            modal_html = modal.get_attribute("outerHTML")
             if modal_html:
                 debug_html_path = os.path.join(SHOT_DIR, f"modal_{int(time.time())}.html")
                 with open(debug_html_path, "w", encoding="utf-8") as f:
@@ -339,110 +349,80 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
                     f.write(modal_html)
                     f.write("\n</body></html>")
                 log.info(f"Saved modal HTML to {debug_html_path}")
-            else:
-                log.warning("Modal element found but outerHTML is empty")
         except Exception as e:
-            log.warning(f"Could not dump modal HTML: {e}", exc_info=True)
+            log.warning(f"Could not dump modal HTML: {e}")
 
-        # Also log all elements with IDs in the modal for debugging
-        try:
-            id_elements = driver.find_elements(By.CSS_SELECTOR, "#myModal [id]")
-            log.info(f"Found {len(id_elements)} elements with IDs in modal:")
-            for elem in id_elements[:20]:  # Log first 20
-                try:
-                    elem_id = elem.get_attribute("id")
-                    elem_tag = elem.tag_name
-                    elem_text = elem.text[:50] if elem.text else "(empty)"
-                    log.info(f"  - <{elem_tag} id='{elem_id}'>: {elem_text}")
-                except Exception as e_elem:
-                    log.warning(f"Could not get info for element: {e_elem}")
-        except Exception as e2:
-            log.warning(f"Could not list modal IDs: {e2}", exc_info=True)
+        # Extract General Details using label → value pattern
+        result["solicitation_type"] = _get_field_value(modal, "Solicitation Type")
+        log.info(f"Solicitation Type: '{result['solicitation_type']}'")
 
-        # Extract General Details
+        delivery_date_text = _get_field_value(modal, "Delivery Date")
+        if delivery_date_text:
+            result["delivery_date"] = _parse_date(delivery_date_text)
+
+        result["delivery_name"] = _get_field_value(modal, "Delivery Name")
+        result["delivery_address"] = _get_field_value(modal, "Delivery Address")
+
+        # Extract Description section
         try:
-            sol_type_elem = driver.find_element(By.ID, "SolicitationType")
-            result["solicitation_type"] = sol_type_elem.text.strip()
-            log.info(f"Found solicitation type: '{result['solicitation_type']}'")
+            description_header = modal.find_element(
+                By.XPATH, ".//*[self::h2 or self::h3][normalize-space(text())='Description']"
+            )
+            description_block = description_header.find_element(By.XPATH, "./following::div[1]")
+            result["description"] = description_block.text.strip()
+            log.info(f"Found description, length: {len(result['description'])}")
         except Exception as e:
-            log.warning(f"Could not find SolicitationType: {e}")
+            log.warning(f"Could not find Description section: {e}")
 
+        # Extract Attachments section
         try:
-            delivery_date_elem = driver.find_element(By.ID, "delivery")
-            result["delivery_date"] = _parse_date(delivery_date_elem.text.strip())
-        except Exception:
-            pass
+            attachments_header = modal.find_element(
+                By.XPATH, ".//*[self::h2 or self::h3][normalize-space(text())='Attachments']"
+            )
+            attachments_table = attachments_header.find_element(By.XPATH, ".//following::table[1]")
 
-        try:
-            delivery_name_elem = driver.find_element(By.ID, "deliveryname")
-            result["delivery_name"] = delivery_name_elem.text.strip()
-        except Exception:
-            pass
+            attachment_rows = attachments_table.find_elements(By.CSS_SELECTOR, "tbody tr")
+            log.info(f"Found {len(attachment_rows)} attachment row(s)")
 
-        try:
-            delivery_addr_elem = driver.find_element(By.ID, "deliveryaddress")
-            result["delivery_address"] = delivery_addr_elem.text.strip()
-        except Exception:
-            pass
-
-        # Extract Description - try multiple selectors
-        try:
-            desc_elem = driver.find_element(By.ID, "description")
-            result["description"] = desc_elem.text.strip()
-            log.info(f"Found description by ID, length: {len(result['description'])}")
-        except Exception as e:
-            log.warning(f"Could not find description by ID 'description': {e}")
-            # Try alternative selectors
-            try:
-                desc_elem = driver.find_element(By.CSS_SELECTOR, "#myModal textarea[id*='description' i]")
-                result["description"] = desc_elem.get_attribute("value") or desc_elem.text.strip()
-                log.info(f"Found description by alternative selector, length: {len(result['description'])}")
-            except Exception as e2:
-                log.warning(f"Could not find description by alternative selectors: {e2}")
-                # Try finding any textarea in modal
-                try:
-                    desc_elem = driver.find_element(By.CSS_SELECTOR, "#myModal textarea")
-                    result["description"] = desc_elem.get_attribute("value") or desc_elem.text.strip()
-                    log.info(f"Found description as first textarea, length: {len(result['description'])}")
-                except Exception as e3:
-                    log.warning(f"No textarea found in modal: {e3}")
-
-        # Extract Attachments
-        try:
-            attachment_rows = driver.find_elements(By.CSS_SELECTOR, "#AttachmentTable tbody tr#AttachmentRow")
-            log.info(f"Found {len(attachment_rows)} attachment row(s) with primary selector")
             for row in attachment_rows:
                 try:
-                    tds = row.find_elements(By.TAG_NAME, "td")
-                    if len(tds) >= 2:
-                        file_name = tds[0].text.strip()
-                        link_elem = tds[1].find_element(By.TAG_NAME, "a")
-                        file_url = link_elem.get_attribute("href")
-                        if file_url:
-                            result["attachments"].append(file_url)
-                            log.info(f"Added attachment: {file_name} -> {file_url[:100]}")
+                    cells = row.find_elements(By.CSS_SELECTOR, "td")
+                    if not cells:
+                        continue
+                    file_name = cells[0].text.strip()
+                    link_el = cells[-1].find_element(By.TAG_NAME, "a")
+                    url = link_el.get_attribute("href")
+                    if url:
+                        result["attachments"].append(url)
+                        log.info(f"Added attachment: {file_name} -> {url[:80]}...")
                 except Exception as e:
                     log.warning(f"Failed to extract attachment row: {e}")
                     continue
         except Exception as e:
-            log.warning(f"Could not find attachment table with primary selector: {e}")
-            # Try alternative selectors
-            try:
-                # Look for any table with "attachment" in ID or class
-                attachment_rows = driver.find_elements(By.CSS_SELECTOR, "#myModal table[id*='ttachment' i] tbody tr, #myModal table[class*='ttachment' i] tbody tr")
-                log.info(f"Found {len(attachment_rows)} attachment row(s) with alternative selector")
-                for row in attachment_rows:
-                    try:
-                        links = row.find_elements(By.TAG_NAME, "a")
-                        for link in links:
-                            file_url = link.get_attribute("href")
-                            if file_url and "blob.core.windows.net" in file_url:
-                                result["attachments"].append(file_url)
-                                log.info(f"Added attachment from alt selector: {file_url[:100]}")
-                    except Exception as e2:
-                        continue
-            except Exception as e3:
-                log.warning(f"Could not find attachments with alternative selectors: {e3}")
+            log.warning(f"Could not find Attachments section: {e}")
+
+        # Extract Line Details section
+        try:
+            line_header = modal.find_element(
+                By.XPATH, ".//*[self::h2 or self::h3][normalize-space(text())='Line Details']"
+            )
+            line_table = line_header.find_element(By.XPATH, ".//following::table[1]")
+
+            # Build header map
+            header_cells = line_table.find_elements(By.CSS_SELECTOR, "thead th")
+            headers = [h.text.strip() for h in header_cells]
+            log.info(f"Line Details headers: {headers}")
+
+            for row in line_table.find_elements(By.CSS_SELECTOR, "tbody tr"):
+                cells = row.find_elements(By.CSS_SELECTOR, "td")
+                if not cells:
+                    continue
+                data = {headers[i]: cells[i].text.strip() for i in range(min(len(headers), len(cells)))}
+                result["line_items"].append(data)
+
+            log.info(f"Found {len(result['line_items'])} line items")
+        except Exception as e:
+            log.info(f"No Line Details section found (this is OK): {e}")
 
     except Exception as e:
         log.error(f"Modal extraction error: {e}", exc_info=True)
@@ -471,21 +451,19 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
         # Log what we extracted
         log.info(f"Modal extraction result - Description length: {len(modal_data['description'])}, Attachments: {len(modal_data['attachments'])}")
 
-        # Close modal
+        # Close modal using ESC key (most reliable method)
         try:
-            close_btn = driver.find_element(By.CSS_SELECTOR, ".modal .close")
-            close_btn.click()
-            time.sleep(0.3)
-            log.info("Modal closed successfully")
+            from selenium.webdriver.common.action_chains import ActionChains
+            actions = ActionChains(driver)
+            actions.send_keys(Keys.ESCAPE).perform()
+
+            # Wait for modal to disappear
+            WebDriverWait(driver, 5).until(
+                EC.invisibility_of_element((By.CSS_SELECTOR, "div[role='dialog'], div[aria-modal='true']"))
+            )
+            log.info("Modal closed successfully with ESC key")
         except Exception as e:
-            log.warning(f"Could not find close button: {e}")
-            # Try clicking outside modal or pressing ESC
-            try:
-                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                time.sleep(0.3)
-                log.info("Modal closed with ESC key")
-            except Exception:
-                log.warning("Could not close modal with ESC")
+            log.warning(f"Could not close modal: {e}")
 
         return modal_data
 
@@ -498,6 +476,7 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
             "delivery_name": "",
             "delivery_address": "",
             "solicitation_type": "",
+            "line_items": [],
         }
 
 
@@ -520,6 +499,15 @@ def fetch_sync() -> List[RawOpportunity]:
         log.info("Navigating to %s", LIST_URL)
         driver.get(LIST_URL)
         time.sleep(1.0)
+
+        # Check for offline skeleton mode
+        if "You're offline. This is a read only version of the page." in driver.page_source:
+            _dump_html(driver)
+            _shot(driver, "offline_skeleton")
+            raise RuntimeError(
+                "Offline skeleton detected – not authenticated or network issue. "
+                "Portal shows: 'You're offline. This is a read only version of the page.'"
+            )
 
         # FIRST PAGE: robust polling
         start_poll = time.time()
@@ -611,6 +599,7 @@ def fetch_sync() -> List[RawOpportunity]:
                                 "delivery_name": "",
                                 "delivery_address": "",
                                 "solicitation_type": "",
+                                "line_items": [],
                             }
 
                         # Build the "link" we surface in the UI. PowerApps doesn't give us a public
@@ -623,6 +612,14 @@ def fetch_sync() -> List[RawOpportunity]:
                         # Use full description from modal
                         desc_text = modal_data["description"] or final_title
 
+                        # Add line items to description if available
+                        if modal_data["line_items"]:
+                            line_items_text = "\n\n### Line Items:\n"
+                            for idx, item in enumerate(modal_data["line_items"], 1):
+                                line_items_text += f"\n{idx}. "
+                                line_items_text += " | ".join(f"{k}: {v}" for k, v in item.items() if v)
+                            desc_text = desc_text + line_items_text
+
                         # Use solicitation type from modal if available, otherwise table type
                         final_type = modal_data["solicitation_type"] or typ
 
@@ -630,6 +627,8 @@ def fetch_sync() -> List[RawOpportunity]:
                         summary_parts = [dept, final_type]
                         if modal_data["delivery_name"]:
                             summary_parts.append(f"Delivery: {modal_data['delivery_name']}")
+                        if modal_data["line_items"]:
+                            summary_parts.append(f"{len(modal_data['line_items'])} line items")
                         summary_text = " | ".join(p for p in summary_parts if p)
 
                         # hash_body for diff detection downstream
