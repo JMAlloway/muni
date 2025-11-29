@@ -36,6 +36,7 @@ LOCATION       = "Franklin County, OH"
 HEADFUL_DEBUG  = False    # show browser while stabilizing; set False in prod
 FORCE_SELENIUM = True     # keep True for reliability on this portal; flip False if you want UC
 ENABLE_MODAL_EXTRACTION = True  # Set to False to skip modal clicking (faster, but less data)
+DEBUG_LIMIT_MODALS = None  # Set to a number (e.g., 3) to only extract modals for first N rows (for debugging)
 PAGE_TIMEOUT_S = 60
 WAIT_TIMEOUT_S = 15
 GLOBAL_HARD_STOP_S = 90
@@ -311,12 +312,16 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
         log.info("Modal found!")
 
         # Wait for modal to be visible (not just present)
-        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#myModal")))
-        log.info("Modal is visible!")
+        # Make this optional - sometimes modals are "present" but visibility detection fails
+        try:
+            WebDriverWait(driver, 3).until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#myModal")))
+            log.info("Modal is visible!")
+        except Exception as e:
+            log.warning(f"Modal visibility check timed out, but continuing anyway: {e}")
 
         # Additional wait for content to load - look for modal body
         try:
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal .modal-body")))
+            WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#myModal .modal-body")))
             log.info("Modal body found!")
         except Exception:
             log.warning("Modal body not found with expected selector")
@@ -327,26 +332,32 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
         try:
             modal_elem = driver.find_element(By.CSS_SELECTOR, "#myModal")
             modal_html = modal_elem.get_attribute("outerHTML")
-            debug_html_path = os.path.join(SHOT_DIR, f"modal_{int(time.time())}.html")
-            with open(debug_html_path, "w", encoding="utf-8") as f:
-                f.write("<!DOCTYPE html>\n<html><head><meta charset='utf-8'></head><body>\n")
-                f.write(modal_html)
-                f.write("\n</body></html>")
-            log.info(f"Saved modal HTML to {debug_html_path}")
+            if modal_html:
+                debug_html_path = os.path.join(SHOT_DIR, f"modal_{int(time.time())}.html")
+                with open(debug_html_path, "w", encoding="utf-8") as f:
+                    f.write("<!DOCTYPE html>\n<html><head><meta charset='utf-8'></head><body>\n")
+                    f.write(modal_html)
+                    f.write("\n</body></html>")
+                log.info(f"Saved modal HTML to {debug_html_path}")
+            else:
+                log.warning("Modal element found but outerHTML is empty")
+        except Exception as e:
+            log.warning(f"Could not dump modal HTML: {e}", exc_info=True)
 
-            # Also log all elements with IDs in the modal for debugging
-            try:
-                id_elements = driver.find_elements(By.CSS_SELECTOR, "#myModal [id]")
-                log.info(f"Found {len(id_elements)} elements with IDs in modal:")
-                for elem in id_elements[:20]:  # Log first 20
+        # Also log all elements with IDs in the modal for debugging
+        try:
+            id_elements = driver.find_elements(By.CSS_SELECTOR, "#myModal [id]")
+            log.info(f"Found {len(id_elements)} elements with IDs in modal:")
+            for elem in id_elements[:20]:  # Log first 20
+                try:
                     elem_id = elem.get_attribute("id")
                     elem_tag = elem.tag_name
                     elem_text = elem.text[:50] if elem.text else "(empty)"
                     log.info(f"  - <{elem_tag} id='{elem_id}'>: {elem_text}")
-            except Exception as e2:
-                log.warning(f"Could not list modal IDs: {e2}")
-        except Exception as e:
-            log.warning(f"Could not dump modal HTML: {e}")
+                except Exception as e_elem:
+                    log.warning(f"Could not get info for element: {e_elem}")
+        except Exception as e2:
+            log.warning(f"Could not list modal IDs: {e2}", exc_info=True)
 
         # Extract General Details
         try:
@@ -434,8 +445,9 @@ def _extract_modal_data(driver: WebDriver, wait: WebDriverWait) -> dict:
                 log.warning(f"Could not find attachments with alternative selectors: {e3}")
 
     except Exception as e:
-        log.warning(f"Modal extraction error: {e}")
+        log.error(f"Modal extraction error: {e}", exc_info=True)
 
+    log.info(f"Returning modal data: desc_len={len(result['description'])}, attachments={len(result['attachments'])}")
     return result
 
 
@@ -550,7 +562,7 @@ def fetch_sync() -> List[RawOpportunity]:
 
                 # Collect rows on this page
                 added = 0
-                for r in rows:
+                for row_idx, r in enumerate(rows):
                     try:
                         tds = r.find_elements(By.TAG_NAME, "td")
                         if len(tds) < 5:
@@ -580,10 +592,18 @@ def fetch_sync() -> List[RawOpportunity]:
                             seen_ids.add(rfq_id)
 
                         # Click row to extract modal data (if enabled)
-                        if ENABLE_MODAL_EXTRACTION:
+                        should_extract_modal = ENABLE_MODAL_EXTRACTION
+                        if DEBUG_LIMIT_MODALS is not None:
+                            total_processed = len(seen_ids) - 1  # -1 because we haven't added current yet
+                            should_extract_modal = should_extract_modal and total_processed < DEBUG_LIMIT_MODALS
+
+                        if should_extract_modal:
                             modal_data = _click_row_and_extract_modal(driver, wait, r)
                         else:
-                            log.info("Modal extraction disabled - using table data only")
+                            if DEBUG_LIMIT_MODALS is not None and len(seen_ids) - 1 >= DEBUG_LIMIT_MODALS:
+                                log.info(f"Skipping modal extraction (debug limit reached: {DEBUG_LIMIT_MODALS})")
+                            else:
+                                log.info("Modal extraction disabled - using table data only")
                             modal_data = {
                                 "description": "",
                                 "attachments": [],
