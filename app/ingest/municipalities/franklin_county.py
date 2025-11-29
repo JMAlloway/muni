@@ -378,8 +378,10 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                 contact_bits.append(f"Email: {row['contact_email']}")
             contact_summary = " | ".join(contact_bits)
 
-            opening_dt = row["opening_dt"]
-            due_dt = None  # Franklin County shows Opening, not vendor due
+            # In Franklin County's portal, "Opening Date" is when bids are DUE (submission deadline)
+            # This is when they open sealed bids - submissions must be in before this time
+            due_dt = row["opening_dt"]
+            posted_date = None  # We don't have the actual posting date from the listing
 
             trimmed_desc = (
                 (detail_desc[:400] + " ...")
@@ -387,8 +389,8 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                 else detail_desc
             )
             summary_text = trimmed_desc or ""
-            if opening_dt:
-                summary_text = f"{summary_text} (Opening: {opening_dt.strftime('%m/%d/%Y')})"
+            if due_dt:
+                summary_text = f"{summary_text} (Due: {due_dt.strftime('%m/%d/%Y')})"
             if contact_summary:
                 summary_text = (summary_text + " " + contact_summary).strip()
 
@@ -407,7 +409,7 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
                     summary=summary_text.strip(),
                     description=detail_desc,
                     due_date=due_dt,
-                    posted_date=opening_dt,
+                    posted_date=posted_date,
                     prebid_date=None,
                     source=row["detail_url"],
                     source_url=row["detail_url"],
