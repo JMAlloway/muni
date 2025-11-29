@@ -16,9 +16,9 @@ def safe_source_url(agency_name: str, source_url: str, list_url: str) -> str:
     ):
         return list_url
 
-    # Some portals (COTA / CRAA gob2g) use ProposalSearchPublicDetail.asp with RID=...
-    # Treat those as valid detail pages when an RID is present; otherwise fall back to list.
+    # Some portals (COTA / CRAA gob2g) use ProposalSearchPublicDetail.asp with RID= or PID=...
+    # Treat those as valid detail pages when an RID/PID is present; otherwise fall back to list.
     if "proposalsearchpublicdetail.asp" in u:
-        return source_url if "rid=" in u else list_url
+        return source_url if ("rid=" in u or "pid=" in u) else list_url
 
     return source_url
