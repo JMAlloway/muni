@@ -121,6 +121,43 @@ def _parse_mmddyyyy(date_str: str) -> Optional[datetime]:
     return None
 
 
+def _parse_opening_datetime(text: str) -> Optional[datetime]:
+    """
+    Parse opening date/time from detail page.
+    Example: "01/09/2026 at 2:00 PM" -> datetime(2026, 1, 9, 14, 0)
+    Also handles: "01/09/2026 at 2:00PM" (no space before AM/PM)
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+
+    # Pattern: "MM/DD/YYYY at H:MM PM" or "M/D/YYYY at H:MM AM"
+    # Try with space before AM/PM
+    for fmt in ["%m/%d/%Y at %I:%M %p", "%m/%d/%Y at %I:%M%p"]:
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+
+    # Try without leading zeros in date
+    # Example: "1/9/2026 at 2:00 PM"
+    match = re.match(r'(\d{1,2})/(\d{1,2})/(\d{4})\s+at\s+(\d{1,2}):(\d{2})\s*(AM|PM)', text, re.I)
+    if match:
+        month, day, year, hour, minute, ampm = match.groups()
+        hour = int(hour)
+        if ampm.upper() == 'PM' and hour != 12:
+            hour += 12
+        elif ampm.upper() == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime(int(year), int(month), int(day), hour, int(minute))
+        except ValueError:
+            pass
+
+    logger.warning(f"Could not parse opening datetime: {text}")
+    return None
+
+
 # ---------------------------------
 # Category tagging
 # ---------------------------------
@@ -285,20 +322,21 @@ def _extract_clean_description(soup: BeautifulSoup) -> str:
 async def _fetch_detail_description_and_attachments(
     session: aiohttp.ClientSession,
     url: str
-) -> Tuple[str, List[str], bool]:
+) -> Tuple[str, List[str], bool, Optional[datetime]]:
     """
     Fetch the bid detail page and pull:
     - cleaned description / scope
     - attachments
     - whether login is required for documents
+    - opening date/time (more precise than listing table)
 
-    Returns: (description, attachment_urls, requires_login)
+    Returns: (description, attachment_urls, requires_login, opening_datetime)
     """
     try:
         html = await _fetch(session, url)
     except Exception as e:
         logger.warning(f"Franklin County detail fetch failed {url}: {e}")
-        return ("", [], False)
+        return ("", [], False, None)
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -309,6 +347,14 @@ async def _fetch_detail_description_and_attachments(
     )
 
     description_text = _extract_clean_description(soup)
+
+    # Extract opening date/time from detail page
+    # Look for pattern like "Opening Date: 01/09/2026 at 2:00 PM"
+    opening_datetime = None
+    page_text = soup.get_text()
+    opening_match = re.search(r'Opening Date:\s*([0-9/]+\s+at\s+[0-9:]+\s*[AP]M)', page_text, re.I)
+    if opening_match:
+        opening_datetime = _parse_opening_datetime(opening_match.group(1))
 
     attachment_urls: List[str] = []
     # Only extract attachments if no login required
@@ -324,7 +370,7 @@ async def _fetch_detail_description_and_attachments(
     else:
         logger.info(f"Documents require login for {url}")
 
-    return (description_text, attachment_urls, requires_login)
+    return (description_text, attachment_urls, requires_login, opening_datetime)
 
 
 # ---------------------------------
@@ -432,9 +478,9 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
         # Handle exceptions from gather
         if isinstance(detail_result, Exception):
             logger.warning(f"Detail fetch failed for {row['detail_url']}: {detail_result}")
-            detail_desc, attachment_urls, requires_login = "", [], False
+            detail_desc, attachment_urls, requires_login, opening_datetime = "", [], False, None
         else:
-            detail_desc, attachment_urls, requires_login = detail_result
+            detail_desc, attachment_urls, requires_login, opening_datetime = detail_result
 
         contact_bits = []
         if row["contact_name"]:
@@ -445,7 +491,8 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
 
         # In Franklin County's portal, "Opening Date" is when bids are DUE (submission deadline)
         # This is when they open sealed bids - submissions must be in before this time
-        due_dt = row["opening_dt"]
+        # Use the more precise datetime from detail page if available, otherwise fall back to listing table date
+        due_dt = opening_datetime if opening_datetime else row["opening_dt"]
         posted_date = None  # We don't have the actual posting date from the listing
 
         trimmed_desc = (
@@ -460,7 +507,12 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
             summary_text = f"[Login required for documents] {summary_text}"
 
         if due_dt:
-            summary_text = f"{summary_text} (Due: {due_dt.strftime('%m/%d/%Y')})"
+            # Show time if we have it (from detail page), otherwise just date
+            if opening_datetime:
+                due_str = due_dt.strftime('%m/%d/%Y at %I:%M %p')
+            else:
+                due_str = due_dt.strftime('%m/%d/%Y')
+            summary_text = f"{summary_text} (Due: {due_str})"
         if contact_summary:
             summary_text = (summary_text + " " + contact_summary).strip()
 
@@ -473,7 +525,16 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
         clean_ref = _normalize_ref_no(row["ref_no"])
 
         # Determine status
-        status = "closed" if row["is_closed"] else "open"
+        # Mark as closed if:
+        # 1. Row explicitly says closed/awarded/cancelled OR
+        # 2. Due date is in the past
+        is_past_due = due_dt and due_dt < datetime.now(timezone.utc)
+        status = "closed" if (row["is_closed"] or is_past_due) else "open"
+
+        # Skip past-due bids entirely (don't ingest them)
+        if is_past_due:
+            logger.debug(f"Skipping past-due bid: {row['title']} (due: {due_dt})")
+            continue
 
         out.append(
             RawOpportunity(
@@ -495,7 +556,8 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
             )
         )
 
-    logger.info(f"Franklin County: scraped {len(out)} row(s) ({len([o for o in out if o.status == 'open'])} open, {len([o for o in out if o.status == 'closed'])} closed).")
+    skipped_count = len(rows) - len(out)
+    logger.info(f"Franklin County: scraped {len(out)} row(s) ({len([o for o in out if o.status == 'open'])} open, {len([o for o in out if o.status == 'closed'])} closed, {skipped_count} skipped as past-due).")
     return out
 
 
