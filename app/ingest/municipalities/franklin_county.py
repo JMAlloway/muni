@@ -531,11 +531,6 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
         is_past_due = due_dt and due_dt < datetime.now(timezone.utc)
         status = "closed" if (row["is_closed"] or is_past_due) else "open"
 
-        # Skip past-due bids entirely (don't ingest them)
-        if is_past_due:
-            logger.debug(f"Skipping past-due bid: {row['title']} (due: {due_dt})")
-            continue
-
         out.append(
             RawOpportunity(
                 agency_name=AGENCY_NAME,
@@ -556,8 +551,9 @@ async def _scrape_listing_page() -> List[RawOpportunity]:
             )
         )
 
-    skipped_count = len(rows) - len(out)
-    logger.info(f"Franklin County: scraped {len(out)} row(s) ({len([o for o in out if o.status == 'open'])} open, {len([o for o in out if o.status == 'closed'])} closed, {skipped_count} skipped as past-due).")
+    open_count = len([o for o in out if o.status == 'open'])
+    closed_count = len([o for o in out if o.status == 'closed'])
+    logger.info(f"Franklin County: scraped {len(out)} row(s) ({open_count} open, {closed_count} closed).")
     return out
 
 
