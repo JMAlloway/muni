@@ -35,8 +35,8 @@ LOCATION       = "Franklin County, OH"
 
 HEADFUL_DEBUG  = False    # show browser while stabilizing; set False in prod
 FORCE_SELENIUM = True     # keep True for reliability on this portal; flip False if you want UC
-ENABLE_MODAL_EXTRACTION = True  # Set to False to skip detail panel extraction (faster, but less data)
-DEBUG_LIMIT_MODALS = None  # Set to a number (e.g., 3) to only extract detail panel for first N rows (for debugging)
+ENABLE_MODAL_EXTRACTION = True  # Set to False to skip modal extraction (faster, but less data)
+DEBUG_LIMIT_MODALS = None  # Set to a number (e.g., 3) to only extract modal for first N rows (for debugging)
 PAGE_TIMEOUT_S = 60
 WAIT_TIMEOUT_S = 15
 GLOBAL_HARD_STOP_S = 90
@@ -291,27 +291,21 @@ def _make_hash(rfq_id: str, dept: str, title: str, typ: str, due_txt: str) -> st
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()
 
 
-def _get_field_value(driver: WebDriver, label_text: str) -> str:
+def _get_field_by_id(driver: WebDriver, element_id: str) -> str:
     """
-    Extract field value by finding the label element and getting the following value element.
-    PowerApps uses a label → value pattern. Reads from the main page, not a modal.
+    Extract field value by ID. The modal uses stable IDs like 'description', 'deliveryname', etc.
     """
     try:
-        label = driver.find_element(
-            By.XPATH,
-            f".//*[normalize-space(text())='{label_text}']"
-        )
-        # Value is usually in the next div after the label
-        value_el = label.find_element(By.XPATH, "./following::div[1]")
-        return value_el.text.strip()
+        element = driver.find_element(By.ID, element_id)
+        return element.text.strip()
     except Exception:
         return ""
 
 
 def _extract_detail_panel_data(driver: WebDriver, wait: WebDriverWait) -> dict:
     """
-    Extract data from the Columbus detail panel (NOT a modal - it's always-visible panel on the page).
-    Clicking a row updates this panel's contents.
+    Extract data from the Columbus detail modal that appears after clicking a row.
+    The modal uses stable IDs for all fields (e.g., id="description", id="deliveryname").
     Returns dict with: description, attachments, delivery_date, delivery_name, delivery_address, solicitation_type, line_items
     """
     result = {
@@ -330,71 +324,59 @@ def _extract_detail_panel_data(driver: WebDriver, wait: WebDriverWait) -> dict:
             log.error("Offline skeleton detected – no RFQ data available")
             return result
 
-        # Wait for detail panel content to populate (not a modal!)
-        # We know content loaded when fields like "Solicitation #" or "Description" become non-empty
-        log.info("Waiting for detail panel to populate after row click...")
+        # Wait for modal to populate - check for the description field with content
+        log.info("Waiting for modal to populate after row click...")
         try:
             wait.until(
-                lambda d: (
-                    _get_field_value(d, "Solicitation #") != "" or
-                    _get_field_value(d, "Description") != ""
-                )
+                lambda d: _get_field_by_id(d, "description") != "" or
+                          _get_field_by_id(d, "Solicitation") != ""
             )
-            log.info("Detail panel content detected!")
+            log.info("Modal content detected!")
         except Exception as e:
-            log.warning(f"Timed out waiting for detail panel to populate: {e}")
+            log.warning(f"Timed out waiting for modal to populate: {e}")
             # Continue anyway, maybe some fields are available
 
-        # Small extra wait for async content
+        # Small extra wait for async content to fully load
         time.sleep(1.0)
 
         # DEBUG: Dump page HTML to see what we're working with
         try:
-            page_html_path = os.path.join(SHOT_DIR, f"detail_panel_{int(time.time())}.html")
+            page_html_path = os.path.join(SHOT_DIR, f"modal_{int(time.time())}.html")
             with open(page_html_path, "w", encoding="utf-8") as f:
                 f.write(driver.page_source)
             log.info(f"Saved page source to {page_html_path}")
         except Exception as e:
             log.warning(f"Could not dump page HTML: {e}")
 
-        # Extract General Details using label → value pattern (from main page)
-        result["solicitation_type"] = _get_field_value(driver, "Solicitation Type")
+        # Extract General Details using stable IDs
+        result["solicitation_type"] = _get_field_by_id(driver, "SolicitationType")
         log.info(f"Solicitation Type: '{result['solicitation_type']}'")
 
-        delivery_date_text = _get_field_value(driver, "Delivery Date")
+        delivery_date_text = _get_field_by_id(driver, "delivery")
         if delivery_date_text:
             result["delivery_date"] = _parse_date(delivery_date_text)
+            log.info(f"Delivery Date: '{delivery_date_text}'")
 
-        result["delivery_name"] = _get_field_value(driver, "Delivery Name")
-        result["delivery_address"] = _get_field_value(driver, "Delivery Address")
+        result["delivery_name"] = _get_field_by_id(driver, "deliveryname")
+        result["delivery_address"] = _get_field_by_id(driver, "deliveryaddress")
 
-        # Extract Description section
+        # Extract Description directly by ID
+        result["description"] = _get_field_by_id(driver, "description")
+        log.info(f"Found description, length: {len(result['description'])}")
+
+        # Extract Attachments from table with id="AttachmentTable"
         try:
-            description_header = driver.find_element(
-                By.XPATH, ".//*[self::h2 or self::h3][normalize-space(text())='Description']"
-            )
-            description_block = description_header.find_element(By.XPATH, "./following::div[1]")
-            result["description"] = description_block.text.strip()
-            log.info(f"Found description, length: {len(result['description'])}")
-        except Exception as e:
-            log.warning(f"Could not find Description section: {e}")
-
-        # Extract Attachments section
-        try:
-            attachments_header = driver.find_element(
-                By.XPATH, ".//*[self::h2 or self::h3][normalize-space(text())='Attachments']"
-            )
-            attachments_table = attachments_header.find_element(By.XPATH, ".//following::table[1]")
-
+            attachments_table = driver.find_element(By.ID, "AttachmentTable")
             attachment_rows = attachments_table.find_elements(By.CSS_SELECTOR, "tbody tr")
             log.info(f"Found {len(attachment_rows)} attachment row(s)")
 
             for row in attachment_rows:
                 try:
                     cells = row.find_elements(By.CSS_SELECTOR, "td")
-                    if not cells:
+                    if not cells or len(cells) < 2:
                         continue
                     file_name = cells[0].text.strip()
+                    # Download link is in the last cell's <a> tag
                     link_el = cells[-1].find_element(By.TAG_NAME, "a")
                     url = link_el.get_attribute("href")
                     if url:
@@ -404,14 +386,11 @@ def _extract_detail_panel_data(driver: WebDriver, wait: WebDriverWait) -> dict:
                     log.warning(f"Failed to extract attachment row: {e}")
                     continue
         except Exception as e:
-            log.warning(f"Could not find Attachments section: {e}")
+            log.warning(f"Could not find Attachments table: {e}")
 
-        # Extract Line Details section
+        # Extract Line Details from table with id="RfqLineTable"
         try:
-            line_header = driver.find_element(
-                By.XPATH, ".//*[self::h2 or self::h3][normalize-space(text())='Line Details']"
-            )
-            line_table = line_header.find_element(By.XPATH, ".//following::table[1]")
+            line_table = driver.find_element(By.ID, "RfqLineTable")
 
             # Build header map
             header_cells = line_table.find_elements(By.CSS_SELECTOR, "thead th")
@@ -427,27 +406,27 @@ def _extract_detail_panel_data(driver: WebDriver, wait: WebDriverWait) -> dict:
 
             log.info(f"Found {len(result['line_items'])} line items")
         except Exception as e:
-            log.info(f"No Line Details section found (this is OK): {e}")
+            log.info(f"No Line Details table found (this is OK): {e}")
 
     except Exception as e:
-        log.error(f"Detail panel extraction error: {e}", exc_info=True)
+        log.error(f"Modal extraction error: {e}", exc_info=True)
 
-    log.info(f"Returning detail panel data: desc_len={len(result['description'])}, attachments={len(result['attachments'])}")
+    log.info(f"Returning modal data: desc_len={len(result['description'])}, attachments={len(result['attachments'])}")
     return result
 
 
 def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_element) -> dict:
     """
-    Click a table row to populate detail panel, extract data.
-    Returns extracted detail panel data dict.
+    Click a table row to open modal popup, extract data.
+    Returns extracted modal data dict.
     """
     try:
-        # Click the row to populate detail panel
-        log.info("Attempting to click row to populate detail panel...")
+        # Click the row to open modal
+        log.info("Attempting to click row to open modal...")
         driver.execute_script("arguments[0].scrollIntoView({block:'center'});", row_element)
         time.sleep(0.2)
         row_element.click()
-        time.sleep(1.0)  # Wait for detail panel to update
+        time.sleep(1.0)  # Wait for modal to open and populate
 
         # DEBUG: Take screenshot after clicking
         try:
@@ -457,27 +436,27 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
         except Exception:
             pass
 
-        # Extract detail panel data
-        log.info("Extracting detail panel data...")
+        # Extract modal data
+        log.info("Extracting modal data...")
         modal_data = _extract_detail_panel_data(driver, wait)
 
         # Log what we extracted
-        log.info(f"Detail panel extraction result - Description length: {len(modal_data['description'])}, Attachments: {len(modal_data['attachments'])}")
+        log.info(f"Modal extraction result - Description length: {len(modal_data['description'])}, Attachments: {len(modal_data['attachments'])}")
 
-        # Press ESC key (closes any overlay/highlight if present)
+        # Press ESC key to close modal
         try:
             from selenium.webdriver.common.action_chains import ActionChains
             actions = ActionChains(driver)
             actions.send_keys(Keys.ESCAPE).perform()
             time.sleep(0.5)
-            log.info("Pressed ESC to clear any overlays")
+            log.info("Pressed ESC to close modal")
         except Exception as e:
             log.warning(f"Could not press ESC: {e}")
 
         return modal_data
 
     except Exception as e:
-        log.error(f"Failed to extract detail panel data: {e}", exc_info=True)
+        log.error(f"Failed to extract modal data: {e}", exc_info=True)
         return {
             "description": "",
             "attachments": [],
@@ -490,7 +469,7 @@ def _click_row_and_extract_modal(driver: WebDriver, wait: WebDriverWait, row_ele
 
 
 # ------------------------------------------------------------------------------------
-# Main scraper: parse table rows and extract detailed data from detail panel
+# Main scraper: parse table rows and extract detailed data from modal
 # ------------------------------------------------------------------------------------
 def fetch_sync() -> List[RawOpportunity]:
     items: List[RawOpportunity] = []
