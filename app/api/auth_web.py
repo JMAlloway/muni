@@ -1,15 +1,18 @@
 # app/routers/auth_web.py
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
+from fastapi.responses import JSONResponse
 import secrets
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy import text
 from typing import Optional
 import json
+from pathlib import Path
 
 from app.core.db import AsyncSessionLocal
 from app.security import hash_password, verify_password
 from app.auth.session import create_session_token, get_current_user_email, SESSION_COOKIE_NAME
 from app.core.settings import settings
+from app.api.team import _ensure_team_feature_access
 
 from app.api._layout import auth_shell, page_shell
 from app.onboarding.interests import DEFAULT_INTEREST_KEY, list_interest_options
@@ -24,7 +27,7 @@ async def _load_user_by_email(email: str):
         res = await session.execute(
             text(
                 """
-                SELECT email, password_hash, digest_frequency, agency_filter, is_active
+                SELECT email, password_hash, digest_frequency, agency_filter, is_active, id
                 FROM users
                 WHERE email = :email
                 LIMIT 1
@@ -33,6 +36,16 @@ async def _load_user_by_email(email: str):
             {"email": email.lower().strip()},
         )
         return res.fetchone()
+
+
+async def _get_user_id(email: str) -> Optional[str]:
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(
+            text("SELECT id FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+            {"email": email},
+        )
+        row = res.fetchone()
+        return row[0] if row else None
 
 
 # --- signup ----------------------------------------------------------
@@ -82,6 +95,16 @@ async def signup_form(request: Request, next: str = "/"):
       <input type="hidden" name="next" value="{next}">
       <input type="hidden" name="plan" id="plan-hidden" value="{selected_plan}">
       {"<input type='hidden' name='paid' value='1'>" if paid_flag else ""}
+      <div class="form-row">
+        <div class="form-col">
+          <label class="auth-label">First name</label>
+          <input class="auth-input" type="text" name="first_name" placeholder="Jane" required />
+        </div>
+        <div class="form-col">
+          <label class="auth-label">Last name</label>
+          <input class="auth-input" type="text" name="last_name" placeholder="Doe" required />
+        </div>
+      </div>
       <div class="form-row">
         <div class="form-col">
           <label class="auth-label">Email</label>
@@ -176,6 +199,8 @@ async def signup_form(request: Request, next: str = "/"):
 
 @router.post("/signup", response_class=HTMLResponse)
 async def signup_submit(
+    first_name: str = Form(...),
+    last_name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
     next: str = Form("/"),
@@ -216,17 +241,25 @@ async def signup_submit(
         await session.execute(
             text(
                 """
-                INSERT INTO users (email, password_hash, digest_frequency, agency_filter, is_active, created_at, primary_interest, onboarding_step, onboarding_completed)
-                VALUES (:email, :pw, 'daily', '[]', 1, CURRENT_TIMESTAMP, :interest, 'signup', 0)
-                ON CONFLICT(email) DO UPDATE SET
-                  password_hash = excluded.password_hash,
-                  is_active = 1,
-                  primary_interest = :interest,
-                  onboarding_step = 'signup',
-                  onboarding_completed = 0
+                INSERT INTO users (email, password_hash, digest_frequency, agency_filter, is_active, created_at, primary_interest, onboarding_step, onboarding_completed, first_name, last_name)
+                    VALUES (:email, :pw, 'daily', '[]', 1, CURRENT_TIMESTAMP, :interest, 'signup', 0, :first_name, :last_name)
+                    ON CONFLICT(email) DO UPDATE SET
+                      password_hash = excluded.password_hash,
+                      is_active = 1,
+                      primary_interest = :interest,
+                      onboarding_step = 'signup',
+                      first_name = COALESCE(excluded.first_name, users.first_name),
+                      last_name = COALESCE(excluded.last_name, users.last_name),
+                      onboarding_completed = 0
                 """
             ),
-            {"email": email_clean, "pw": pw_hash, "interest": interest_choice},
+            {
+                "email": email_clean,
+                "pw": pw_hash,
+                "interest": interest_choice,
+                "first_name": first_name.strip(),
+                "last_name": last_name.strip(),
+            },
         )
         await session.commit()
 
@@ -379,91 +412,204 @@ async def logout():
     return resp
 
 
+# --- Account APIs ----------------------------------------------------
+@router.get("/api/account/overview", response_class=JSONResponse)
+async def account_overview(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    plan_prices = {
+        "free": {"label": "Free", "amount": "$0", "period": "/month"},
+        "starter": {"label": "Starter", "amount": "$29", "period": "/month"},
+        "professional": {"label": "Professional", "amount": "$99", "period": "/month"},
+        "enterprise": {"label": "Enterprise", "amount": "$299", "period": "/month"},
+    }
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text(
+                """
+                SELECT id, email, first_name, last_name, COALESCE(Tier, tier) AS tier, team_id,
+                       stripe_customer_id, stripe_subscription_id
+                FROM users
+                WHERE lower(email) = lower(:email)
+                LIMIT 1
+                """
+            ),
+            {"email": user_email},
+        )
+        row = res.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id, email, first_name, last_name, tier_raw, team_id, stripe_customer_id, stripe_subscription_id = row
+        tier_key = (tier_raw or "free").strip().lower()
+        plan = plan_prices.get(tier_key, plan_prices["free"])
+
+        tracked_res = await db.execute(
+            text("SELECT COUNT(*) FROM user_bid_trackers WHERE user_id = :uid"), {"uid": user_id}
+        )
+        tracked_count = tracked_res.scalar() or 0
+
+        uploads_res = await db.execute(
+            text("SELECT COUNT(*), COALESCE(SUM(size), 0) FROM user_uploads WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        uploads_row = uploads_res.fetchone() or (0, 0)
+        upload_count = uploads_row[0] or 0
+        upload_size = uploads_row[1] or 0
+
+        members: list[dict] = []
+        team_id_val = team_id
+        user_role = "member"
+        try:
+            user_id_val, team_id_val = await _ensure_team_feature_access(db, user_email)
+            if team_id_val:
+                member_res = await db.execute(
+                    text(
+                        """
+                        SELECT tm.id, tm.user_id, tm.invited_email, tm.role, tm.accepted_at, tm.invited_at,
+                               u.first_name, u.last_name, u.email
+                        FROM team_members tm
+                        LEFT JOIN users u ON u.id = tm.user_id
+                        WHERE tm.team_id = :team
+                        """
+                    ),
+                    {"team": team_id_val},
+                )
+                rows = member_res.fetchall()
+                for r in rows:
+                    mid, m_user_id, invited_email, m_role, accepted_at, invited_at, f, l, u_email = r
+                    email_val = u_email or invited_email
+                    name_val = " ".join([p for p in [(f or "").strip(), (l or "").strip()] if p]).strip()
+                    members.append(
+                        {
+                            "id": mid,
+                            "email": email_val,
+                            "name": name_val or (email_val or ""),
+                            "role": (m_role or "member").lower(),
+                            "accepted": bool(accepted_at),
+                            "accepted_at": accepted_at,
+                            "invited_at": invited_at,
+                        }
+                    )
+                    if m_user_id and str(m_user_id) == str(user_id):
+                        user_role = (m_role or "member").lower()
+        except Exception:
+            members = []
+
+    usage = {
+        "tracked": tracked_count,
+        "documents": {"count": upload_count, "bytes": upload_size},
+        "team": len(members) if members else (1 if user_email else 0),
+        "token_calls": 0,
+    }
+
+    return {
+        "user": {
+            "email": email,
+            "first_name": first_name or "",
+            "last_name": last_name or "",
+            "name": " ".join([p for p in [first_name or "", last_name or ""] if p]).strip() or email,
+            "tier": plan["label"],
+            "tier_key": tier_key,
+            "role": user_role,
+        },
+        "plan": {
+            "label": plan["label"],
+            "amount": plan["amount"],
+            "period": plan["period"],
+            "billing_url": "/billing",
+            "stripe_customer_id": stripe_customer_id,
+            "stripe_subscription_id": stripe_subscription_id,
+        },
+        "usage": usage,
+        "team": {
+            "members": members,
+            "team_id": team_id_val,
+        },
+    }
+
+
+@router.post("/api/account/profile", response_class=JSONResponse)
+async def update_profile(request: Request, payload: dict):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    first_name = (payload.get("first_name") or "").strip()
+    last_name = (payload.get("last_name") or "").strip()
+    if not first_name or not last_name:
+        raise HTTPException(status_code=400, detail="First and last name required")
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                UPDATE users
+                SET first_name = :fn, last_name = :ln
+                WHERE lower(email) = lower(:email)
+                """
+            ),
+            {"fn": first_name, "ln": last_name, "email": user_email},
+        )
+        await db.commit()
+    return {"ok": True}
+
+
+@router.get("/api/company-profile", response_class=JSONResponse)
+async def get_company_profile(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+    user_id = await _get_user_id(user_email)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1"),
+            {"uid": user_id},
+        )
+        row = res.fetchone()
+        data = row[0] if row else {}
+        return {"data": data or {}}
+
+
+@router.post("/api/company-profile", response_class=JSONResponse)
+async def save_company_profile(request: Request, payload: dict):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+    user_id = await _get_user_id(user_email)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                INSERT INTO company_profiles (id, user_id, data, created_at, updated_at)
+                VALUES (:id, :uid, :data, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                  data = excluded.data,
+                  updated_at = CURRENT_TIMESTAMP
+                """
+            ),
+            {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(payload or {})},
+        )
+        await db.commit()
+    return {"ok": True}
+
+
 # --- minimal /account (optional) ------------------------------------
 
 @router.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request):
     user_email = get_current_user_email(request)
     if not user_email:
-        # gentle sign-in prompt; do NOT redirect here
-        return HTMLResponse(
-            page_shell(
-                """
-          <section class="card"><h2 class="section-heading">You're signed out</h2>
-          <a class="button-primary" href="/login">Sign in</a></section>
-                """,
-                title="My Account - EasyRFP",
-                user_email=None,
-            )
-        )
+        return RedirectResponse("/login?next=/account", status_code=303)
 
-    body = """
-<section class="card" style="border:0; box-shadow:none; padding:0;">
-  <div class="account-hero">
-    <div>
-      <h2 class="title">My Account</h2>
-      <p class="subtext">Signed in as <b>{user_email}</b></p>
-      <div class="account-meta">
-        <span class="pill">Active</span>
-        <span>Alerts, tracker, and uploads included</span>
-      </div>
-    </div>
-    <div><a class="button-primary" href="/logout">Sign out</a></div>
-  </div>
-  <div class="account-subnav">
-    <a class="primary" href="/account">Overview</a>
-    <a href="/onboarding">Preferences &amp; onboarding</a>
-    <a href="/tracker/dashboard">Dashboard</a>
-    <a href="/account/team">Team</a>
-  </div>
-</section>
-
-<div class="account-grid">
-  <div class="account-card">
-    <h3>Profile</h3>
-    <p>Manage your sign-in, contact email, and organization details.</p>
-    <div class="actions">
-      <a class="button-primary" href="/login?next=/account">Manage sign-in</a>
-    </div>
-  </div>
-  <div class="account-card">
-    <h3>Preferences &amp; onboarding</h3>
-    <p>Tell us what you buy so alerts and the dashboard stay relevant.</p>
-    <div class="actions">
-      <a class="btn-secondary" href="/onboarding">Open preferences</a>
-    </div>
-  </div>
-  <div class="account-card">
-    <h3>Notifications</h3>
-    <p>Control email digests and important updates.</p>
-    <div class="actions">
-      <a class="btn-secondary" href="/preferences">Notification settings</a>
-    </div>
-  </div>
-  <div class="account-card">
-    <h3>Tracker &amp; uploads</h3>
-    <p>Jump to your bid dashboard to update status or upload files.</p>
-    <div class="actions">
-      <a class="btn-secondary" href="/tracker/dashboard">Go to dashboard</a>
-    </div>
-  </div>
-  <div class="account-card">
-    <h3>Team (Professional)</h3>
-    <p>Invite up to 3 teammates to collaborate on bids and notes.</p>
-    <div class="actions">
-      <a class="btn-secondary" href="/account/team">Manage team</a>
-    </div>
-  </div>
-</div>
-    """
-    body = body.format(user_email=user_email)
-    return HTMLResponse(
-        page_shell(
-            body,
-            title="My Account - EasyRFP",
-            user_email=user_email,
-        )
-    )
+    static_account = Path(__file__).resolve().parent.parent / "web" / "static" / "account.html"
+    return FileResponse(static_account)
 
 
 @router.get("/account/team", response_class=HTMLResponse)
@@ -471,6 +617,10 @@ async def team_settings(request: Request):
     user_email = get_current_user_email(request)
     if not user_email:
         return RedirectResponse("/login?next=/account/team", status_code=303)
+
+@router.get("/account/preferences", response_class=HTMLResponse)
+async def account_preferences_redirect():
+    return RedirectResponse("/preferences", status_code=303)
 
     body = """
 <section class="card team-shell">

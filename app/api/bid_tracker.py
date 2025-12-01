@@ -69,6 +69,27 @@ async def _resolve_opportunity_id(key: str) -> int:
 
 
 # ============================================================
+# Utility: active tracker count
+# ============================================================
+
+@router.get("/count", include_in_schema=False)
+async def tracker_count(user=Depends(_require_user)):
+    """
+    Return count of active (non-archived) tracked opportunities for the current user.
+    """
+    async with engine.begin() as conn:
+        res = await conn.exec_driver_sql(
+            """
+            SELECT COUNT(*) FROM user_bid_trackers
+            WHERE user_id = :uid AND COALESCE(status, '') NOT LIKE '%archive%'
+            """,
+            {"uid": user["id"]},
+        )
+        count = res.scalar() or 0
+    return {"count": count}
+
+
+# ============================================================
 # Routes
 # ============================================================
 
@@ -81,7 +102,7 @@ async def track_opportunity(opportunity_key: str, user=Depends(_require_user)):
     oid = await _resolve_opportunity_id(opportunity_key)
 
     async with engine.begin() as conn:
-        result = await conn.exec_driver_sql(
+        await conn.exec_driver_sql(
             """
             INSERT INTO user_bid_trackers (user_id, opportunity_id)
             VALUES (:uid, :oid)
@@ -89,36 +110,60 @@ async def track_opportunity(opportunity_key: str, user=Depends(_require_user)):
             """,
             {"uid": user["id"], "oid": oid}
         )
+        count_res = await conn.exec_driver_sql(
+            """
+            SELECT COUNT(*) FROM user_bid_trackers
+            WHERE user_id = :uid AND COALESCE(status, '') NOT LIKE '%archive%'
+            """,
+            {"uid": user["id"]},
+        )
+        count = count_res.scalar() or 0
 
     first_time = await record_milestone(user["email"], "tracked_first", {"opportunity_id": oid})
 
-    return {"ok": True, "first_time": first_time}
+    return {"ok": True, "first_time": first_time, "count": count}
 
 
 @router.get("/{opportunity_key}")
 async def get_tracker(opportunity_key: str, user=Depends(_require_user)):
     """
     Return tracker entry for this user/opportunity.
-    404 if not found.
+    If not tracked, return a benign payload instead of raising.
+    Best-effort even if the opportunity row is missing.
     """
-    oid = await _resolve_opportunity_id(opportunity_key)
-
     async with engine.begin() as conn:
+        # Try exact opportunity_id match first
+        if opportunity_key.isdigit():
+            res = await conn.exec_driver_sql(
+                """
+                SELECT id, status, notes, created_at
+                FROM user_bid_trackers
+                WHERE user_id = :uid AND opportunity_id = :oid
+                LIMIT 1
+                """,
+                {"uid": user["id"], "oid": int(opportunity_key)},
+            )
+            row = res.first()
+            if row:
+                return dict(row._mapping)
+
+        # Then try via external_id join
         res = await conn.exec_driver_sql(
             """
-            SELECT id, status, notes, created_at
-            FROM user_bid_trackers
-            WHERE user_id = :uid AND opportunity_id = :oid
+            SELECT t.id, t.status, t.notes, t.created_at
+            FROM user_bid_trackers t
+            JOIN opportunities o ON o.id = t.opportunity_id
+            WHERE t.user_id = :uid AND (o.external_id = :key OR CAST(o.id AS TEXT) = :key)
             LIMIT 1
             """,
-            {"uid": user["id"], "oid": oid}
+            {"uid": user["id"], "key": opportunity_key},
         )
         row = res.first()
+        if row:
+            return dict(row._mapping)
 
-    if not row:
-        raise HTTPException(status_code=404, detail="Not tracked")
-
-    return dict(row._mapping)
+    # not tracked
+    return {"id": None, "status": None, "notes": "", "created_at": None, "tracked": False}
 
 
 @router.patch("/{opportunity_key}")
@@ -193,16 +238,60 @@ async def delete_tracker(opportunity_key: str, user=Depends(_require_user)):
     """
     Delete the tracker row for this user/opportunity.
     Safe to call; no-op if it doesn't exist.
+    Best-effort even if the opportunity row is missing.
     """
-    oid = await _resolve_opportunity_id(opportunity_key)
+    oid = None
+    try:
+        oid = await _resolve_opportunity_id(opportunity_key)
+    except HTTPException:
+        if opportunity_key.isdigit():
+            oid = int(opportunity_key)
 
     async with engine.begin() as conn:
-        await conn.exec_driver_sql(
+        if oid is not None:
+            await conn.exec_driver_sql(
+                """
+                DELETE FROM user_bid_trackers
+                WHERE user_id = :uid AND opportunity_id = :oid
+                """,
+                {"uid": user["id"], "oid": oid},
+            )
+        else:
+            # fallback: try deleting by external_id mapping
+            await conn.exec_driver_sql(
+                """
+                DELETE FROM user_bid_trackers
+                WHERE user_id = :uid
+                  AND opportunity_id IN (
+                    SELECT id FROM opportunities WHERE external_id = :ext LIMIT 1
+                  )
+                """,
+                {"uid": user["id"], "ext": opportunity_key},
+            )
+        count_res = await conn.exec_driver_sql(
             """
-            DELETE FROM user_bid_trackers
-            WHERE user_id = :uid AND opportunity_id = :oid
+            SELECT COUNT(*) FROM user_bid_trackers
+            WHERE user_id = :uid AND COALESCE(status, '') NOT LIKE '%archive%'
             """,
-            {"uid": user["id"], "oid": oid},
+            {"uid": user["id"]},
         )
+        count = count_res.scalar() or 0
 
-    return {"ok": True}
+    return {"ok": True, "count": count}
+
+
+@router.get("/count")
+async def tracker_count(user=Depends(_require_user)):
+    """
+    Return count of active (non-archived) tracked opportunities for the current user.
+    """
+    async with engine.begin() as conn:
+        res = await conn.exec_driver_sql(
+            """
+            SELECT COUNT(*) FROM user_bid_trackers
+            WHERE user_id = :uid AND COALESCE(status, '') NOT LIKE '%archive%'
+            """,
+            {"uid": user["id"]},
+        )
+        count = res.scalar() or 0
+    return {"count": count}

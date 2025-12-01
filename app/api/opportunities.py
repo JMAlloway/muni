@@ -1,5 +1,6 @@
 ﻿        # Track button: use data-* (no inline JS)
 
+from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
@@ -12,6 +13,17 @@ from app.api._layout import page_shell
 from app.auth.auth_utils import require_login
 from app.data.agencies import AGENCIES
 
+TEMPLATE_DIR = Path(__file__).parent / "templates" / "opportunities"
+
+
+def render_template(name: str, context: dict[str, str] | None = None) -> str:
+    content = (TEMPLATE_DIR / name).read_text(encoding="utf-8")
+    if not context:
+        return content
+    for key, value in context.items():
+        content = content.replace(f"{{{{{key}}}}}", value)
+    return content
+
 router = APIRouter(tags=["opportunities"])
 
 
@@ -21,6 +33,16 @@ async def opportunities(request: Request):
     user_email = await require_login(request)
     if isinstance(user_email, RedirectResponse):
         return user_email
+
+    user_id = None
+    async with engine.begin() as conn:
+        uid_res = await conn.execute(
+            text("SELECT id FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+            {"email": user_email},
+        )
+        uid_row = uid_res.first()
+        if uid_row:
+            user_id = uid_row[0]
 
     query_params = request.query_params
 
@@ -41,7 +63,11 @@ async def opportunities(request: Request):
     search_filter = query_params.get("search", "").strip()
     due_within_raw = query_params.get("due_within", "").strip()
     sort_by = query_params.get("sort_by", "soonest_due").strip()
-    status_filter = query_params.get("status", "").strip().lower()
+    status_vals = query_params.getlist("status") if hasattr(query_params, "getlist") else []
+    if not status_vals:
+        status_vals = [query_params.get("status", "open")]
+    raw_status = (status_vals[-1] or "").strip().lower()
+    status_filter = "" if raw_status in {"", "all", "any"} else raw_status
 
     # -------- saved preferences (agencies, keywords) --------
     pref_agencies = []
@@ -105,7 +131,7 @@ async def opportunities(request: Request):
 
     # optional status-only filter
     if status_filter == "open":
-        where_clauses.append("(status IS NULL OR TRIM(LOWER(status)) LIKE 'open%')")
+        where_clauses.append("(opportunities.status IS NULL OR TRIM(LOWER(opportunities.status)) LIKE 'open%')")
 
     # specialties / tags filter
     tags_raw = query_params.get("tags", "")
@@ -153,21 +179,26 @@ async def opportunities(request: Request):
         result = await conn.execute(
             text(f"""
                 SELECT
-                    id AS opp_id,
-                    external_id,
-                    title,
-                    agency_name,
-                    due_date,
-                    source_url,
-                    status,
-                    COALESCE(ai_category, category) AS category,
-                    date_added
+                    opportunities.id AS opp_id,
+                    opportunities.external_id,
+                    opportunities.title,
+                    opportunities.agency_name,
+                    opportunities.due_date,
+                    opportunities.source_url,
+                    opportunities.status,
+                    COALESCE(opportunities.ai_category, opportunities.category) AS category,
+                    opportunities.date_added,
+                    (ubt.opportunity_id IS NOT NULL) AS is_tracked
                 FROM opportunities
+                LEFT JOIN user_bid_trackers ubt
+                  ON ubt.opportunity_id = opportunities.id
+                 AND ubt.user_id = :track_user_id
+                 AND COALESCE(ubt.status, '') NOT LIKE '%archive%'
                 WHERE {where_sql}
                 ORDER BY {order_sql}
                 LIMIT :limit_val OFFSET :offset_val
             """),
-            sql_params,
+            {**sql_params, "track_user_id": user_id},
         )
         rows = result.fetchall()
 
@@ -204,6 +235,21 @@ async def opportunities(request: Request):
     if not agencies:
         agencies = AGENCIES
 
+    tracking_count = 0
+    if user_id:
+        async with engine.begin() as conn:
+            track_res = await conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM user_bid_trackers
+                    WHERE user_id = :uid
+                      AND COALESCE(status, '') NOT LIKE '%archive%'
+                    """
+                ),
+                {"uid": user_id},
+            )
+            tracking_count = track_res.scalar() or 0
+
     open_count = stats_row[0] if stats_row else 0
     agency_count = stats_row[1] if stats_row else 0
     next_due = stats_row[2] if stats_row and stats_row[2] else None
@@ -218,23 +264,6 @@ async def opportunities(request: Request):
             next_due_str = "-"
     else:
         next_due_str = "-"
-    stats_html = f"""
-<div class="stats">
-  <div class="item">
-    <div class="value">{open_count}</div>
-    <div class="label">Open bids</div>
-  </div>
-  <div class="item">
-    <div class="value">{agency_count}</div>
-    <div class="label">Agencies</div>
-  </div>
-  <div class="item">
-    <div class="value">{next_due_str}</div>
-    <div class="label">Next due date</div>
-  </div>
-</div>
-"""
-
     # fallback URLs for agencies whose scraped link is a JS action
     agency_fallback_urls = {
         "Central Ohio Transit Authority (COTA)": "https://cota.dbesystem.com/FrontEnd/proposalsearchpublic.asp",
@@ -277,7 +306,7 @@ async def opportunities(request: Request):
 </svg>
 """.strip()
 
-    for opp_id, external_id, title, agency, due, url, status, category, date_added in rows:
+    for opp_id, external_id, title, agency, due, url, status, category, date_added, is_tracked in rows:
         due_date_str = "-"
         due_time_str = ""
         due_cell_class = "due-cell"
@@ -340,10 +369,12 @@ async def opportunities(request: Request):
         else:
             solicitation_html = "<span class='solicitation-id'>-</span>"
 
+        tracked_class = " tracked" if is_tracked else ""
         track_btn_html = (
-            "<button class='track-btn' "
+            f"<button class='track-btn{tracked_class}' "
             f"data-opp-id='{opp_id}' "
             f"data-ext='{_esc_attr(external_id or '')}' "
+            f"data-tracked='{1 if is_tracked else 0}' "
             "title='Track this bid'>"
             f"{track_icon}</button>"
         )
@@ -424,74 +455,6 @@ async def opportunities(request: Request):
 
     # specialties input & chips
     tags_value = ",".join(tags_filter)
-    chips_html = ""
-    if tags_filter:
-        chips = "".join([f"<span class='chip'>{_esc_attr(t)}</span>" for t in tags_filter])
-        chips_html = f"""
-        <div class="filter-chips">
-          <span>Specialties:</span>
-          {chips}
-          <a href="/opportunities?agency=" class="chip-clear">Clear</a>
-        </div>
-        """
-
-    body_filter_html = f"""
-    <section class="card filter-card" style="padding:18px 18px 14px;">
-      
-      <div class="filter-head">
-        <div>
-          <h3 class="section-heading">Filters</h3>
-          <div class="subtext">Blend your saved specialties with quick tweaks.</div>
-        </div>
-        <a href="/opportunities?agency=" class="reset-link">Reset</a>
-      </div>
-
-      <form method="GET" action="/opportunities">
-        <div class="filter-grid">
-          <div class="form-col">
-            <label class="label-small">Agency</label>
-            <select name="agency">
-              {''.join(agency_options_html)}
-            </select>
-          </div>
-
-          <div class="form-col">
-            <label class="label-small">Search title</label>
-            <input type="text" name="search" value="{search_filter}" placeholder="road, managed services, HVAC..." />
-          </div>
-
-          <div class="form-col">
-            <label class="label-small">Specialties</label>
-            <input type="text" name="tags" value="{tags_value}" placeholder="hvac, paving, it" />
-          </div>
-
-          <div class="form-col">
-            <label class="label-small">Due within</label>
-            <select name="due_within">
-              {''.join([f"<option value='{val}' {'selected' if ((val=='' and due_within is None) or (val and due_within is not None and val==str(due_within))) else ''}>{label}</option>" for val,label in [('', 'Any due date'), ('7','Next 7 days'), ('30','Next 30 days'), ('90','Next 90 days')]])}
-            </select>
-          </div>
-
-          <div class="form-col">
-            <label class="label-small">Status</label>
-            <label class="checkbox-row"><input type="checkbox" name="status" value="open" {'checked' if status_filter=='open' else ''}/> Open only</label>
-          </div>
-
-          <div class="form-col">
-            <label class="label-small">Sort by</label>
-            <select name="sort_by">
-              {''.join([f"<option value='{v}' {'selected' if sort_by==v else ''}>{l}</option>" for v,l in [('soonest_due','Soonest due'),('latest_due','Latest due'),('agency_az','Agency A-Z'),('title_az','Title A-Z')]])}
-            </select>
-          </div>
-
-          <div class="form-col" style="max-width:220px;">
-            <button class="button-primary" type="submit" style="width:100%;">Apply</button>
-          </div>
-        </div>
-      </form>
-      {chips_html}
-    </section>
-    """
 
     # -------- pagination links --------
     def page_href(p: int) -> str:
@@ -534,354 +497,57 @@ async def opportunities(request: Request):
 
     pagination_html = "<div class='pagination'>" + "".join(pagination_btns) + "</div>"
 
-    # --- redesigned stats + filters + table markup ---
-    tracking_count = len(rows)
-    stats_html = f"""
-    <div class="stats-row fade-in">
-      <div class="stat-card">
-        <div class="stat-icon open">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="15" y2="15"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{open_count}</span>
-          <span class="stat-label">Open Bids</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon agencies">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 21h18"/>
-            <path d="M5 21V7l8-4v18"/>
-            <path d="M19 21V11l-6-4"/>
-            <path d="M9 9v.01"/>
-            <path d="M9 12v.01"/>
-            <path d="M9 15v.01"/>
-            <path d="M9 18v.01"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{agency_count}</span>
-          <span class="stat-label">Agencies</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon deadline">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value date">{next_due_str}</span>
-          <span class="stat-label">Next Due Date</span>
-        </div>
-      </div>
-      <div class="stat-card featured">
-        <div class="stat-icon tracking">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{tracking_count}</span>
-          <span class="stat-label">Tracking</span>
-        </div>
-      </div>
-    </div>
-    """
+    stats_html = render_template(
+        "stats.html",
+        {
+            "OPEN_COUNT": str(open_count),
+            "AGENCY_COUNT": str(agency_count),
+            "NEXT_DUE": _esc_attr(next_due_str),
+            "TRACKING_COUNT": str(tracking_count),
+        },
+    )
 
-    filters_html = f"""
-    <div class="filters-card fade-in">
-      <div class="filters-header">
-        <h3 class="filters-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
-          Filters
-        </h3>
-        <a class="reset-btn" href="/opportunities">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-          </svg>
-          Reset
-        </a>
-      </div>
-      <form method="GET" action="/opportunities">
-        <div class="filters-grid">
-          <div class="filter-group">
-            <label class="filter-label">Agency</label>
-            <div class="select-wrapper">
-              <select class="filter-select" name="agency">{''.join(agency_options_html)}</select>
-              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </div>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">Search title</label>
-            <div class="search-wrapper">
-              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input class="filter-input" type="text" name="search" value="{_esc_attr(search_filter)}" placeholder="e.g. HVAC, roofing, IT services..." />
-            </div>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">Specialties</label>
-            <div class="select-wrapper">
-              <input class="filter-input" type="text" name="tags" value="{_esc_attr(tags_value)}" placeholder="hvac, paving, it" />
-            </div>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">Due within</label>
-            <div class="select-wrapper">
-              <select class="filter-select" name="due_within">{''.join(duewithin_options_html)}</select>
-              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div class="filters-footer">
-          <div class="status-toggle">
-            <label class="toggle-label">
-              <input type="checkbox" name="status" value="open" {'checked' if status_filter=='open' else ''}/>
-              <span class="toggle-switch"></span>
-              <span class="toggle-text">Open only</span>
-            </label>
-          </div>
-          <div class="sort-group">
-            <span class="filter-label">Sort by</span>
-            <div class="select-wrapper small">
-              <select class="filter-select" name="sort_by">{''.join(sort_options_html)}</select>
-              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </div>
-          </div>
-          <button class="apply-btn" type="submit">
-            Apply filters
-          </button>
-        </div>
-      </form>
-    </div>
-    """
+    filters_html = render_template(
+        "filters.html",
+        {
+            "AGENCY_OPTIONS": "".join(agency_options_html),
+            "SEARCH_VALUE": _esc_attr(search_filter),
+            "TAGS_VALUE": _esc_attr(tags_value),
+            "DUE_OPTIONS": "".join(duewithin_options_html),
+            "STATUS_CHECKED": "checked" if status_filter == "open" else "",
+            "SORT_OPTIONS": "".join(sort_options_html),
+        },
+    )
 
     showing_start = offset + 1 if rows else 0
     showing_end = offset + len(rows)
 
-    table_html = f"""
-    <div class="table-card fade-in">
-      <div class="table-header">
-        <div class="results-count">Showing <strong>{showing_start}-{showing_end}</strong> of {total_count} results</div>
-        <div class="table-actions">
-          <button class="table-action-btn" type="button" onclick="window.location='/opportunities/export'" aria-label="Export results">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 5v14"/><path d="M5 12l7 7 7-7"/><path d="M5 5h14"/>
-            </svg>
-            Export
-          </button>
-        </div>
-      </div>
-      <div class="table-wrapper">
-        <table class="opportunities-table">
-          <thead>
-            <tr>
-              <th>Solicitation #</th>
-              <th>Title</th>
-              <th>Agency</th>
-              <th>Date Added</th>
-              <th>Due Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {''.join(table_rows_html) if table_rows_html else "<tr><td colspan='7' class='muted'>No results found.</td></tr>"}
-          </tbody>
-        </table>
-      </div>
-      <div class="table-footer">
-        <div class="pagination-info">Page {page} of {total_pages}</div>
-        {pagination_html}
-      </div>
-    </div>
-    """
+    table_html = render_template(
+        "table.html",
+        {
+            "SHOWING_START": str(showing_start),
+            "SHOWING_END": str(showing_end),
+            "TOTAL_COUNT": str(total_count),
+            "ROWS_HTML": "".join(table_rows_html)
+            if table_rows_html
+            else "<tr><td colspan='7' class='muted'>No results found.</td></tr>",
+            "PAGE": str(page),
+            "TOTAL_PAGES": str(total_pages),
+            "PAGINATION_HTML": pagination_html,
+        },
+    )
 
-    # -------- modal HTML + JS --------
-    # NOTE: this is a plain triple-quoted string, not an f-string,
-    # so we can safely use JS template literals (${...}) inside it.
-    modal_js = """
-<!-- Track Drawer (no uploads here) -->
-<div id="bid-drawer" class="drawer hidden">
-  <div class="drawer-header">
-    <h3 id="drawer-title">Bid Tracker</h3>
-    <button class="btn-secondary" style="padding:6px 10px;border-radius:8px;" onclick="closeDrawer()" aria-label="Close">&times;</button>
-  </div>
-  <div class="drawer-body">
-    <section class="card">
-      <div class="row" style="justify-content:space-between;align-items:center;gap:10px;">
-        <div style="max-width:65%;">
-          <div class="label-small">Solicitation</div>
-          <div id="drawer-solicitation" style="font-weight:600;word-break:break-word;"></div>
-          <input type="hidden" id="opp-id" />
-        </div>
-        <div style="flex-shrink:0;">
-          <a class="btn-secondary" href="/tracker/dashboard" target="_blank">Open My Dashboard &rarr;</a>
-        </div>
-      </div>
-    </section>
+    modal_html = render_template("modal.html")
 
-    <section class="card">
-      <label class="label">Status</label>
-      <select id="tracker-status" style="width:100%;">
-        <option value="prospecting">Prospecting</option>
-        <option value="deciding">Deciding</option>
-        <option value="drafting">Drafting</option>
-        <option value="submitted">Submitted</option>
-        <option value="won">Won</option>
-        <option value="lost">Lost</option>
-      </select>
-
-      <label class="label" style="margin-top:10px;">Notes</label>
-      <textarea id="tracker-notes" rows="4" placeholder="Add notes."></textarea>
-
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn" id="save-tracker-btn">Save</button>
-        <button class="btn-secondary" onclick="window.open('/tracker/dashboard?focus='+document.getElementById('opp-id').value,'_blank')">
-          Manage Files in Dashboard
-        </button>
-      </div>
-      <div id="tracker-save-msg" class="muted" style="margin-top:8px;"></div>
-    </section>
-  </div>
-</div>
-<!-- Modal overlay for RFQ / solicitation detail -->
-<div id="rfq-modal-overlay" style="display:none;">
-  <div id="rfq-modal-card">
-    <button onclick="closeDetailModal()" id="rfq-close">&times;</button>
-    <div id="rfq-modal-content">Loading.</div>
-  </div>
-</div>
-
-<script>
-async function api(path, init = {}) {
-  const token = (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || "";
-  const method = (init.method||"GET").toUpperCase();
-  const headers = Object.assign({}, init.headers||{});
-  if (method !== "GET") { headers["X-CSRF-Token"] = token; }
-  const res = await fetch(path, { credentials: "include", ...init, headers });
-  if (res.status === 401) {
-    const next = location.pathname + location.search;
-    const oppId = document.getElementById("opp-id")?.value || "";
-    const hash = oppId ? ("#openTracker:" + oppId) : "";
-    window.location.href = "/login?next=" + encodeURIComponent(next + hash);
-    throw new Error("Auth required");
-  }
-  return res;
-}
-
-async function openTrackerDrawer(oppId, extId) {
-  document.getElementById('opp-id').value = oppId;
-  document.getElementById('drawer-solicitation').textContent = extId || '(no ext id)';
-  document.getElementById('tracker-save-msg').textContent = '';
-
-  try {
-    await api(`/tracker/${oppId}/track`, { method: 'POST' });
-    const res = await api(`/tracker/${oppId}`);
-    if (res.ok) {
-      const t = await res.json();
-      document.getElementById('tracker-status').value = t.status || 'prospecting';
-      document.getElementById('tracker-notes').value  = t.notes  || '';
-    }
-  } catch (_) { return; }
-
-  document.getElementById('bid-drawer').classList.remove('hidden');
-}
-
-document.addEventListener('click', async (e) => {
-  const rfq = e.target.closest('.rfq-btn');
-  if (rfq) {
-    e.preventDefault();
-    const id = rfq.getAttribute('data-ext') || '';
-    const ag = rfq.getAttribute('data-agency') || '';
-    if (typeof openDetailModal === 'function') {
-      openDetailModal(id, ag);
-    }
-    return;
-  }
-  const track = e.target.closest('.track-btn');
-  if (track) {
-    openTrackerDrawer(track.dataset.oppId, track.dataset.ext || '');
-    return;
-  }
-  if (e.target && e.target.id === 'save-tracker-btn') {
-    const oppId = document.getElementById('opp-id').value;
-    const payload = {
-      status: document.getElementById('tracker-status').value,
-      notes:  document.getElementById('tracker-notes').value
-    };
-    try {
-      const res = await api(`/tracker/${oppId}`, {
-        method: 'PATCH',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      });
-      document.getElementById('tracker-save-msg').textContent =
-        res.ok ? 'Saved.' : 'Save failed.';
-    } catch (_) {}
-  }
-});
-</script>
-
-"""
-
-    body_html = f"""
-<main class="page">
-  <div class="page-header fade-in">
-    <div class="page-title-section">
-      <h1 class="page-title">Open Opportunities</h1>
-      <p class="page-subtitle">Live feed from municipal procurement portals. Updated automatically every few hours.</p>
-    </div>
-  </div>
-  {stats_html}
-  {filters_html}
-  {table_html}
-</main>
-
-<!-- vendor sidebar markup -->
-<div id="vendor-overlay" onclick="closeVendorGuide()"></div>
-<div id="vendor-guide-panel">
-  <div id="vendor-guide-header">
-    <div>
-      <h2>How to bid</h2>
-      <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
-    </div>
-    <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">&times;</button>
-  </div>
-  <div id="vendor-guide-content">Loading...</div>
-</div>
-
-{modal_js}
-<link rel="stylesheet" href="/static/css/vendor.css"> 
-<link rel="stylesheet" href="/static/css/highlight.css"> 
-<link rel="stylesheet" href="/static/css/bid_tracker.css"> 
-<link rel="stylesheet" href="/static/css/opportunities.css?v=2"> 
-
-<script src="/static/js/vendor.js"></script>
-<script src="/static/js/highlight.js"></script>
-<script src="/static/js/rfq_modal.js"></script>
-<script src="/static/js/bid_tracker.js"></script>
-
-"""
+    body_html = render_template(
+        "page.html",
+        {
+            "STATS_HTML": stats_html,
+            "FILTERS_HTML": filters_html,
+            "TABLE_HTML": table_html,
+            "MODAL_HTML": modal_html,
+        },
+    )
 
     return HTMLResponse(
         page_shell(

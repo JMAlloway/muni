@@ -121,8 +121,8 @@ async def calendar_page(request: Request):
     """
     user_email = get_current_user_email(request)
     body = """
-<link rel="stylesheet" href="/static/css/dashboard.css?v=__VER__">
-<link rel="stylesheet" href="/static/css/calendar.css?v=__VER__">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/calendar.css">
 <main class="page calendar-page">
   <div class="calendar-header fade-in">
     <div class="calendar-title-section">

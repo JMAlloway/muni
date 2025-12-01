@@ -67,6 +67,7 @@ from app.core.db_migrations import (
     ensure_team_schema,
     ensure_user_tier_column,
     ensure_billing_schema,
+    ensure_company_profile_schema,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -90,6 +91,20 @@ async def log_every_request(request: Request, call_next):
             print(base + f" Location={loc}")
         else:
             print(base)
+    except Exception:
+        pass
+    return response
+
+# -------------------------------------------------------------------
+# Dev-only: disable caching for static assets to see live CSS/JS
+# -------------------------------------------------------------------
+@app.middleware("http")
+async def disable_cache_for_static(request: Request, call_next):
+    response = await call_next(request)
+    try:
+        env = (settings.ENV or "").lower()
+        if env in {"local", "dev", "development"} and request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store"
     except Exception:
         pass
     return response
@@ -269,6 +284,7 @@ async def on_startup():
         await ensure_team_schema(engine)
         await ensure_user_tier_column(engine)
         await ensure_billing_schema(engine)
+        await ensure_company_profile_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 

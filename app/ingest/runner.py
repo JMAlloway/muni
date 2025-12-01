@@ -36,6 +36,7 @@ from app.ingest.municipalities import city_worthington
 from app.ingest.municipalities import city_grandview_heights
 from app.ingest.municipalities import swaco
 from app.ingest.municipalities import cota
+from app.ingest.municipalities import cota_improved
 from app.ingest.municipalities import franklin_county
 from app.ingest.municipalities import city_westerville
 from app.ingest.municipalities import columbus_metropolitan_library
@@ -299,25 +300,26 @@ async def run_ingestors_once() -> int:
     sources = [
          #mock_ingestor.fetch,
          city_columbus.fetch,
-         city_grove_city.fetch,
-         city_gahanna.fetch,
-         city_marysville.fetch,
-         city_whitehall.fetch,
-         city_worthington.fetch,
-         city_grandview_heights.fetch,
-         swaco.fetch,
-         cota.fetch,
-         franklin_county.fetch,
-         city_westerville.fetch,
-         columbus_metropolitan_library.fetch,
-         cmha.fetch,
-         metro_parks.fetch,
-         columbus_airports.fetch,
-         morpc.fetch,
-         dublin_city_schools.fetch,
-         minerva_park.fetch,
-         city_new_albany.fetch,
-         ohiobuys.fetch,
+         #city_grove_city.fetch,
+         #city_gahanna.fetch,
+         #city_marysville.fetch,
+         #city_whitehall.fetch,
+         #city_worthington.fetch,
+         #city_grandview_heights.fetch,
+         #swaco.fetch,
+         #cota.fetch,
+         #cota_improved.fetch,
+         #franklin_county.fetch,
+         #city_westerville.fetch,
+         #columbus_metropolitan_library.fetch,
+         #cmha.fetch,
+         #metro_parks.fetch,
+         #columbus_airports.fetch,
+         #morpc.fetch,
+         #dublin_city_schools.fetch,
+         #minerva_park.fetch,
+         #city_new_albany.fetch,
+         #ohiobuys.fetch,
     ]
 
     total = 0

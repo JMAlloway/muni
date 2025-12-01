@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Dashboard - EasyRFP</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="scroll-progress" id="scrollProgress"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="12" fill="url(#grad1)"/>
+          <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#126a45"/>
+              <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>EasyRFP</span>
+      </div>
+
+      <div class="nav-label">Main Menu</div>
+      <nav class="navlinks">
+        <a href="index.html" class="nav-link">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="opportunities.html" class="nav-link">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-text">Discover Bids</span>
+        </a>
+        <a href="dashboard-demo.html" class="nav-link active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">My Dashboard</span>
+        </a>
+        <a href="documents.html" class="nav-link">
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Documents</span>
+        </a>
+        <a href="calendar.html" class="nav-link">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Calendar</span>
+        </a>
+      </nav>
+
+      <div class="nav-label" style="margin-top: 24px;">Account</div>
+      <nav class="navlinks">
+        <a href="#" class="nav-link">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">Support</span>
+        </a>
+      </nav>
+    </aside>
+
+    <div class="content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="top-pill" href="index.html">
+            <span>←</span>
+            <span class="top-label">Back to Site</span>
+          </a>
+          <span class="top-pill">
+            <span>⚡</span>
+            <span class="top-label">Plan:</span>
+            <strong>Professional</strong>
+            <a href="#" class="top-upgrade">Upgrade</a>
+          </span>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn tooltip" data-tooltip="Notifications" type="button">
+            🔔
+            <span class="notif-dot">3</span>
+          </button>
+          <button class="icon-btn tooltip" data-tooltip="Help Center">❓</button>
+          <button class="avatar-button">
+            <span class="avatar-circle">JD</span>
+            <span style="font-size: 10px; color: #94a3b8;">▼</span>
+          </button>
+        </div>
+      </div>
+
+      <main class="page">
+        <div class="team-bar fade-in">
+          <div class="team-info">
+            <div class="team-avatars">
+              <div class="team-avatar">JD</div>
+              <div class="team-avatar" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">SK</div>
+              <div class="team-avatar" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">MR</div>
+              <div class="team-avatar add">+</div>
+            </div>
+            <div class="team-details">
+              <span class="team-label">Your Team</span>
+              <span><strong>Acme Contractors</strong> • 3 members</span>
+            </div>
+          </div>
+          <button class="shared-dashboard-btn">
+            <span>👥</span>
+            Team Dashboard
+          </button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card featured fade-in stagger-1">
+            <div class="stat-icon">📋</div>
+            <div class="stat-label">Active Bids</div>
+            <div class="stat-value"><span class="counter" data-target="12">0</span></div>
+            <span class="stat-change positive">↑ 3 this week</span>
+          </div>
+          <div class="stat-card fade-in stagger-2">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-label">Due This Week</div>
+            <div class="stat-value"><span class="counter" data-target="5">0</span></div>
+            <span class="stat-change negative">↓ 2 urgent</span>
+          </div>
+          <div class="stat-card fade-in stagger-3">
+            <div class="stat-icon">✅</div>
+            <div class="stat-label">Won This Quarter</div>
+            <div class="stat-value"><span class="counter" data-target="8">0</span></div>
+            <span class="stat-change positive">↑ 23% vs Q3</span>
+          </div>
+          <div class="stat-card fade-in stagger-4">
+            <div class="stat-icon">💰</div>
+            <div class="stat-label">Pipeline Value</div>
+            <div class="stat-value">$<span class="counter" data-target="2.4">0</span>M</div>
+            <span class="stat-change positive">↑ $340K added</span>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div>
+            <div class="timeline-section fade-in stagger-2">
+              <div class="timeline-header">
+                <div>
+                  <h3 class="section-title">Upcoming Deadlines</h3>
+                  <p class="section-subtitle">Next 7 days</p>
+                </div>
+                <div class="section-tabs">
+                  <button class="section-tab active">Week</button>
+                  <button class="section-tab">Month</button>
+                  <button class="section-tab">All</button>
+                </div>
+              </div>
+              <div class="timeline">
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-date">Today, 2:00 PM</div>
+                    <div class="timeline-title">Safety Boots Supply Contract</div>
+                    <div class="timeline-desc">City of Columbus • Final submission deadline</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-date">Tomorrow, 1:30 PM</div>
+                    <div class="timeline-title">Yard Waste Processing RFP</div>
+                    <div class="timeline-desc">Franklin County • Proposal due</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-date">Nov 25, 1:00 PM</div>
+                    <div class="timeline-title">HVAC Services Contract</div>
+                    <div class="timeline-desc">COTA • Technical documents due</div>
+                  </div>
+                </div>
+                <div class="timeline-item upcoming">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-date">Nov 28, 3:00 PM</div>
+                    <div class="timeline-title">IT Support Services</div>
+                    <div class="timeline-desc">Ohio DOT • Pre-qualification deadline</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-header fade-in stagger-3">
+              <div>
+                <h2 class="section-title">Tracked Solicitations</h2>
+                <p class="section-subtitle">6 active opportunities</p>
+              </div>
+              <div class="section-tabs">
+                <button class="section-tab active">All</button>
+                <button class="section-tab">Due Soon</button>
+                <button class="section-tab">Won</button>
+              </div>
+            </div>
+
+            <div class="filters fade-in stagger-3">
+              <div class="filter-group">
+                <select>
+                  <option>All Statuses</option>
+                  <option>In Progress</option>
+                  <option>Due Soon</option>
+                  <option>Submitted</option>
+                </select>
+                <select>
+                  <option>All Agencies</option>
+                  <option>City of Columbus</option>
+                  <option>Franklin County</option>
+                  <option>COTA</option>
+                  <option>Ohio DOT</option>
+                </select>
+                <select>
+                  <option>Due Date ↑</option>
+                  <option>Due Date ↓</option>
+                  <option>Value: High to Low</option>
+                  <option>Recently Added</option>
+                </select>
+              </div>
+              <input type="search" placeholder="Search bids...">
+              <button class="reset-btn">Reset</button>
+            </div>
+
+            <div class="result-count fade-in stagger-3">Showing 6 of 12 opportunities • <strong style="color: #f59e0b;">2 urgent</strong></div>
+
+            <div class="solicitations-list">
+              <div class="solicitation-card status-urgent fade-in stagger-4" >
+                <div class="solicitation-card-header">
+                  <div class="solicitation-left">
+                    <div class="status-dot"></div>
+                    <div class="solicitation-info">
+                      <div class="solicitation-title">G000-TSS-Safety Boots-Keen</div>
+                      <div class="solicitation-agency">
+                        <span class="agency-badge">🏛️ City of Columbus</span>
+                        <span>• Est. $45,000</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="solicitation-right">
+                    <div class="progress-ring tooltip" data-tooltip="75% complete">
+                      <svg viewBox="0 0 44 44">
+                        <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                        <circle class="progress-ring-fill" cx="22" cy="22" r="18" 
+                                stroke-dasharray="113" stroke-dashoffset="28"/>
+                      </svg>
+                      <span class="progress-ring-text">75%</span>
+                    </div>
+                    <div class="due-badge">
+                      <span class="due-icon">🔥</span>
+                      Due Today
+                    </div>
+                    <button class="expand-btn">▼</button>
+                  </div>
+                </div>
+                <div class="solicitation-details">
+                  <div class="details-divider"></div>
+                  <div class="details-grid">
+                    <div class="detail-section">
+                      <h4>Checklist Progress</h4>
+                      <ul class="checklist">
+                        <li><span class="checklist-check">✓</span> Downloaded RFP documents</li>
+                        <li><span class="checklist-check">✓</span> Reviewed requirements</li>
+                        <li><span class="checklist-check">✓</span> Prepared pricing sheet</li>
+                        <li><span class="checklist-check pending">○</span> Final review & submit</li>
+                      </ul>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Attached Files</h4>
+                      <div class="files-list">
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📄</span>
+                          RFP_Document.pdf
+                        </a>
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📊</span>
+                          Pricing_Sheet.xlsx
+                        </a>
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📝</span>
+                          Technical_Proposal.docx
+                        </a>
+                      </div>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Quick Actions</h4>
+                      <div class="quick-actions">
+                        <button class="action-btn primary">
+                          <span>🚀</span> Submit Proposal
+                        </button>
+                        <button class="action-btn">
+                          <span>📤</span> Upload Document
+                        </button>
+                        <button class="action-btn">
+                          <span>👁️</span> View Requirements
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="solicitation-card status-due-soon fade-in stagger-4" >
+                <div class="solicitation-card-header">
+                  <div class="solicitation-left">
+                    <div class="status-dot"></div>
+                    <div class="solicitation-info">
+                      <div class="solicitation-title">RFP - Yard Waste Collection & Processing</div>
+                      <div class="solicitation-agency">
+                        <span class="agency-badge">🏛️ Franklin County</span>
+                        <span>• Est. $180,000</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="solicitation-right">
+                    <div class="progress-ring tooltip" data-tooltip="60% complete">
+                      <svg viewBox="0 0 44 44">
+                        <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                        <circle class="progress-ring-fill" cx="22" cy="22" r="18" 
+                                stroke-dasharray="113" stroke-dashoffset="45"/>
+                      </svg>
+                      <span class="progress-ring-text">60%</span>
+                    </div>
+                    <div class="due-badge">
+                      <span class="due-icon">⚠️</span>
+                      Due Tomorrow
+                    </div>
+                    <button class="expand-btn">▼</button>
+                  </div>
+                </div>
+                <div class="solicitation-details">
+                  <div class="details-divider"></div>
+                  <div class="details-grid">
+                    <div class="detail-section">
+                      <h4>Checklist Progress</h4>
+                      <ul class="checklist">
+                        <li><span class="checklist-check">✓</span> Downloaded RFP documents</li>
+                        <li><span class="checklist-check">✓</span> Site visit completed</li>
+                        <li><span class="checklist-check pending">○</span> Cost estimate pending</li>
+                        <li><span class="checklist-check pending">○</span> Final submission</li>
+                      </ul>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Attached Files</h4>
+                      <div class="files-list">
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📄</span>
+                          RFP_YardWaste_2024.pdf
+                        </a>
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📸</span>
+                          Site_Photos.zip
+                        </a>
+                      </div>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Quick Actions</h4>
+                      <div class="quick-actions">
+                        <button class="action-btn primary">
+                          <span>📊</span> Create Estimate
+                        </button>
+                        <button class="action-btn">
+                          <span>📤</span> Upload Document
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="solicitation-card fade-in stagger-5" >
+                <div class="solicitation-card-header">
+                  <div class="solicitation-left">
+                    <div class="status-dot"></div>
+                    <div class="solicitation-info">
+                      <div class="solicitation-title">HVAC Maintenance, Repair & Replacement Services</div>
+                      <div class="solicitation-agency">
+                        <span class="agency-badge">🏛️ COTA</span>
+                        <span>• Est. $320,000</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="solicitation-right">
+                    <div class="progress-ring tooltip" data-tooltip="40% complete">
+                      <svg viewBox="0 0 44 44">
+                        <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                        <circle class="progress-ring-fill" cx="22" cy="22" r="18" 
+                                stroke-dasharray="113" stroke-dashoffset="68"/>
+                      </svg>
+                      <span class="progress-ring-text">40%</span>
+                    </div>
+                    <div class="due-badge">
+                      <span class="due-icon">📅</span>
+                      Nov 25
+                    </div>
+                    <button class="chat-drawer-btn" data-title="HVAC Maintenance, Repair & Replacement Services" data-messages="4">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                      <span class="chat-badge">4</span>
+                    </button>
+                    <button class="expand-btn">▼</button>
+                  </div>
+                </div>
+                <div class="solicitation-details">
+                  <div class="details-divider"></div>
+                  <div class="details-grid">
+                    <div class="detail-section">
+                      <h4>Checklist Progress</h4>
+                      <ul class="checklist">
+                        <li><span class="checklist-check">✓</span> Downloaded RFP</li>
+                        <li><span class="checklist-check">✓</span> Assigned team members</li>
+                        <li><span class="checklist-check pending">○</span> Technical proposal</li>
+                        <li><span class="checklist-check pending">○</span> Pricing & submission</li>
+                      </ul>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Attached Files</h4>
+                      <div class="files-list">
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📄</span>
+                          COTA_HVAC_RFP.pdf
+                        </a>
+                      </div>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Quick Actions</h4>
+                      <div class="quick-actions">
+                        <button class="action-btn primary">
+                          <span>✏️</span> Start Proposal
+                        </button>
+                        <button class="action-btn">
+                          <span>👥</span> Assign Team
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="solicitation-card fade-in stagger-5" >
+                <div class="solicitation-card-header">
+                  <div class="solicitation-left">
+                    <div class="status-dot"></div>
+                    <div class="solicitation-info">
+                      <div class="solicitation-title">AED & LifePak Maintenance & Repair Services</div>
+                      <div class="solicitation-agency">
+                        <span class="agency-badge">🏛️ Ohio DOC</span>
+                        <span>• Est. $95,000</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="solicitation-right">
+                    <div class="progress-ring tooltip" data-tooltip="25% complete">
+                      <svg viewBox="0 0 44 44">
+                        <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                        <circle class="progress-ring-fill" cx="22" cy="22" r="18" 
+                                stroke-dasharray="113" stroke-dashoffset="85"/>
+                      </svg>
+                      <span class="progress-ring-text">25%</span>
+                    </div>
+                    <div class="due-badge">
+                      <span class="due-icon">📅</span>
+                      Nov 28
+                    </div>
+                    <button class="chat-drawer-btn" data-title="AED & LifePak Maintenance & Repair Services" data-messages="2">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                      <span class="chat-badge">2</span>
+                    </button>
+                    <button class="expand-btn">▼</button>
+                  </div>
+                </div>
+                <div class="solicitation-details">
+                  <div class="details-divider"></div>
+                  <div class="details-grid">
+                    <div class="detail-section">
+                      <h4>Checklist Progress</h4>
+                      <ul class="checklist">
+                        <li><span class="checklist-check">✓</span> Downloaded RFP</li>
+                        <li><span class="checklist-check pending">○</span> Review requirements</li>
+                        <li><span class="checklist-check pending">○</span> Prepare proposal</li>
+                        <li><span class="checklist-check pending">○</span> Submit</li>
+                      </ul>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Attached Files</h4>
+                      <div class="files-list">
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📄</span>
+                          ODOC_AED_RFP.pdf
+                        </a>
+                      </div>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Quick Actions</h4>
+                      <div class="quick-actions">
+                        <button class="action-btn primary">
+                          <span>📖</span> Review RFP
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="solicitation-card fade-in stagger-6" >
+                <div class="solicitation-card-header">
+                  <div class="solicitation-left">
+                    <div class="status-dot"></div>
+                    <div class="solicitation-info">
+                      <div class="solicitation-title">Lake Erie Carts OSC OCSS 714 RJL</div>
+                      <div class="solicitation-agency">
+                        <span class="agency-badge">🏛️ Ohio DAS</span>
+                        <span>• Est. $67,000</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="solicitation-right">
+                    <div class="progress-ring tooltip" data-tooltip="90% complete">
+                      <svg viewBox="0 0 44 44">
+                        <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                        <circle class="progress-ring-fill" cx="22" cy="22" r="18" 
+                                stroke-dasharray="113" stroke-dashoffset="11"/>
+                      </svg>
+                      <span class="progress-ring-text">90%</span>
+                    </div>
+                    <div class="due-badge">
+                      <span class="due-icon">📅</span>
+                      Dec 15
+                    </div>
+                    <button class="chat-drawer-btn" data-title="Lake Erie Carts OSC OCSS 714 RJL" data-messages="7">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                      <span class="chat-badge">7</span>
+                    </button>
+                    <button class="expand-btn">▼</button>
+                  </div>
+                </div>
+                <div class="solicitation-details">
+                  <div class="details-divider"></div>
+                  <div class="details-grid">
+                    <div class="detail-section">
+                      <h4>Checklist Progress</h4>
+                      <ul class="checklist">
+                        <li><span class="checklist-check">✓</span> All documents ready</li>
+                        <li><span class="checklist-check">✓</span> Pricing finalized</li>
+                        <li><span class="checklist-check">✓</span> Team review complete</li>
+                        <li><span class="checklist-check pending">○</span> Final submission</li>
+                      </ul>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Attached Files</h4>
+                      <div class="files-list">
+                        <a href="#" class="file-item">
+                          <span class="file-icon">📦</span>
+                          Complete_Submission.zip
+                        </a>
+                      </div>
+                    </div>
+                    <div class="detail-section">
+                      <h4>Quick Actions</h4>
+                      <div class="quick-actions">
+                        <button class="action-btn primary">
+                          <span>🚀</span> Submit Now
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="chart-card fade-in stagger-3" style="margin-bottom: 24px;">
+              <div class="chart-header">
+                <h3 class="chart-title">Bid Status Overview</h3>
+              </div>
+              <div class="donut-chart">
+                <svg viewBox="0 0 200 200">
+                  <circle class="donut-segment" cx="100" cy="100" r="70" 
+                          stroke="#126a45" stroke-dasharray="175 440" stroke-dashoffset="0"/>
+                  <circle class="donut-segment" cx="100" cy="100" r="70" 
+                          stroke="#22c55e" stroke-dasharray="110 440" stroke-dashoffset="-175"/>
+                  <circle class="donut-segment" cx="100" cy="100" r="70" 
+                          stroke="#f59e0b" stroke-dasharray="88 440" stroke-dashoffset="-285"/>
+                  <circle class="donut-segment" cx="100" cy="100" r="70" 
+                          stroke="#3b82f6" stroke-dasharray="67 440" stroke-dashoffset="-373"/>
+                </svg>
+                <div class="donut-center">
+                  <div class="donut-value">12</div>
+                  <div class="donut-label">Total Bids</div>
+                </div>
+              </div>
+              <div class="chart-legend">
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #126a45;"></span>
+                  Active (4)
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #22c55e;"></span>
+                  Won (3)
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #f59e0b;"></span>
+                  Pending (2)
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #3b82f6;"></span>
+                  Review (3)
+                </div>
+              </div>
+            </div>
+
+            <div class="activity-feed fade-in stagger-4">
+              <div class="activity-header">
+                <h3 class="activity-title">Recent Activity</h3>
+              </div>
+              <div class="activity-item">
+                <div class="activity-icon">📤</div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>Sarah K.</strong> uploaded pricing sheet for HVAC contract</div>
+                  <div class="activity-time">2 hours ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-icon">✅</div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>Mike R.</strong> completed site visit for Yard Waste RFP</div>
+                  <div class="activity-time">Yesterday at 3:45 PM</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-icon">🎉</div>
+                <div class="activity-content">
+                  <div class="activity-text">Contract <strong>awarded</strong> for Fleet Maintenance Services</div>
+                  <div class="activity-time">2 days ago</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-icon">📋</div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>You</strong> added 2 new opportunities to tracking</div>
+                  <div class="activity-time">3 days ago</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <div class="chat-drawer" id="chatDrawer">
+    <div class="drawer-header">
+      <div class="drawer-header-top">
+        <button class="drawer-close-btn" id="drawerCloseBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <div class="drawer-title-area">
+          <div class="drawer-label">Team Thread</div>
+          <div class="drawer-title" id="drawerTitle">HVAC Contract Discussion</div>
+        </div>
+      </div>
+      <div class="drawer-members">
+        <div class="drawer-avatar">JD</div>
+        <div class="drawer-avatar blue">SK</div>
+        <div class="drawer-avatar purple">MR</div>
+        <span class="drawer-member-count">3 members</span>
+      </div>
+    </div>
+    
+    <div class="drawer-messages" id="drawerMessages">
+      <div class="drawer-date-divider">
+        <span>Today</span>
+      </div>
+      
+      <div class="drawer-message">
+        <div class="drawer-msg-avatar blue">SK</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">Sarah K.</span>
+            <span class="drawer-msg-time">10:32 AM</span>
+          </div>
+          <div class="drawer-msg-text">Hey team! I just finished reviewing the requirements. The scope is larger than expected - they want coverage for 12 buildings.</div>
+          <div class="drawer-msg-reactions">
+            <button class="drawer-reaction active">👍 2</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="drawer-message">
+        <div class="drawer-msg-avatar purple">MR</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">Mike R.</span>
+            <span class="drawer-msg-time">10:45 AM</span>
+          </div>
+          <div class="drawer-msg-text">Thanks for the heads up! I can handle the site visits next week. Should we adjust our pricing to account for the extra buildings?</div>
+        </div>
+      </div>
+      
+      <div class="drawer-message own">
+        <div class="drawer-msg-avatar">JD</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">You</span>
+            <span class="drawer-msg-time">11:02 AM</span>
+          </div>
+          <div class="drawer-msg-text">Good thinking. Let's add 15% buffer for the additional scope. I'll update the spreadsheet this afternoon.</div>
+          <div class="drawer-msg-status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Seen by all
+          </div>
+        </div>
+      </div>
+      
+      <div class="drawer-message">
+        <div class="drawer-msg-avatar blue">SK</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">Sarah K.</span>
+            <span class="drawer-msg-time">11:15 AM</span>
+          </div>
+          <div class="drawer-msg-text">Perfect! Also, the deadline is coming up fast. Can we have a quick sync at 2pm?</div>
+          <div class="drawer-msg-reactions">
+            <button class="drawer-reaction">🙌 1</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="drawer-typing" id="drawerTyping" style="display: none;">
+        <div class="drawer-msg-avatar purple">MR</div>
+        <div class="drawer-typing-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="drawer-input-area">
+      <button class="drawer-attach-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+        </svg>
+      </button>
+      <input type="text" class="drawer-input" id="drawerInput" placeholder="Type a message...">
+      <button class="drawer-emoji-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+          <line x1="9" y1="9" x2="9.01" y2="9"></line>
+          <line x1="15" y1="9" x2="15.01" y2="9"></line>
+        </svg>
+      </button>
+      <button class="drawer-send-btn" id="drawerSendBtn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.solicitation-card').forEach(card => {
+        const header = card.querySelector('.solicitation-card-header');
+        if (header) {
+          header.addEventListener('click', function(e) {
+            if (e.target.closest('.action-btn') || e.target.closest('.file-item')) {
+              return;
+            }
+            card.classList.toggle('expanded');
+          });
+        }
+        
+        const expandBtn = card.querySelector('.expand-btn');
+        if (expandBtn) {
+          expandBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            card.classList.toggle('expanded');
+          });
+        }
+      });
+
+      document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const action = this.textContent.trim();
+          console.log('Action clicked:', action);
+        });
+      });
+
+      document.querySelectorAll('.file-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+          e.stopPropagation();
+        });
+      });
+    });
+
+    function animateCounters() {
+      const counters = document.querySelectorAll('.counter');
+      counters.forEach(counter => {
+        if (counter.dataset.animated) return;
+        counter.dataset.animated = 'true';
+        
+        const target = parseFloat(counter.getAttribute('data-target'));
+        const isDecimal = target % 1 !== 0;
+        const duration = 2000;
+        const start = performance.now();
+        
+        function update(currentTime) {
+          const elapsed = currentTime - start;
+          const progress = Math.min(elapsed / duration, 1);
+          const easeOut = 1 - Math.pow(1 - progress, 4);
+          const current = target * easeOut;
+          
+          if (isDecimal) {
+            counter.textContent = current.toFixed(1);
+          } else {
+            counter.textContent = Math.floor(current);
+          }
+          
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          } else {
+            counter.textContent = isDecimal ? target.toFixed(1) : target;
+          }
+        }
+        
+        requestAnimationFrame(update);
+      });
+    }
+
+    document.querySelectorAll('.section-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        this.parentElement.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+          if (entry.target.querySelector('.counter')) {
+            animateCounters();
+          }
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.fade-in').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(16px)';
+      observer.observe(el);
+    });
+
+    setTimeout(() => {
+      document.querySelectorAll('.fade-in').forEach(el => {
+        el.style.opacity = '1';
+        el.style.transform = 'translateY(0)';
+      });
+      animateCounters();
+    }, 150);
+
+    document.querySelectorAll('.team-avatar.add').forEach(avatar => {
+      avatar.addEventListener('click', function() {
+        alert('Invite team member feature coming soon!');
+      });
+    });
+
+    document.querySelector('.shared-dashboard-btn')?.addEventListener('click', function() {
+      alert('Team dashboard feature coming soon!');
+    });
+
+    // Scroll Progress Indicator
+    const scrollProgress = document.getElementById('scrollProgress');
+    const content = document.querySelector('.content');
+    
+    content.addEventListener('scroll', () => {
+      const scrollTop = content.scrollTop;
+      const scrollHeight = content.scrollHeight - content.clientHeight;
+      const progress = (scrollTop / scrollHeight) * 100;
+      scrollProgress.style.width = progress + '%';
+    });
+
+    // Chat Drawer Functionality
+    const chatDrawer = document.getElementById('chatDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+    const drawerTitle = document.getElementById('drawerTitle');
+    const drawerInput = document.getElementById('drawerInput');
+    const drawerSendBtn = document.getElementById('drawerSendBtn');
+    const drawerMessages = document.getElementById('drawerMessages');
+    const drawerTyping = document.getElementById('drawerTyping');
+
+    function openDrawer(title) {
+      drawerTitle.textContent = title;
+      chatDrawer.classList.add('open');
+      drawerOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      drawerMessages.scrollTop = drawerMessages.scrollHeight;
+    }
+
+    function closeDrawer() {
+      chatDrawer.classList.remove('open');
+      drawerOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.chat-drawer-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const title = this.dataset.title;
+        openDrawer(title);
+      });
+    });
+
+    drawerCloseBtn.addEventListener('click', closeDrawer);
+    drawerOverlay.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && chatDrawer.classList.contains('open')) {
+        closeDrawer();
+      }
+    });
+
+    function getCurrentTime() {
+      return new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    }
+
+    function addDrawerMessage(text, isOwn = true) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `drawer-message${isOwn ? ' own' : ''}`;
+      
+      const avatar = isOwn ? 'JD' : 'SK';
+      const author = isOwn ? 'You' : 'Sarah K.';
+      const avatarClass = isOwn ? '' : ' blue';
+      
+      messageDiv.innerHTML = `
+        <div class="drawer-msg-avatar${avatarClass}">${avatar}</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">${author}</span>
+            <span class="drawer-msg-time">${getCurrentTime()}</span>
+          </div>
+          <div class="drawer-msg-text">${text}</div>
+          ${isOwn ? `<div class="drawer-msg-status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Sent
+          </div>` : ''}
+        </div>
+      `;
+      
+      drawerMessages.insertBefore(messageDiv, drawerTyping);
+      drawerMessages.scrollTop = drawerMessages.scrollHeight;
+    }
+
+    function showDrawerTyping() {
+      drawerTyping.style.display = 'flex';
+      drawerMessages.scrollTop = drawerMessages.scrollHeight;
+    }
+
+    function hideDrawerTyping() {
+      drawerTyping.style.display = 'none';
+    }
+
+    function simulateReply() {
+      const replies = [
+        "Sounds good! I'll take a look at it.",
+        "Great point, let me check on that.",
+        "Perfect, I'll update the team.",
+        "Thanks for the update!",
+        "I'll get back to you shortly.",
+        "Let me coordinate with Mike on this."
+      ];
+      
+      showDrawerTyping();
+      
+      setTimeout(() => {
+        hideDrawerTyping();
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        addDrawerMessage(randomReply, false);
+      }, 1500 + Math.random() * 1000);
+    }
+
+    function sendDrawerMessage() {
+      const text = drawerInput.value.trim();
+      if (!text) return;
+      
+      addDrawerMessage(text, true);
+      drawerInput.value = '';
+      
+      setTimeout(simulateReply, 500);
+    }
+
+    drawerSendBtn.addEventListener('click', sendDrawerMessage);
+    
+    drawerInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendDrawerMessage();
+      }
+    });
+
+    document.querySelectorAll('.drawer-reaction').forEach(btn => {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('active');
+      });
+    });
+  </script>
+</body>
+</html>

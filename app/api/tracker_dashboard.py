@@ -126,13 +126,18 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
               o.external_id,
               o.due_date,
               COALESCE(o.ai_category, o.category) AS category,
+              (
+                SELECT COUNT(*)
+                FROM bid_notes bn
+                WHERE bn.team_id = :team_id AND bn.opportunity_id = o.id
+              ) AS note_count,
               (SELECT COUNT(*) FROM user_uploads u WHERE u.opportunity_id = o.id) AS file_count
             FROM user_bid_trackers t
             JOIN opportunities o ON o.id = t.opportunity_id
             WHERE t.user_id = :uid
             ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
             """,
-            {"uid": user_id},
+            {"uid": user_id, "team_id": team_id},
         )
         tracked = [dict(r._mapping) for r in tracked_rows.fetchall()]
 
@@ -318,32 +323,33 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
 
     stats_html = f"""
     <div class="stats-grid">
-      <div class="stat-card featured">
-        <div class="stat-icon">📈</div>
+      <div class="stat-card featured fade-in stagger-1">
+        <div class="stat-icon">dY"^</div>
         <div class="stat-label">Active Bids</div>
-        <div class="stat-value">{total_items}</div>
+        <div class="stat-value"><span class="counter" data-target="{total_items}">0</span></div>
         <span class="stat-change positive">+{tracked_this_week} this week</span>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">⏰</div>
+      <div class="stat-card fade-in stagger-2">
+        <div class="stat-icon">???</div>
         <div class="stat-label">Due This Week</div>
-        <div class="stat-value">{due_soon_count}</div>
+        <div class="stat-value"><span class="counter" data-target="{due_soon_count}">0</span></div>
         <span class="stat-change negative">{due_soon_count} urgent</span>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">✅</div>
+      <div class="stat-card fade-in stagger-3">
+        <div class="stat-icon">?o.</div>
         <div class="stat-label">Won This Quarter</div>
-        <div class="stat-value">{won_count}</div>
+        <div class="stat-value"><span class="counter" data-target="{won_count}">0</span></div>
         <span class="stat-change positive">+0 vs Q3</span>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">💰</div>
+      <div class="stat-card fade-in stagger-4">
+        <div class="stat-icon">dY'?</div>
         <div class="stat-label">Pipeline Value</div>
-        <div class="stat-value">$2.4M</div>
+        <div class="stat-value">$<span class="counter" data-target="2.4">0</span>M</div>
         <span class="stat-change positive">$340K added</span>
       </div>
     </div>
     """
+
 
     timeline_html = f"""
     <div class="timeline-section fade-in stagger-2">
@@ -438,23 +444,69 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
     <div id="summary-count" class="section-subtitle"></div>
     """
 
-    thread_html = """
-    <div id="thread-overlay" aria-hidden="true"></div>
-    <aside id="thread-drawer" aria-hidden="true">
-      <header>
-        <div>
-          <div id="thread-title">Team room</div>
-          <div id="thread-subtitle" class="muted"></div>
+    drawer_members_html = "".join(
+        f'<div class="drawer-avatar" style="background:{_color_for(m.get("email") or "", idx)};">{_esc(_initials(m.get("email") or ""))}</div>'
+        for idx, m in enumerate(member_list[:3])
+    )
+    drawer_member_count = f'{len(member_list)} member{"s" if len(member_list) != 1 else ""}'
+    thread_html = f"""
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <div class="chat-drawer" id="chatDrawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div class="drawer-header-top">
+          <button class="drawer-close-btn" id="drawerCloseBtn" type="button" aria-label="Close chat">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <div class="drawer-title-area">
+            <div class="drawer-label">Team Thread</div>
+            <div class="drawer-title" id="drawerTitle">Select a solicitation</div>
+            <div class="drawer-subtitle" id="drawerSubtitle"></div>
+          </div>
         </div>
-        <button id="thread-cancel" class="icon-btn" type="button">Close</button>
-      </header>
-      <div id="thread-messages"></div>
-      <div class="thread-input">
-        <label id="thread-label" class="muted">Send a message</label>
-        <textarea id="thread-input" rows="2" placeholder="Type @name to notify..."></textarea>
-        <button id="thread-send" type="button">Send</button>
+        <div class="drawer-members" id="drawerMembers">
+          {drawer_members_html}
+          <span class="drawer-member-count">{drawer_member_count}</span>
+        </div>
       </div>
-    </aside>
+      
+      <div class="drawer-messages" id="drawerMessages">
+        <div class="drawer-date-divider" id="drawerEmpty">
+          <span>Select a solicitation to view messages.</span>
+        </div>
+        <div class="drawer-typing" id="drawerTyping" style="display: none;">
+          <div class="drawer-msg-avatar">...</div>
+          <div class="drawer-typing-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="drawer-input-area">
+        <button class="drawer-attach-btn" type="button" aria-label="Attach">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+          </svg>
+        </button>
+        <input type="text" class="drawer-input" id="drawerInput" placeholder="Type a message...">
+        <button class="drawer-emoji-btn" type="button" aria-label="Emoji">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+          </svg>
+        </button>
+        <button class="drawer-send-btn" id="drawerSendBtn" type="button" aria-label="Send">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
     """
 
     upload_html = """
@@ -494,9 +546,9 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
     """
 
     body_template = """
-    <link rel="stylesheet" href="/static/css/vendor.css?v=9">
-    <link rel="stylesheet" href="/static/css/layout.css?v=9">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=9">
+    <link rel="stylesheet" href="/static/css/vendor.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
     <div class="page dashboard-page">
       __TEAM_BAR__
       __STATS__
@@ -557,6 +609,24 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
     </script>
     <script>
       (function(){
+        const counters = document.querySelectorAll('.counter[data-target]');
+        counters.forEach((el) => {
+          const target = parseFloat(el.getAttribute('data-target') || '0');
+          const start = performance.now();
+          const duration = 1200;
+          const animate = (ts) => {
+            const progress = Math.min(1, (ts - start) / duration);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const val = target % 1 === 0 ? Math.round(target * eased) : (target * eased).toFixed(1);
+            el.textContent = val;
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        });
+      })();
+    </script>
+    <script>
+      (function(){
         const overlay = document.getElementById('upload-overlay');
         const drawer = document.getElementById('upload-drawer');
         const form = document.getElementById('upload-form');
@@ -607,7 +677,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
         }
       })();
     </script>
-    <script src="/static/js/tracker_dashboard.js?v=24"></script>
+    <script src="/static/js/tracker_dashboard.js"></script>
     """
 
     body = (

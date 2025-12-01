@@ -1,0 +1,39 @@
+<div class="table-card fade-in">
+  <div class="table-header">
+    <div class="results-info">
+      <span class="results-count">Showing <strong>{{TOTAL_COUNT}}</strong> opportunities</span>
+    </div>
+    <div class="table-actions">
+      <button class="table-action-btn" type="button" onclick="window.location='/opportunities/export'" aria-label="Export results">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export
+      </button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="opportunities-table">
+      <thead>
+        <tr>
+          <th>Solicitation #</th>
+          <th>Title</th>
+          <th>Agency</th>
+          <th>Date Added</th>
+          <th>Due Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ROWS_HTML}}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer">
+    <div class="pagination-info">Showing {{SHOWING_START}}-{{SHOWING_END}} of {{TOTAL_COUNT}} opportunities</div>
+    {{PAGINATION_HTML}}
+  </div>
+</div>

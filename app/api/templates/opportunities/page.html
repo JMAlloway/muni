@@ -1,0 +1,72 @@
+<main class="page">
+  <div class="page-header fade-in">
+    <div class="page-title-section">
+      <h1 class="page-title">Open Opportunities</h1>
+      <p class="page-subtitle">Live feed from municipal procurement portals. Updated automatically every few hours.</p>
+    </div>
+  </div>
+  {{STATS_HTML}}
+  {{FILTERS_HTML}}
+  {{TABLE_HTML}}
+</main>
+
+<!-- vendor sidebar markup -->
+<div id="vendor-overlay" onclick="closeVendorGuide()"></div>
+<div id="vendor-guide-panel">
+  <div id="vendor-guide-header">
+    <div>
+      <h2>How to bid</h2>
+      <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
+    </div>
+    <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">&times;</button>
+  </div>
+  <div id="vendor-guide-content">Loading...</div>
+</div>
+
+{{MODAL_HTML}}
+<link rel="stylesheet" href="/static/css/vendor.css"> 
+<link rel="stylesheet" href="/static/css/highlight.css"> 
+<link rel="stylesheet" href="/static/css/dashboard.css"> 
+<link rel="stylesheet" href="/static/css/bid_tracker.css"> 
+<link rel="stylesheet" href="/static/css/opportunities.css"> 
+
+<script src="/static/js/vendor.js"></script>
+<script src="/static/js/highlight.js"></script>
+<script src="/static/js/rfq_modal.js"></script>
+<script src="/static/js/bid_tracker.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Animate stat counts if data-count is present
+  document.querySelectorAll('.stat-value[data-count]').forEach((el) => {
+    const target = Number(el.dataset.count || 0);
+    const start = performance.now();
+    const duration = 1200;
+    const step = (ts) => {
+      const progress = Math.min(1, (ts - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(target * eased);
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    if (target > 0) requestAnimationFrame(step);
+  });
+
+  // Stagger table row entry
+  document.querySelectorAll('.opportunities-table tbody tr').forEach((row, idx) => {
+    row.style.animationDelay = `${idx * 50}ms`;
+  });
+
+  // Refresh tracking count from server to ensure accuracy
+  const tracking = document.getElementById('tracking-count');
+  if (tracking) {
+    fetch('/tracker/count', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const next = Number(data.count || 0);
+        tracking.dataset.count = String(next);
+        tracking.textContent = Number.isInteger(next) ? String(next) : next.toFixed(1);
+      })
+      .catch(() => {});
+  }
+});
+</script>

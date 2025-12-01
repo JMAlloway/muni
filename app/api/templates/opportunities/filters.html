@@ -1,0 +1,80 @@
+<div class="filters-card fade-in">
+  <div class="filters-header">
+    <h3 class="filters-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+      </svg>
+      Filters
+    </h3>
+    <a class="reset-btn" href="/opportunities">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </svg>
+      Reset
+    </a>
+  </div>
+  <form method="GET" action="/opportunities">
+    <div class="filters-grid">
+      <div class="filter-group">
+        <label class="filter-label">Agency</label>
+        <div class="select-wrapper">
+          <select class="filter-select" name="agency">{{AGENCY_OPTIONS}}</select>
+          <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Search title</label>
+        <div class="search-wrapper">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input class="filter-input" type="text" name="search" value="{{SEARCH_VALUE}}" placeholder="e.g. HVAC, roofing, IT services..." />
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Specialties</label>
+        <div class="select-wrapper">
+          <input class="filter-input" type="text" name="tags" value="{{TAGS_VALUE}}" placeholder="hvac, paving, it" />
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Due within</label>
+        <div class="select-wrapper">
+          <select class="filter-select" name="due_within">{{DUE_OPTIONS}}</select>
+          <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="filters-footer">
+      <div class="status-toggle">
+        <label class="toggle-label">
+          <input type="hidden" name="status" value="all"/>
+          <input type="checkbox" name="status" value="open" {{STATUS_CHECKED}}/>
+          <span class="toggle-switch"></span>
+          <span class="toggle-text">Open only</span>
+        </label>
+      </div>
+      <div class="sort-group">
+        <span class="filter-label">Sort by</span>
+        <div class="select-wrapper small">
+          <select class="filter-select" name="sort_by">{{SORT_OPTIONS}}</select>
+          <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
+      <button class="apply-btn" type="submit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Apply Filters
+      </button>
+    </div>
+  </form>
+</div>

@@ -707,18 +707,44 @@
       const trackBtns = document.querySelectorAll('.track-btn');
       trackBtns.forEach(btn => {
         btn.addEventListener('click', function() {
+          const wasTracked = this.classList.contains('tracked');
           this.classList.toggle('tracked');
-          if (this.classList.contains('tracked')) {
+          
+          if (!wasTracked) {
             this.title = 'Tracking';
-            this.style.transform = 'scale(1.2)';
-            setTimeout(() => {
-              this.style.transform = '';
-            }, 200);
+            showSuccessAnimation();
           } else {
             this.title = 'Track this bid';
           }
         });
       });
+
+      function showSuccessAnimation() {
+        const overlay = document.createElement('div');
+        overlay.className = 'success-overlay';
+        
+        const checkmark = document.createElement('div');
+        checkmark.className = 'success-checkmark';
+        checkmark.innerHTML = `
+          <svg class="check-icon" viewBox="0 0 52 52">
+            <circle class="check-circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="check-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+          </svg>
+          <div class="success-text">Bid Tracked!</div>
+        `;
+        
+        document.body.appendChild(overlay);
+        document.body.appendChild(checkmark);
+        
+        setTimeout(() => {
+          overlay.style.animation = 'fadeOut 0.3s ease forwards';
+          checkmark.style.animation = 'fadeOut 0.3s ease forwards';
+          setTimeout(() => {
+            overlay.remove();
+            checkmark.remove();
+          }, 300);
+        }, 1200);
+      }
 
       document.getElementById('resetFilters').addEventListener('click', function() {
         document.getElementById('agencyFilter').value = '';

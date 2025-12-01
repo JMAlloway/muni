@@ -1,0 +1,179 @@
+<!-- Track Drawer (no uploads here) -->
+<div id="bid-drawer" class="drawer hidden">
+  <div class="drawer-header">
+    <h3 id="drawer-title">Bid Tracker</h3>
+    <button class="btn-secondary" style="padding:6px 10px;border-radius:8px;" onclick="closeDrawer()" aria-label="Close">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <section class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:10px;">
+        <div style="max-width:65%;">
+          <div class="label-small">Solicitation</div>
+          <div id="drawer-solicitation" style="font-weight:600;word-break:break-word;"></div>
+          <input type="hidden" id="opp-id" />
+        </div>
+        <div style="flex-shrink:0;">
+          <a class="btn-secondary" href="/tracker/dashboard" target="_blank">Open My Dashboard &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <label class="label">Status</label>
+      <select id="tracker-status" style="width:100%;">
+        <option value="prospecting">Prospecting</option>
+        <option value="deciding">Deciding</option>
+        <option value="drafting">Drafting</option>
+        <option value="submitted">Submitted</option>
+        <option value="won">Won</option>
+        <option value="lost">Lost</option>
+      </select>
+
+      <label class="label" style="margin-top:10px;">Notes</label>
+      <textarea id="tracker-notes" rows="4" placeholder="Add notes."></textarea>
+
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" id="save-tracker-btn">Save</button>
+        <button class="btn-secondary" onclick="window.open('/tracker/dashboard?focus='+document.getElementById('opp-id').value,'_blank')">
+          Manage Files in Dashboard
+        </button>
+      </div>
+      <div id="tracker-save-msg" class="muted" style="margin-top:8px;"></div>
+    </section>
+  </div>
+</div>
+<!-- Modal overlay for RFQ / solicitation detail -->
+<div id="rfq-modal-overlay" style="display:none;">
+  <div id="rfq-modal-card">
+    <button onclick="closeDetailModal()" id="rfq-close">&times;</button>
+    <div id="rfq-modal-content">Loading.</div>
+  </div>
+</div>
+
+<script>
+async function api(path, init = {}) {
+  const token = (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || "";
+  const method = (init.method||"GET").toUpperCase();
+  const headers = Object.assign({}, init.headers||{});
+  if (method !== "GET") { headers["X-CSRF-Token"] = token; }
+  const res = await fetch(path, { credentials: "include", ...init, headers });
+  if (res.status === 401) {
+    const next = location.pathname + location.search;
+    const oppId = document.getElementById("opp-id")?.value || "";
+    const hash = oppId ? ("#openTracker:" + oppId) : "";
+    window.location.href = "/login?next=" + encodeURIComponent(next + hash);
+    throw new Error("Auth required");
+  }
+  return res;
+}
+
+function showSuccessAnimation() {
+  const overlay = document.createElement('div');
+  overlay.className = 'success-overlay';
+  const checkmark = document.createElement('div');
+  checkmark.className = 'success-checkmark';
+  checkmark.innerHTML = `
+    <svg class="check-icon" viewBox="0 0 52 52">
+      <circle class="check-circle" cx="26" cy="26" r="25" fill="none"/>
+      <path class="check-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+    </svg>
+    <div class="success-text">Bid Tracked!</div>
+  `;
+  document.body.appendChild(overlay);
+  document.body.appendChild(checkmark);
+  setTimeout(() => {
+    overlay.style.animation = 'fadeOut 0.3s ease forwards';
+    checkmark.style.animation = 'fadeOut 0.3s ease forwards';
+    setTimeout(() => { overlay.remove(); checkmark.remove(); }, 300);
+  }, 1200);
+}
+
+document.addEventListener('click', async (e) => {
+  const rfq = e.target.closest('.rfq-btn');
+  if (rfq) {
+    e.preventDefault();
+    const id = rfq.getAttribute('data-ext') || '';
+    const ag = rfq.getAttribute('data-agency') || '';
+    if (typeof openDetailModal === 'function') {
+      openDetailModal(id, ag);
+    }
+    return;
+  }
+  const track = e.target.closest('.track-btn');
+  if (track) {
+    const oppId = track.dataset.oppId;
+    if (!oppId) return;
+    const counter = document.getElementById('tracking-count');
+    const setCounter = (val) => {
+      if (!counter) return;
+      const next = Math.max(0, Number(val || 0));
+      counter.dataset.count = String(next);
+      counter.textContent = Number.isInteger(next) ? String(next) : next.toFixed(1);
+    };
+    const refreshCounter = async () => {
+      if (!counter) return;
+      try {
+        const res = await api('/tracker/count');
+        if (!res.ok) return;
+        const data = await res.json();
+        setCounter(data.count);
+      } catch (_) {}
+    };
+    const setTracked = (val) => {
+      if (val) {
+        track.classList.add('tracked');
+        track.dataset.tracked = '1';
+        track.setAttribute('aria-pressed', 'true');
+        track.title = 'Tracking';
+      } else {
+        track.classList.remove('tracked');
+        track.dataset.tracked = '0';
+        track.removeAttribute('aria-pressed');
+        track.title = 'Track this bid';
+      }
+    };
+
+    if (track.classList.contains('tracked')) {
+      const ok = window.confirm("Stop tracking this solicitation? It will be removed from your dashboard and archived.");
+      if (!ok) return;
+      try {
+        const res = await api(`/tracker/${oppId}`, { method: 'DELETE' });
+        if (res.ok) {
+          try { const data = await res.json(); setCounter(data.count); } catch(_) {}
+          setTracked(false);
+          await refreshCounter();
+        }
+      } catch (_) {}
+      return;
+    }
+
+    try {
+      const res = await api(`/tracker/${oppId}/track`, { method: 'POST' });
+      if (res.ok) {
+        try { const data = await res.json(); setCounter(data.count); } catch(_) {}
+        setTracked(true);
+        showSuccessAnimation();
+        await refreshCounter();
+      } else {
+      }
+    } catch (_) {}
+    return;
+  }
+  if (e.target && e.target.id === 'save-tracker-btn') {
+    const oppId = document.getElementById('opp-id').value;
+    const payload = {
+      status: document.getElementById('tracker-status').value,
+      notes:  document.getElementById('tracker-notes').value
+    };
+    try {
+      const res = await api(`/tracker/${oppId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('tracker-save-msg').textContent =
+        res.ok ? 'Saved.' : 'Save failed.';
+    } catch (_) {}
+  }
+});
+</script>

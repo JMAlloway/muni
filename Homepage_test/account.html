@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Account - EasyRFP</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="account.css">
+</head>
+<body>
+  <div class="scroll-progress" id="scrollProgress"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="12" fill="url(#grad1)"/>
+          <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#126a45"/>
+              <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>EasyRFP</span>
+      </div>
+
+      <div class="nav-label">Main Menu</div>
+      <nav class="navlinks">
+        <a href="index.html" class="nav-link">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="opportunities.html" class="nav-link">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-text">Discover Bids</span>
+        </a>
+        <a href="dashboard-demo.html" class="nav-link">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">My Dashboard</span>
+        </a>
+        <a href="documents.html" class="nav-link">
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Documents</span>
+        </a>
+        <a href="calendar.html" class="nav-link">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Calendar</span>
+        </a>
+      </nav>
+
+      <div class="nav-label" style="margin-top: 24px;">Account</div>
+      <nav class="navlinks">
+        <a href="account.html" class="nav-link active">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">My Account</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">Support</span>
+        </a>
+      </nav>
+    </aside>
+
+    <div class="content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="top-pill" href="index.html">
+            <span>←</span>
+            <span class="top-label">Back to Site</span>
+          </a>
+          <span class="top-pill">
+            <span>⚡</span>
+            <span class="top-label">Plan:</span>
+            <strong>Professional</strong>
+            <a href="#upgrade" class="top-upgrade">Upgrade</a>
+          </span>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn tooltip" data-tooltip="Notifications" type="button">
+            🔔
+            <span class="notif-dot">3</span>
+          </button>
+          <button class="icon-btn tooltip" data-tooltip="Help Center">❓</button>
+          <button class="avatar-button">
+            <span class="avatar-circle">JD</span>
+            <span style="font-size: 10px; color: #94a3b8;">▼</span>
+          </button>
+        </div>
+      </div>
+
+      <main class="page account-page">
+        <div class="account-header fade-in">
+          <div class="account-header-left">
+            <div class="large-avatar">
+              <span>JD</span>
+              <button class="avatar-edit-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="account-header-info">
+              <h1 class="account-name">John Davidson</h1>
+              <p class="account-email">john.davidson@acmecontractors.com</p>
+              <div class="account-badges">
+                <span class="badge badge-pro">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                  </svg>
+                  Professional
+                </span>
+                <span class="badge badge-verified">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                  Verified
+                </span>
+                <span class="badge badge-member">Member since Oct 2023</span>
+              </div>
+            </div>
+          </div>
+          <div class="account-header-actions">
+            <button class="btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              Settings
+            </button>
+            <button class="btn-danger-outline" id="signOutBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+
+        <div class="account-tabs fade-in stagger-1">
+          <button class="account-tab active" data-tab="overview">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            Overview
+          </button>
+          <button class="account-tab" data-tab="profile">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Profile
+          </button>
+          <button class="account-tab" data-tab="billing">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+              <line x1="1" y1="10" x2="23" y2="10"></line>
+            </svg>
+            Billing
+          </button>
+          <button class="account-tab" data-tab="team">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Team
+          </button>
+          <button class="account-tab" data-tab="notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            Notifications
+          </button>
+          <button class="account-tab" data-tab="security">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            Security
+          </button>
+        </div>
+
+        <div class="account-content">
+          <div class="tab-content active" id="tab-overview">
+            <div class="account-grid">
+              <div class="account-card plan-card fade-in stagger-2">
+                <div class="plan-header">
+                  <div class="plan-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                  </div>
+                  <div class="plan-info">
+                    <span class="plan-label">Current Plan</span>
+                    <h3 class="plan-name">Professional</h3>
+                  </div>
+                  <div class="plan-price">
+                    <span class="price-amount">$49</span>
+                    <span class="price-period">/month</span>
+                  </div>
+                </div>
+                <div class="plan-features">
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Unlimited bid tracking</span>
+                  </div>
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Up to 5 team members</span>
+                  </div>
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Advanced analytics</span>
+                  </div>
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Priority support</span>
+                  </div>
+                </div>
+                <div class="plan-actions">
+                  <button class="btn-primary">Upgrade to Enterprise</button>
+                  <button class="btn-ghost">Compare Plans</button>
+                </div>
+                <div class="plan-renewal">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  Next billing: December 15, 2024
+                </div>
+              </div>
+
+              <div class="account-card usage-card fade-in stagger-3">
+                <div class="card-header">
+                  <h3 class="card-title">Usage This Month</h3>
+                  <span class="card-period">Nov 1 - Nov 30</span>
+                </div>
+                <div class="usage-stats">
+                  <div class="usage-item">
+                    <div class="usage-info">
+                      <span class="usage-label">Active Bids</span>
+                      <span class="usage-value">12 / Unlimited</span>
+                    </div>
+                    <div class="usage-bar">
+                      <div class="usage-fill" style="width: 100%; background: var(--primary-gradient);"></div>
+                    </div>
+                  </div>
+                  <div class="usage-item">
+                    <div class="usage-info">
+                      <span class="usage-label">Team Members</span>
+                      <span class="usage-value">3 / 5</span>
+                    </div>
+                    <div class="usage-bar">
+                      <div class="usage-fill" style="width: 60%;"></div>
+                    </div>
+                  </div>
+                  <div class="usage-item">
+                    <div class="usage-info">
+                      <span class="usage-label">Documents Stored</span>
+                      <span class="usage-value">847 MB / 5 GB</span>
+                    </div>
+                    <div class="usage-bar">
+                      <div class="usage-fill" style="width: 17%;"></div>
+                    </div>
+                  </div>
+                  <div class="usage-item">
+                    <div class="usage-info">
+                      <span class="usage-label">API Calls</span>
+                      <span class="usage-value">1,247 / 10,000</span>
+                    </div>
+                    <div class="usage-bar">
+                      <div class="usage-fill" style="width: 12%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="account-card quick-actions-card fade-in stagger-2">
+                <div class="card-header">
+                  <h3 class="card-title">Quick Actions</h3>
+                </div>
+                <div class="quick-actions-grid">
+                  <button class="quick-action">
+                    <div class="quick-action-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </div>
+                    <span>Edit Profile</span>
+                  </button>
+                  <button class="quick-action">
+                    <div class="quick-action-icon blue">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                      </svg>
+                    </div>
+                    <span>Invite Member</span>
+                  </button>
+                  <button class="quick-action">
+                    <div class="quick-action-icon purple">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                      </svg>
+                    </div>
+                    <span>Update Payment</span>
+                  </button>
+                  <button class="quick-action">
+                    <div class="quick-action-icon orange">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                    </div>
+                    <span>Export Data</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="account-card activity-card fade-in stagger-3">
+                <div class="card-header">
+                  <h3 class="card-title">Recent Activity</h3>
+                  <a href="#" class="card-link">View All</a>
+                </div>
+                <div class="activity-list">
+                  <div class="activity-item">
+                    <div class="activity-icon green">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                    <div class="activity-content">
+                      <span class="activity-text">Submitted bid for <strong>HVAC Services Contract</strong></span>
+                      <span class="activity-time">2 hours ago</span>
+                    </div>
+                  </div>
+                  <div class="activity-item">
+                    <div class="activity-icon blue">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                    </div>
+                    <div class="activity-content">
+                      <span class="activity-text">Uploaded 3 documents to <strong>Yard Waste RFP</strong></span>
+                      <span class="activity-time">5 hours ago</span>
+                    </div>
+                  </div>
+                  <div class="activity-item">
+                    <div class="activity-icon purple">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                      </svg>
+                    </div>
+                    <div class="activity-content">
+                      <span class="activity-text">Invited <strong>Sarah Kim</strong> to join the team</span>
+                      <span class="activity-time">Yesterday</span>
+                    </div>
+                  </div>
+                  <div class="activity-item">
+                    <div class="activity-icon orange">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                    </div>
+                    <div class="activity-content">
+                      <span class="activity-text">Set reminder for <strong>Safety Boots deadline</strong></span>
+                      <span class="activity-time">2 days ago</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="account-card team-preview-card fade-in stagger-4">
+                <div class="card-header">
+                  <h3 class="card-title">Your Team</h3>
+                  <a href="#" class="card-link">Manage</a>
+                </div>
+                <div class="team-list">
+                  <div class="team-member">
+                    <div class="member-avatar owner">JD</div>
+                    <div class="member-info">
+                      <span class="member-name">John Davidson</span>
+                      <span class="member-role">Owner</span>
+                    </div>
+                    <span class="member-status online">Online</span>
+                  </div>
+                  <div class="team-member">
+                    <div class="member-avatar" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">SK</div>
+                    <div class="member-info">
+                      <span class="member-name">Sarah Kim</span>
+                      <span class="member-role">Admin</span>
+                    </div>
+                    <span class="member-status online">Online</span>
+                  </div>
+                  <div class="team-member">
+                    <div class="member-avatar" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">MR</div>
+                    <div class="member-info">
+                      <span class="member-name">Mike Rodriguez</span>
+                      <span class="member-role">Member</span>
+                    </div>
+                    <span class="member-status offline">Offline</span>
+                  </div>
+                </div>
+                <button class="btn-secondary full-width">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Invite New Member
+                </button>
+              </div>
+
+              <div class="account-card integrations-card fade-in stagger-4">
+                <div class="card-header">
+                  <h3 class="card-title">Connected Apps</h3>
+                  <a href="#" class="card-link">Browse All</a>
+                </div>
+                <div class="integrations-list">
+                  <div class="integration-item">
+                    <div class="integration-icon google">
+                      <svg width="20" height="20" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                    </div>
+                    <div class="integration-info">
+                      <span class="integration-name">Google Workspace</span>
+                      <span class="integration-desc">Calendar & Drive sync</span>
+                    </div>
+                    <span class="integration-status connected">Connected</span>
+                  </div>
+                  <div class="integration-item">
+                    <div class="integration-icon slack">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#E01E5A">
+                        <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                      </svg>
+                    </div>
+                    <div class="integration-info">
+                      <span class="integration-name">Slack</span>
+                      <span class="integration-desc">Notifications & alerts</span>
+                    </div>
+                    <span class="integration-status connected">Connected</span>
+                  </div>
+                  <div class="integration-item">
+                    <div class="integration-icon dropbox">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#0061FF">
+                        <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75-6 3.75-6-3.75zm18-3.75l6 3.75-6 3.75-6-3.75 6-3.75zM6 17.5l6-3.75 6 3.75-6 3.75-6-3.75z"/>
+                      </svg>
+                    </div>
+                    <div class="integration-info">
+                      <span class="integration-name">Dropbox</span>
+                      <span class="integration-desc">Document backup</span>
+                    </div>
+                    <button class="btn-connect">Connect</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-profile">
+            <div class="settings-section fade-in">
+              <div class="settings-header">
+                <h3>Personal Information</h3>
+                <p>Update your personal details and contact information.</p>
+              </div>
+              <div class="settings-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" value="John" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" value="Davidson" class="form-input">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Email Address</label>
+                  <input type="email" value="john.davidson@acmecontractors.com" class="form-input">
+                  <span class="form-hint">This is your primary login email</span>
+                </div>
+                <div class="form-group">
+                  <label>Phone Number</label>
+                  <input type="tel" value="(614) 555-0123" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label>Job Title</label>
+                  <input type="text" value="Business Development Manager" class="form-input">
+                </div>
+                <div class="form-actions">
+                  <button class="btn-primary">Save Changes</button>
+                  <button class="btn-ghost">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-1">
+              <div class="settings-header">
+                <h3>Organization Details</h3>
+                <p>Information about your company for bid submissions.</p>
+              </div>
+              <div class="settings-form">
+                <div class="form-group">
+                  <label>Company Name</label>
+                  <input type="text" value="Acme Contractors LLC" class="form-input">
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Industry</label>
+                    <select class="form-select">
+                      <option>Construction</option>
+                      <option selected>General Contracting</option>
+                      <option>HVAC Services</option>
+                      <option>Electrical</option>
+                      <option>Plumbing</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Company Size</label>
+                    <select class="form-select">
+                      <option>1-10 employees</option>
+                      <option selected>11-50 employees</option>
+                      <option>51-200 employees</option>
+                      <option>200+ employees</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Address</label>
+                  <input type="text" value="1234 Construction Ave, Columbus, OH 43215" class="form-input">
+                </div>
+                <div class="form-actions">
+                  <button class="btn-primary">Save Changes</button>
+                  <button class="btn-ghost">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-billing">
+            <div class="billing-overview fade-in">
+              <div class="billing-plan-card">
+                <div class="billing-plan-header">
+                  <div class="billing-plan-badge">Current Plan</div>
+                  <div class="billing-plan-info">
+                    <h2>Professional</h2>
+                    <p>Perfect for growing teams</p>
+                  </div>
+                  <div class="billing-plan-price">
+                    <span class="price-big">$49</span>
+                    <span class="price-period">/month</span>
+                  </div>
+                </div>
+                <div class="billing-plan-body">
+                  <div class="billing-stat">
+                    <span class="billing-stat-value">$588</span>
+                    <span class="billing-stat-label">Annual cost</span>
+                  </div>
+                  <div class="billing-stat">
+                    <span class="billing-stat-value">Dec 15</span>
+                    <span class="billing-stat-label">Next billing</span>
+                  </div>
+                  <div class="billing-stat">
+                    <span class="billing-stat-value">Monthly</span>
+                    <span class="billing-stat-label">Billing cycle</span>
+                  </div>
+                </div>
+                <div class="billing-plan-actions">
+                  <button class="btn-primary">Upgrade Plan</button>
+                  <button class="btn-secondary">Switch to Annual (Save 20%)</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-1">
+              <div class="settings-header">
+                <h3>Payment Method</h3>
+                <p>Manage your payment information.</p>
+              </div>
+              <div class="payment-methods">
+                <div class="payment-card active">
+                  <div class="payment-card-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                      <rect x="1" y="4" width="22" height="16" rx="3" fill="#1A1F71"/>
+                      <text x="12" y="14" text-anchor="middle" fill="white" font-size="6" font-weight="bold">VISA</text>
+                    </svg>
+                  </div>
+                  <div class="payment-card-info">
+                    <span class="payment-card-number">•••• •••• •••• 4242</span>
+                    <span class="payment-card-expiry">Expires 08/26</span>
+                  </div>
+                  <span class="payment-card-default">Default</span>
+                  <button class="payment-card-edit">Edit</button>
+                </div>
+                <button class="add-payment-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Add Payment Method
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-2">
+              <div class="settings-header">
+                <h3>Billing History</h3>
+                <p>Download invoices and view past payments.</p>
+              </div>
+              <div class="billing-table">
+                <div class="billing-row header">
+                  <span>Date</span>
+                  <span>Description</span>
+                  <span>Amount</span>
+                  <span>Status</span>
+                  <span></span>
+                </div>
+                <div class="billing-row">
+                  <span>Nov 15, 2024</span>
+                  <span>Professional Plan - Monthly</span>
+                  <span>$49.00</span>
+                  <span class="status-badge paid">Paid</span>
+                  <button class="download-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div class="billing-row">
+                  <span>Oct 15, 2024</span>
+                  <span>Professional Plan - Monthly</span>
+                  <span>$49.00</span>
+                  <span class="status-badge paid">Paid</span>
+                  <button class="download-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div class="billing-row">
+                  <span>Sep 15, 2024</span>
+                  <span>Professional Plan - Monthly</span>
+                  <span>$49.00</span>
+                  <span class="status-badge paid">Paid</span>
+                  <button class="download-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-team">
+            <div class="team-header fade-in">
+              <div class="team-header-info">
+                <h2>Team Members</h2>
+                <p>Manage your team and their permissions.</p>
+              </div>
+              <div class="team-header-stats">
+                <div class="team-stat">
+                  <span class="team-stat-value">3</span>
+                  <span class="team-stat-label">Members</span>
+                </div>
+                <div class="team-stat">
+                  <span class="team-stat-value">2</span>
+                  <span class="team-stat-label">Available</span>
+                </div>
+              </div>
+              <button class="btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Invite Member
+              </button>
+            </div>
+
+            <div class="team-grid fade-in stagger-1">
+              <div class="team-card owner-card">
+                <div class="team-card-header">
+                  <div class="team-card-avatar">JD</div>
+                  <div class="team-card-badge owner">Owner</div>
+                </div>
+                <div class="team-card-body">
+                  <h4>John Davidson</h4>
+                  <p>john.davidson@acmecontractors.com</p>
+                  <span class="team-card-status online">
+                    <span class="status-dot"></span>
+                    Online now
+                  </span>
+                </div>
+                <div class="team-card-footer">
+                  <span class="team-card-joined">Joined Oct 2023</span>
+                </div>
+              </div>
+
+              <div class="team-card">
+                <div class="team-card-header">
+                  <div class="team-card-avatar" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">SK</div>
+                  <div class="team-card-badge admin">Admin</div>
+                </div>
+                <div class="team-card-body">
+                  <h4>Sarah Kim</h4>
+                  <p>sarah.kim@acmecontractors.com</p>
+                  <span class="team-card-status online">
+                    <span class="status-dot"></span>
+                    Online now
+                  </span>
+                </div>
+                <div class="team-card-footer">
+                  <span class="team-card-joined">Joined Nov 2023</span>
+                  <button class="team-card-menu">•••</button>
+                </div>
+              </div>
+
+              <div class="team-card">
+                <div class="team-card-header">
+                  <div class="team-card-avatar" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">MR</div>
+                  <div class="team-card-badge member">Member</div>
+                </div>
+                <div class="team-card-body">
+                  <h4>Mike Rodriguez</h4>
+                  <p>mike.rodriguez@acmecontractors.com</p>
+                  <span class="team-card-status offline">
+                    <span class="status-dot"></span>
+                    Offline
+                  </span>
+                </div>
+                <div class="team-card-footer">
+                  <span class="team-card-joined">Joined Jan 2024</span>
+                  <button class="team-card-menu">•••</button>
+                </div>
+              </div>
+
+              <div class="team-card add-card">
+                <div class="add-card-content">
+                  <div class="add-card-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </div>
+                  <h4>Add Team Member</h4>
+                  <p>2 seats remaining</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-2">
+              <div class="settings-header">
+                <h3>Pending Invitations</h3>
+              </div>
+              <div class="pending-invites">
+                <div class="pending-invite">
+                  <div class="pending-avatar">?</div>
+                  <div class="pending-info">
+                    <span class="pending-email">alex.johnson@acmecontractors.com</span>
+                    <span class="pending-sent">Sent 2 days ago</span>
+                  </div>
+                  <div class="pending-actions">
+                    <button class="btn-ghost">Resend</button>
+                    <button class="btn-danger-ghost">Revoke</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-notifications">
+            <div class="settings-section fade-in">
+              <div class="settings-header">
+                <h3>Email Notifications</h3>
+                <p>Choose what updates you want to receive via email.</p>
+              </div>
+              <div class="notification-list">
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Bid Deadline Reminders</h4>
+                    <p>Get notified 24 hours and 1 hour before deadlines</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>New Opportunities</h4>
+                    <p>Daily digest of new bids matching your preferences</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Team Activity</h4>
+                    <p>Updates when team members make changes to bids</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Weekly Summary</h4>
+                    <p>Weekly report of your bid activity and wins</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Product Updates</h4>
+                    <p>New features and improvements to EasyRFP</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-1">
+              <div class="settings-header">
+                <h3>Push Notifications</h3>
+                <p>Real-time alerts in your browser.</p>
+              </div>
+              <div class="notification-list">
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Urgent Deadlines</h4>
+                    <p>Immediate alerts for bids due within 2 hours</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Team Messages</h4>
+                    <p>Notifications for new messages and mentions</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4>Document Updates</h4>
+                    <p>Alerts when documents are uploaded or modified</p>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-security">
+            <div class="settings-section fade-in">
+              <div class="settings-header">
+                <h3>Password</h3>
+                <p>Update your password to keep your account secure.</p>
+              </div>
+              <div class="settings-form">
+                <div class="form-group">
+                  <label>Current Password</label>
+                  <div class="password-input-wrapper">
+                    <input type="password" placeholder="Enter current password" class="form-input">
+                    <button class="password-toggle" type="button">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>New Password</label>
+                  <div class="password-input-wrapper">
+                    <input type="password" placeholder="Enter new password" class="form-input">
+                    <button class="password-toggle" type="button">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="password-strength">
+                    <div class="strength-bar">
+                      <div class="strength-fill" style="width: 0%;"></div>
+                    </div>
+                    <span class="strength-label">Enter a password</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Confirm New Password</label>
+                  <input type="password" placeholder="Confirm new password" class="form-input">
+                </div>
+                <div class="form-actions">
+                  <button class="btn-primary">Update Password</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-1">
+              <div class="settings-header">
+                <h3>Two-Factor Authentication</h3>
+                <p>Add an extra layer of security to your account.</p>
+              </div>
+              <div class="two-factor-card">
+                <div class="two-factor-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </div>
+                <div class="two-factor-info">
+                  <h4>Two-Factor Authentication is OFF</h4>
+                  <p>Protect your account with an additional security layer using your phone.</p>
+                </div>
+                <button class="btn-primary">Enable 2FA</button>
+              </div>
+            </div>
+
+            <div class="settings-section fade-in stagger-2">
+              <div class="settings-header">
+                <h3>Active Sessions</h3>
+                <p>Manage devices where you're currently logged in.</p>
+              </div>
+              <div class="sessions-list">
+                <div class="session-item current">
+                  <div class="session-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                      <line x1="8" y1="21" x2="16" y2="21"></line>
+                      <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                  </div>
+                  <div class="session-info">
+                    <span class="session-device">MacBook Pro - Chrome</span>
+                    <span class="session-location">Columbus, OH • Current session</span>
+                  </div>
+                  <span class="session-current-badge">This device</span>
+                </div>
+                <div class="session-item">
+                  <div class="session-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                      <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                  </div>
+                  <div class="session-info">
+                    <span class="session-device">iPhone 14 - Safari</span>
+                    <span class="session-location">Columbus, OH • Last active 2 hours ago</span>
+                  </div>
+                  <button class="btn-danger-ghost">Revoke</button>
+                </div>
+              </div>
+              <button class="btn-danger-outline full-width">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sign Out All Other Sessions
+              </button>
+            </div>
+
+            <div class="settings-section danger-zone fade-in stagger-3">
+              <div class="settings-header">
+                <h3>Danger Zone</h3>
+                <p>Irreversible and destructive actions.</p>
+              </div>
+              <div class="danger-actions">
+                <div class="danger-action">
+                  <div class="danger-info">
+                    <h4>Export Your Data</h4>
+                    <p>Download a copy of all your data including bids, documents, and settings.</p>
+                  </div>
+                  <button class="btn-secondary">Export Data</button>
+                </div>
+                <div class="danger-action">
+                  <div class="danger-info">
+                    <h4>Delete Account</h4>
+                    <p>Permanently delete your account and all associated data. This cannot be undone.</p>
+                  </div>
+                  <button class="btn-danger">Delete Account</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const scrollProgress = document.getElementById('scrollProgress');
+      const content = document.querySelector('.content');
+      
+      content.addEventListener('scroll', () => {
+        const scrollTop = content.scrollTop;
+        const scrollHeight = content.scrollHeight - content.clientHeight;
+        const progress = (scrollTop / scrollHeight) * 100;
+        scrollProgress.style.width = progress + '%';
+      });
+
+      const tabs = document.querySelectorAll('.account-tab');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const tabId = tab.dataset.tab;
+          
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          
+          tabContents.forEach(content => {
+            content.classList.remove('active');
+            if (content.id === `tab-${tabId}`) {
+              content.classList.add('active');
+              content.querySelectorAll('.fade-in').forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(16px)';
+                setTimeout(() => {
+                  el.style.opacity = '1';
+                  el.style.transform = 'translateY(0)';
+                }, 50 * i);
+              });
+            }
+          });
+        });
+      });
+
+      setTimeout(() => {
+        document.querySelectorAll('.fade-in').forEach((el, i) => {
+          setTimeout(() => {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+          }, 50 * i);
+        });
+      }, 100);
+
+      document.querySelectorAll('.toggle input').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+          const label = this.closest('.notification-item').querySelector('h4').textContent;
+          console.log(`${label}: ${this.checked ? 'enabled' : 'disabled'}`);
+        });
+      });
+
+      document.querySelectorAll('.password-toggle').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const input = this.previousElementSibling;
+          const type = input.type === 'password' ? 'text' : 'password';
+          input.type = type;
+          this.classList.toggle('active');
+        });
+      });
+
+      const newPasswordInput = document.querySelector('input[placeholder="Enter new password"]');
+      if (newPasswordInput) {
+        newPasswordInput.addEventListener('input', function() {
+          const password = this.value;
+          const strengthFill = document.querySelector('.strength-fill');
+          const strengthLabel = document.querySelector('.strength-label');
+          
+          let strength = 0;
+          if (password.length >= 8) strength += 25;
+          if (/[A-Z]/.test(password)) strength += 25;
+          if (/[0-9]/.test(password)) strength += 25;
+          if (/[^A-Za-z0-9]/.test(password)) strength += 25;
+          
+          strengthFill.style.width = strength + '%';
+          
+          if (strength === 0) {
+            strengthLabel.textContent = 'Enter a password';
+            strengthFill.style.background = '#94a3b8';
+          } else if (strength <= 25) {
+            strengthLabel.textContent = 'Weak';
+            strengthFill.style.background = '#ef4444';
+          } else if (strength <= 50) {
+            strengthLabel.textContent = 'Fair';
+            strengthFill.style.background = '#f59e0b';
+          } else if (strength <= 75) {
+            strengthLabel.textContent = 'Good';
+            strengthFill.style.background = '#22c55e';
+          } else {
+            strengthLabel.textContent = 'Strong';
+            strengthFill.style.background = 'var(--primary-gradient)';
+          }
+        });
+      }
+
+      document.getElementById('signOutBtn')?.addEventListener('click', function() {
+        if (confirm('Are you sure you want to sign out?')) {
+          window.location.href = 'index.html';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

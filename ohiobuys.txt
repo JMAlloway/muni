@@ -553,7 +553,7 @@ __ivHtmlControls['footer_x_foot_x_btnAccessibility']= {"clientValidation":false,
 __ivHtmlControls['footer_x_foot_x_btnSiteMap']= {"clientValidation":false,"iconAlign":"left","controlID":"btnSiteMap"};
 __ivHtmlControls['footer_x_foot_x_btnLegalMentions']= {"clientValidation":false,"iconAlign":"left","modalUrl":{"url":"/modal.aspx/en/bas/legal_mentions?modal=true","autoOpen":true,"size":""},"controlID":"btnLegalMentions"};
 </script>
-<script src="/dist/js/rfp_script.min.js?v=20251106190746"></script><script></script>
+<script src="/dist/js/rfp_script.min.js"></script><script></script>
 <div class="aspNetHidden">
 
 	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="7C067871">

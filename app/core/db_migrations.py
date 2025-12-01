@@ -41,6 +41,15 @@ async def ensure_onboarding_schema(engine) -> None:
             res = await conn.exec_driver_sql("PRAGMA table_info('users')")
             cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
 
+            if "first_name" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN first_name TEXT"
+                )
+            if "last_name" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN last_name TEXT"
+                )
+
             if "primary_interest" not in cols:
                 await conn.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN primary_interest TEXT DEFAULT 'everything'"
@@ -101,6 +110,32 @@ async def ensure_onboarding_schema(engine) -> None:
                 )
     except Exception:
         # Non-SQLite or insufficient permissions; ignore quietly.
+        return
+
+
+async def ensure_company_profile_schema(engine) -> None:
+    """Ensure company_profiles table exists for AI autofill."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql(
+                """
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name='company_profiles'
+                """
+            )
+            if not res.fetchone():
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE company_profiles (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT UNIQUE,
+                        data JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+    except Exception:
         return
 
 

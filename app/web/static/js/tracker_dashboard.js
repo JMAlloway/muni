@@ -125,15 +125,17 @@
   const btnReset  = document.getElementById("reset-filters");
   const summaryEl = document.getElementById("summary-count");
   const threadUI = {
-    overlay: document.getElementById("thread-overlay"),
-    drawer: document.getElementById("thread-drawer"),
-    title: document.getElementById("thread-title"),
-    subtitle: document.getElementById("thread-subtitle"),
-    list: document.getElementById("thread-messages"),
-    input: document.getElementById("thread-input"),
-    send: document.getElementById("thread-send"),
-    cancel: document.getElementById("thread-cancel"),
-    label: document.getElementById("thread-label")
+    overlay: document.getElementById("drawerOverlay"),
+    drawer: document.getElementById("chatDrawer"),
+    title: document.getElementById("drawerTitle"),
+    subtitle: document.getElementById("drawerSubtitle"),
+    list: document.getElementById("drawerMessages"),
+    input: document.getElementById("drawerInput"),
+    send: document.getElementById("drawerSendBtn"),
+    close: document.getElementById("drawerCloseBtn"),
+    typing: document.getElementById("drawerTyping"),
+    empty: document.getElementById("drawerEmpty"),
+    members: document.getElementById("drawerMembers")
   };
   const threadState = { oid: null, meta: null };
 
@@ -165,6 +167,7 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       collabState.notesCache[oid] = (data.notes || []).map(n => Object.assign({}, n, { body: noteBody(n) }));
+      updateChatBadge(oid);
       if (threadState.oid === oid) renderThread();
     } catch(_) {} finally {
       collabState.fetching.delete(oid);
@@ -205,6 +208,39 @@
   function noteBody(n){
     if (!n) return "";
     return (n.body || n.text || "").toString();
+  }
+  function initials(email){
+    const handle = (email || "").split("@")[0] || "";
+    const clean = handle.replace(/[._]+/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (clean.length >= 2) return (clean[0][0] + clean[1][0]).toUpperCase();
+    return (handle.slice(0, 2) || "??").toUpperCase();
+  }
+  function avatarClass(email){
+    const s = (email || "").toLowerCase();
+    if (!s) return "";
+    let sum = 0;
+    for (let i = 0; i < s.length; i++) sum += s.charCodeAt(i);
+    const idx = sum % 3;
+    return ["", "blue", "purple"][idx];
+  }
+  function updateChatBadge(oid){
+    if (!oid) return;
+    const item = items.find(x => String(x.opportunity_id) === String(oid));
+    const count = (collabState.notesCache[oid] || []).length || (item && item.note_count) || 0;
+    if (item) item.note_count = count;
+    const btn = document.querySelector(`.chat-drawer-btn[data-oid="${oid}"]`);
+    if (!btn) return;
+    let badge = btn.querySelector('.chat-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'chat-badge';
+        btn.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
   }
 
   // Inject minimal styles for collab UI
@@ -259,11 +295,12 @@
     const oid = threadState.oid;
     const notes = oid ? getNotes(oid) : [];
     if (!oid) {
-      threadUI.list.innerHTML = "<div class='muted'>Select a solicitation to see its thread.</div>";
+      threadUI.list.innerHTML = `<div class="drawer-date-divider"><span>Select a solicitation to view messages.</span></div>`;
       return;
     }
     if (!notes.length) {
-      threadUI.list.innerHTML = "<div class='muted'>No messages yet. Start the thread with an @mention.</div>";
+      threadUI.list.innerHTML = `<div class="drawer-date-divider"><span>No messages yet. Start the thread with an @mention.</span></div>`;
+      updateChatBadge(oid);
       return;
     }
     threadUI.list.innerHTML = notes.map(n=>{
@@ -274,20 +311,43 @@
       const isMineId = currentUserId && n.author_user_id && String(n.author_user_id) === String(currentUserId);
       const isMine = !!(isMineEmail || isMineId);
       const label = isMine ? "You" : author;
-      return `<div class="thread-message ${isMine ? 'mine' : ''}">
-        <div>${text}</div>
-        <div class="meta"><span class="author">${escHtml(label)}</span>${ts ? `<span>&#183;</span><span>${ts}</span>` : ''}</div>
+      const avClass = avatarClass(author);
+      const init = initials(author);
+      return `<div class="drawer-message ${isMine ? 'own' : ''}">
+        <div class="drawer-msg-avatar${avClass ? ' ' + avClass : ''}">${escHtml(init)}</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">${escHtml(label)}</span>
+            <span class="drawer-msg-time">${escHtml(ts || '')}</span>
+          </div>
+          <div class="drawer-msg-text">${text}</div>
+          ${isMine ? `<div class="drawer-msg-status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Sent
+          </div>` : ''}
+        </div>
       </div>`;
     }).join("");
+    if (threadUI.typing) {
+      threadUI.list.appendChild(threadUI.typing);
+    }
+    threadUI.list.scrollTop = threadUI.list.scrollHeight;
+    updateChatBadge(oid);
   }
   function openThread(meta){
     if (!meta || !meta.opportunity_id) return;
     setThreadMeta(meta);
     if (threadUI.overlay) {
-      threadUI.overlay.style.display = 'block';
+      threadUI.overlay.classList.add('open');
       threadUI.overlay.setAttribute('aria-hidden','false');
     }
-    if (threadUI.drawer) threadUI.drawer.setAttribute('aria-hidden','false');
+    if (threadUI.drawer) {
+      threadUI.drawer.classList.add('open');
+      threadUI.drawer.setAttribute('aria-hidden','false');
+    }
+    document.body.style.overflow = 'hidden';
     fetchNotes(meta.opportunity_id).then(()=>{ renderThread(); render(); }).catch(()=>{ renderThread(); });
     if (threadUI.input) threadUI.input.focus();
   }
@@ -295,11 +355,16 @@
     threadState.oid = null;
     threadState.meta = null;
     if (threadUI.overlay) {
-      threadUI.overlay.style.display = 'none';
+      threadUI.overlay.classList.remove('open');
       threadUI.overlay.setAttribute('aria-hidden','true');
     }
-    if (threadUI.drawer) threadUI.drawer.setAttribute('aria-hidden','true');
-    if (threadUI.list) threadUI.list.innerHTML = "<div class='muted'>Select a solicitation to see its thread.</div>";
+    if (threadUI.drawer) {
+      threadUI.drawer.classList.remove('open');
+      threadUI.drawer.setAttribute('aria-hidden','true');
+    }
+    if (threadUI.list) threadUI.list.innerHTML = `<div class="drawer-date-divider"><span>Select a solicitation to view messages.</span></div>`;
+    if (threadUI.typing) threadUI.typing.style.display = 'none';
+    document.body.style.overflow = '';
   }
   async function sendThreadMessage(){
     const oid = threadState.oid;
@@ -315,19 +380,23 @@
       renderThread();
     } catch(_) {} finally {
       if (threadUI.send) threadUI.send.disabled = false;
+      if (threadUI.input) threadUI.input.focus();
     }
   }
   if (threadUI.overlay) threadUI.overlay.addEventListener('click', closeThread);
-  if (threadUI.cancel) threadUI.cancel.addEventListener('click', closeThread);
+  if (threadUI.close) threadUI.close.addEventListener('click', closeThread);
   if (threadUI.send) threadUI.send.addEventListener('click', sendThreadMessage);
   if (threadUI.input) threadUI.input.addEventListener('keydown', function(e){
-    if (e.key === 'Enter' && e.ctrlKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendThreadMessage();
     }
   });
-  const closeThreadBtn = document.getElementById("close-thread");
-  if (closeThreadBtn) closeThreadBtn.addEventListener('click', closeThread);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && threadUI.drawer && threadUI.drawer.classList.contains('open')) {
+      closeThread();
+    }
+  });
 
   function openUploads(it){
     // Preferred: right-hand drawer exposed by the app shell
@@ -433,7 +502,11 @@
         render();
       }
     };
-    fetch(`/tracker/${it.opportunity_id}`, { method: "DELETE", headers: { "X-CSRF-Token": (getCSRF()||"") } })
+    fetch(`/tracker/${it.opportunity_id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "X-CSRF-Token": (getCSRF()||"") }
+    })
       .catch(()=>{})
       .finally(()=>{
         if (el) {
@@ -554,6 +627,7 @@
       const ringCirc = 2 * Math.PI * 18; // matches 113 in demo
       const dashOffset = ringCirc - (ringCirc * Math.max(0, Math.min(100, prog)) / 100);
       const statusClass = dueSoon ? "status-due-soon" : "";
+      const msgCount = Math.max(0, Number(it.note_count || 0));
       return `
         <article class="solicitation-card tracked-card ${statusClass} ${expanded ? 'expanded' : ''}" data-oid="${it.opportunity_id}" tabindex="0" style="--primary:${colors.dot};">
           <div class="solicitation-card-header" data-action="toggle-card" data-oid="${it.opportunity_id}">
@@ -583,6 +657,12 @@
                 <span class="due-icon">🕒</span>
                 Due ${dueStr(it.due_date)}
               </div>
+              <button class="chat-drawer-btn" type="button" data-action="open-thread" data-oid="${it.opportunity_id}" aria-label="Open team chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                ${msgCount > 0 ? `<span class="chat-badge">${msgCount}</span>` : ""}
+              </button>
               <button class="expand-btn" type="button" data-action="toggle-card" data-oid="${it.opportunity_id}" aria-expanded="${expanded}">⌄</button>
             </div>
           </div>

@@ -7,29 +7,76 @@ from urllib.parse import urlparse
 from app.core.settings import settings
 
 def _nav_links_html(user_email: Optional[str]) -> str:
-    if user_email:
-        return """
-        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true">🏠</span><span class="nav-text">Overview</span></a>
-        <a href="/opportunities" class="nav-link"><span class="nav-icon" aria-hidden="true">🧭</span><span class="nav-text">Open Opportunities</span></a>
-        <a href="/tracker/dashboard" class="nav-link"><span class="nav-icon" aria-hidden="true">📊</span><span class="nav-text">My Dashboard</span></a>
-        <a href="/documents" class="nav-link"><span class="nav-icon" aria-hidden="true">📁</span><span class="nav-text">Documents</span></a>
-        <a href="/calendar" class="nav-link"><span class="nav-icon" aria-hidden="true">🗓️</span><span class="nav-text">Calendar</span></a>
-        <a href="/account" class="nav-link"><span class="nav-icon" aria-hidden="true">👤</span><span class="nav-text">My Account</span></a>
-        """
-    else:
-        return """
-        <a href="/" class="nav-link"><span class="nav-icon" aria-hidden="true">🏠</span><span class="nav-text">Home</span></a>
-        <a href="/signup" class="nav-link"><span class="nav-icon" aria-hidden="true">✨</span><span class="nav-text">Sign up</span></a>
-        <a href="/login" class="nav-link"><span class="nav-icon" aria-hidden="true">🔐</span><span class="nav-text">Sign in</span></a>
+    # Match Homepage_test /opportunities sidebar markup/icons
+    return """
+        <a href="/" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="/opportunities" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <span class="nav-text">Discover Bids</span>
+        </a>
+        <a href="/tracker/dashboard" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="nav-text">My Dashboard</span>
+        </a>
+        <a href="/documents" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="nav-text">Documents</span>
+        </a>
+        <a href="/calendar" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <span class="nav-text">Calendar</span>
+        </a>
+        <a href="/account" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="nav-text">My Account</span>
+        </a>
         """
 
 
 def _account_links_html() -> str:
     return """
-        <div class="nav-label" style="margin-top: 24px;">Account</div>
+        <div class="nav-label" style="margin-top: 24px;">ACCOUNT</div>
         <nav class="navlinks">
-            <a href="/account/settings" class="nav-link"><span class="nav-icon" aria-hidden="true">⚙️</span><span class="nav-text">Settings</span></a>
-            <a href="/support" class="nav-link"><span class="nav-icon" aria-hidden="true">💬</span><span class="nav-text">Support</span></a>
+            <a href="/account" class="nav-link">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+              </svg>
+              <span class="nav-text">Settings</span>
+            </a>
+            <a href="/support" class="nav-link">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span class="nav-text">Support</span>
+            </a>
         </nav>
     """
 
