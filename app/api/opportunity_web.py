@@ -15,8 +15,7 @@ HTML_TEMPLATE = """
   <meta charset="utf-8" />
   <title>{title}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/css/base.css" />
-  <link rel="stylesheet" href="/static/css/pages.css" />
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
 </head>
 <body class="opportunity-page">
   <h1>{title}</h1>

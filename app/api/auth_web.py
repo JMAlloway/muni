@@ -54,8 +54,11 @@ async def _get_user_id(email: str) -> Optional[str]:
 async def signup_form(request: Request, next: str = "/"):
     user_email = get_current_user_email(request)
     csrf_cookie = request.cookies.get("csrftoken") or secrets.token_urlsafe(32)
+    invite_mode = bool((request.query_params.get("invite") or "").strip())
     selected_plan = (request.query_params.get("plan") or "free").lower()
     if selected_plan not in {"free", "starter", "professional", "enterprise"}:
+        selected_plan = "free"
+    if invite_mode:
         selected_plan = "free"
     paid_flag = (request.query_params.get("paid") or "").strip()
     prefill_email = request.query_params.get("email") or ""
@@ -86,14 +89,48 @@ async def signup_form(request: Request, next: str = "/"):
             for p in plan_cards
         ]
     )
+    plan_section = ""
+    if not invite_mode:
+        plan_section = f"""
+      <div class="form-row plan-chooser">
+        <div class="plan-chooser-head">
+          <div>
+            <div class="label-small">Pick your starting plan</div>
+            <div class="help-text">Confirm your plan. Paid plans go to Stripe checkout, then you return here to finish signup.</div>
+          </div>
+          <div class="plan-chooser-note">Change anytime</div>
+        </div>
+        <div class="plan-tiles">{plan_html}</div>
+      </div>
+      <div class="form-actions" style="justify-content:space-between; align-items:center;">
+        <button class="button-secondary" type="button" id="pay-now-btn">Confirm plan & go to Stripe</button>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
+          <button class="button-primary" type="submit">Create account & continue</button>
+        </div>
+      </div>
+        """
+    else:
+        plan_section = """
+      <div class="auth-alert" style="color:#166534; border-color:#bbf7d0; background:#ecfdf3;">
+        You were invited to a team. No billing required—finish creating your free account to join.
+      </div>
+      <div class="form-actions" style="justify-content:flex-end; align-items:center;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
+          <button class="button-primary" type="submit">Create account & continue</button>
+        </div>
+      </div>
+        """
     body_html = f"""
     <h1 class="auth-title">Create your account</h1>
-    <p class="auth-subtext">Start in seconds. Confirm a plan, finish checkout, then complete signup.</p>
+    <p class="auth-subtext">Start in seconds. {"Join your team with a free account—no billing needed." if invite_mode else "Confirm a plan, finish checkout, then complete signup."}</p>
     {"<div class='auth-alert' style='color:#166534; border-color:#bbf7d0; background:#ecfdf3;'>Payment received for your selected plan. Finish creating your account below.</div>" if paid_flag else ""}
 
     <form class="auth-form" method="POST" action="/signup">\n        <input type="hidden" name="csrf_token" id="csrf_signup" value="{csrf_cookie}">
       <input type="hidden" name="next" value="{next}">
       <input type="hidden" name="plan" id="plan-hidden" value="{selected_plan}">
+      {"<input type='hidden' name='invite' value='1'>" if invite_mode else ""}
       {"<input type='hidden' name='paid' value='1'>" if paid_flag else ""}
       <div class="form-row">
         <div class="form-col">
@@ -126,23 +163,7 @@ async def signup_form(request: Request, next: str = "/"):
           <div class="help-text">We use this to auto-tailor your welcome dashboard.</div>
         </div>
       </div>
-      <div class="form-row plan-chooser">
-        <div class="plan-chooser-head">
-          <div>
-            <div class="label-small">Pick your starting plan</div>
-            <div class="help-text">Confirm your plan. Paid plans go to Stripe checkout, then you return here to finish signup.</div>
-          </div>
-          <div class="plan-chooser-note">Change anytime</div>
-        </div>
-        <div class="plan-tiles">{plan_html}</div>
-      </div>
-      <div class="form-actions" style="justify-content:space-between; align-items:center;">
-        <button class="button-secondary" type="button" id="pay-now-btn">Confirm plan & go to Stripe</button>
-        <div style="display:flex; gap:12px; align-items:center;">
-          <label style="font-size:13px; color:#374151;"><input type="checkbox" name="remember"> Keep me signed in</label>
-          <button class="button-primary" type="submit">Create account & continue</button>
-        </div>
-      </div>
+      {plan_section}
       <div class="auth-inline-links" style="justify-content:flex-start;">
         <span>Already have an account? <a href="/login?next={next}">Sign in</a>.</span>
       </div>
@@ -447,7 +468,13 @@ async def account_overview(request: Request):
         plan = plan_prices.get(tier_key, plan_prices["free"])
 
         tracked_res = await db.execute(
-            text("SELECT COUNT(*) FROM user_bid_trackers WHERE user_id = :uid"), {"uid": user_id}
+            text(
+                """
+                SELECT COUNT(*) FROM user_bid_trackers
+                WHERE (user_id = :uid OR (visibility = 'team' AND :team_id IS NOT NULL AND team_id = :team_id))
+                """
+            ),
+            {"uid": user_id, "team_id": team_id},
         )
         tracked_count = tracked_res.scalar() or 0
 
@@ -843,13 +870,27 @@ async def account_preferences_redirect():
 
 
 @router.get("/team/accept", response_class=HTMLResponse)
-async def accept_invite_ui(request: Request):
+async def accept_invite_ui(request: Request, email: str = ""):
     """
-    Lightweight accept screen for invited users. Use after clicking an invite link.
+    Accept screen for invited users. If not signed in, show login / signup options (no billing for invitees).
     """
     user_email = get_current_user_email(request)
     if not user_email:
-        return RedirectResponse("/login?next=/team/accept", status_code=303)
+        invite_email = (email or "").strip()
+        signup_href = f"/signup?next=/team/accept&plan=free&invite=1"
+        if invite_email:
+            signup_href += f"&email={invite_email}"
+        body = f"""
+        <section class="card" style="max-width:620px; margin:0 auto; text-align:center;">
+          <h2 class="section-heading">Join your team</h2>
+          <p class="subtext">Sign in or create an account to accept the invite{f" for <b>{invite_email}</b>" if invite_email else ""}. No billing required for team members.</p>
+          <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:16px;">
+            <a class="button-primary" href="/login?next=/team/accept">Sign in</a>
+            <a class="button-secondary" href="{signup_href}">Create account</a>
+          </div>
+        </section>
+        """
+        return HTMLResponse(page_shell(body, title="Accept Team Invite", user_email=None))
 
     body = """
     <section class="card" style="max-width:620px; margin:0 auto;">

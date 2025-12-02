@@ -159,6 +159,15 @@
   };
   function setAssignee(){ /* server-backed assignee not yet wired */ }
   function collabFor(){ return {}; }
+  async function updateVisibility(oid, nextVis){
+    const res = await fetch(`/tracker/${encodeURIComponent(oid)}`, {
+      method:'PATCH',
+      credentials:'include',
+      headers:{ 'Content-Type':'application/json', 'X-CSRF-Token': (getCSRF()||'') },
+      body: JSON.stringify({ visibility: nextVis })
+    });
+    if (!res.ok) throw new Error('Visibility update failed');
+  }
   async function fetchNotes(oid){
     if (!oid || collabState.fetching.has(oid)) return;
     collabState.fetching.add(oid);
@@ -628,6 +637,8 @@
       const dashOffset = ringCirc - (ringCirc * Math.max(0, Math.min(100, prog)) / 100);
       const statusClass = dueSoon ? "status-due-soon" : "";
       const msgCount = Math.max(0, Number(it.note_count || 0));
+      const isShared = (it.visibility || "").toLowerCase() === "team";
+      const visibilityBadge = isShared ? `<span class="agency-badge">Team Shared</span>` : "";
       return `
         <article class="solicitation-card tracked-card ${statusClass} ${expanded ? 'expanded' : ''}" data-oid="${it.opportunity_id}" tabindex="0" style="--primary:${colors.dot};">
           <div class="solicitation-card-header" data-action="toggle-card" data-oid="${it.opportunity_id}">
@@ -638,6 +649,7 @@
                 <div class="solicitation-agency">
                   ${it.agency_name ? `<span class="agency-badge">${escHtml(it.agency_name)}</span>` : ""}
                   ${it.external_id ? `<span class="agency-badge">${escHtml(it.external_id)}</span>` : ""}
+                  ${visibilityBadge}
                   <span>${filesLabel}</span>
                 </div>
               </div>
@@ -698,6 +710,7 @@
                   <button class="action-btn" data-action="upload" data-oid="${it.opportunity_id}">Upload Document</button>
                   <button class="action-btn" data-action="guide" data-oid="${it.opportunity_id}">View Requirements</button>
                   <button class="action-btn" data-action="open-thread" data-oid="${it.opportunity_id}">Team Thread</button>
+                  <button class="action-btn" data-action="toggle-share" data-oid="${it.opportunity_id}" data-visibility="${isShared ? 'team' : 'private'}">${isShared ? 'Make Private' : 'Share with Team'}</button>
                   <button class="action-btn" data-action="remove" data-oid="${it.opportunity_id}">Archive</button>
                 </div>
               </div>
@@ -857,6 +870,14 @@
         render();
         openThread(threadMetaFromItem(it) || { opportunity_id: oid });
       }).catch(()=>{});
+      return;
+    }
+    if (action === 'toggle-share') {
+      const next = (it.visibility || '').toLowerCase() === 'team' ? 'private' : 'team';
+      updateVisibility(oid, next).then(()=>{
+        it.visibility = next;
+        render();
+      }).catch(()=>{ alert('Could not update sharing.'); });
       return;
     }
     if (action === 'remove') return removeTracker(it);

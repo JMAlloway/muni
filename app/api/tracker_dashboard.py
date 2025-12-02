@@ -126,6 +126,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
               o.external_id,
               o.due_date,
               COALESCE(o.ai_category, o.category) AS category,
+              COALESCE(t.visibility, 'private') AS visibility,
               (
                 SELECT COUNT(*)
                 FROM bid_notes bn
@@ -134,7 +135,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
               (SELECT COUNT(*) FROM user_uploads u WHERE u.opportunity_id = o.id) AS file_count
             FROM user_bid_trackers t
             JOIN opportunities o ON o.id = t.opportunity_id
-            WHERE t.user_id = :uid
+            WHERE (t.user_id = :uid OR (t.visibility = 'team' AND :team_id IS NOT NULL AND t.team_id = :team_id))
             ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
             """,
             {"uid": user_id, "team_id": team_id},
@@ -163,12 +164,12 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
             JOIN opportunities o ON o.id = u.opportunity_id
             WHERE u.user_id = :uid
               AND u.opportunity_id IN (
-                SELECT opportunity_id FROM user_bid_trackers WHERE user_id = :uid
+                SELECT opportunity_id FROM user_bid_trackers WHERE (user_id = :uid OR (visibility = 'team' AND :team_id IS NOT NULL AND team_id = :team_id))
               )
             ORDER BY u.created_at DESC
             LIMIT 20
             """,
-            {"uid": user_id},
+            {"uid": user_id, "team_id": team_id},
         )
         uploads = [dict(r._mapping) for r in uploads_rows.fetchall()]
 
@@ -547,7 +548,6 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
 
     body_template = """
     <link rel="stylesheet" href="/static/css/vendor.css">
-    <link rel="stylesheet" href="/static/css/layout.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <div class="page dashboard-page">
       __TEAM_BAR__

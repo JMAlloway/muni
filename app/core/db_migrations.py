@@ -139,6 +139,20 @@ async def ensure_company_profile_schema(engine) -> None:
         return
 
 
+async def ensure_tracker_team_schema(engine) -> None:
+    """Add team_id + visibility to user_bid_trackers for team sharing."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql("PRAGMA table_info('user_bid_trackers')")
+            cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
+            if "team_id" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE user_bid_trackers ADD COLUMN team_id TEXT")
+            if "visibility" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE user_bid_trackers ADD COLUMN visibility TEXT DEFAULT 'private'")
+    except Exception:
+        return
+
+
 async def ensure_team_schema(engine) -> None:
     """Ensure team tables exist for collaboration features."""
     try:

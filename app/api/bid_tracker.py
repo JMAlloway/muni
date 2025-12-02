@@ -33,6 +33,16 @@ async def _require_user(request: Request):
     return {"id": m["id"], "email": m["email"]}
 
 
+async def _user_team_id(user_id: int) -> int | None:
+    async with engine.begin() as conn:
+        res = await conn.exec_driver_sql(
+            "SELECT team_id FROM users WHERE id = :uid LIMIT 1",
+            {"uid": user_id}
+        )
+        row = res.first()
+        return row[0] if row else None
+
+
 async def _resolve_opportunity_id(key: str) -> int:
     """
     Accept either internal numeric id (e.g. '42')
@@ -77,13 +87,15 @@ async def tracker_count(user=Depends(_require_user)):
     """
     Return count of active (non-archived) tracked opportunities for the current user.
     """
+    team_id = await _user_team_id(user["id"])
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
             """
             SELECT COUNT(*) FROM user_bid_trackers
-            WHERE user_id = :uid AND COALESCE(status, '') NOT LIKE '%archive%'
+            WHERE (user_id = :uid OR (visibility = 'team' AND :team_id IS NOT NULL AND team_id = :team_id))
+              AND COALESCE(status, '') NOT LIKE '%archive%'
             """,
-            {"uid": user["id"]},
+            {"uid": user["id"], "team_id": team_id},
         )
         count = res.scalar() or 0
     return {"count": count}
@@ -100,15 +112,16 @@ async def track_opportunity(opportunity_key: str, user=Depends(_require_user)):
     Safe to call repeatedly — ON CONFLICT DO NOTHING.
     """
     oid = await _resolve_opportunity_id(opportunity_key)
+    team_id = await _user_team_id(user["id"])
 
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
             """
-            INSERT INTO user_bid_trackers (user_id, opportunity_id)
-            VALUES (:uid, :oid)
+            INSERT INTO user_bid_trackers (user_id, opportunity_id, team_id, visibility)
+            VALUES (:uid, :oid, :team_id, 'private')
             ON CONFLICT(user_id, opportunity_id) DO NOTHING
             """,
-            {"uid": user["id"], "oid": oid}
+            {"uid": user["id"], "oid": oid, "team_id": team_id}
         )
         count_res = await conn.exec_driver_sql(
             """
@@ -172,6 +185,7 @@ async def update_tracker(opportunity_key: str, payload: dict, user=Depends(_requ
     Upsert tracker row, then update status/notes.
     """
     oid = await _resolve_opportunity_id(opportunity_key)
+    team_id = await _user_team_id(user["id"])
 
     # Always ensure the row exists first (idempotent)
     async with engine.begin() as conn:
@@ -183,6 +197,15 @@ async def update_tracker(opportunity_key: str, payload: dict, user=Depends(_requ
             """,
             {"uid": user["id"], "oid": oid}
         )
+        if team_id:
+            await conn.exec_driver_sql(
+                """
+                UPDATE user_bid_trackers
+                SET team_id = COALESCE(team_id, :team_id)
+                WHERE user_id = :uid AND opportunity_id = :oid
+                """,
+                {"uid": user["id"], "oid": oid, "team_id": team_id},
+            )
 
     # Now apply updates
     fields = []
@@ -193,6 +216,9 @@ async def update_tracker(opportunity_key: str, payload: dict, user=Depends(_requ
     if "notes" in payload:
         fields.append("notes = :notes")
         params["notes"] = payload["notes"]
+    if "visibility" in payload:
+        fields.append("visibility = :visibility")
+        params["visibility"] = payload["visibility"]
 
     if fields:
         sql = f"""
@@ -211,6 +237,7 @@ async def my_tracked(user=Depends(_require_user)):
     Return list of all tracked opportunities for current user.
     Used for dashboard view.
     """
+    team_id = await _user_team_id(user["id"])
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
             """
@@ -220,13 +247,14 @@ async def my_tracked(user=Depends(_require_user)):
               o.title,
               o.agency_name,
               COALESCE(o.ai_category, o.category) AS category,
-              o.due_date
+              o.due_date,
+              t.visibility
             FROM user_bid_trackers t
             JOIN opportunities o ON o.id = t.opportunity_id
-            WHERE t.user_id = :uid
+            WHERE (t.user_id = :uid OR (t.visibility = 'team' AND :team_id IS NOT NULL AND t.team_id = :team_id))
             ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
             """,
-            {"uid": user["id"]}
+            {"uid": user["id"], "team_id": team_id}
         )
         rows = res.fetchall()
 
@@ -285,13 +313,15 @@ async def tracker_count(user=Depends(_require_user)):
     """
     Return count of active (non-archived) tracked opportunities for the current user.
     """
+    team_id = await _user_team_id(user["id"])
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
             """
             SELECT COUNT(*) FROM user_bid_trackers
-            WHERE user_id = :uid AND COALESCE(status, '') NOT LIKE '%archive%'
+            WHERE (user_id = :uid OR (visibility = 'team' AND :team_id IS NOT NULL AND team_id = :team_id))
+              AND COALESCE(status, '') NOT LIKE '%archive%'
             """,
-            {"uid": user["id"]},
+            {"uid": user["id"], "team_id": team_id},
         )
         count = res.scalar() or 0
     return {"count": count}

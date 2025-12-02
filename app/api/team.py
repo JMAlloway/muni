@@ -319,7 +319,7 @@ async def invite_member(request: Request, payload: dict):
     # Send invite email (best-effort)
     try:
         base_url = "https://" + settings.PUBLIC_APP_HOST if settings.PUBLIC_APP_HOST else "http://localhost:8000"
-        accept_url = f"{base_url}/team/accept"
+        accept_url = f"{base_url}/team/accept?email={invite_email}"
         html_body = f"""
         <p>Hi,</p>
         <p><b>{user_email}</b> invited you to join their EasyRFP team.</p>
@@ -352,11 +352,12 @@ async def accept_invite(request: Request):
             raise HTTPException(status_code=404, detail="User not found")
         user_id = row[0]
 
+        # Look for a pending invite matching this email (case-insensitive)
         res = await session.execute(
             text(
                 """
                 SELECT team_id FROM team_members
-                WHERE invited_email = :email
+                WHERE lower(invited_email) = lower(:email) AND accepted_at IS NULL
                 ORDER BY invited_at DESC LIMIT 1
                 """
             ),
@@ -364,15 +365,31 @@ async def accept_invite(request: Request):
         )
         row = res.fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="No pending invite")
-        team_id = row[0]
+            # If no pending invite, see if the user already has a membership record; if so, ensure linkage.
+            fallback = await session.execute(
+                text(
+                    """
+                    SELECT team_id FROM team_members
+                    WHERE user_id = :uid OR lower(invited_email) = lower(:email)
+                    ORDER BY accepted_at DESC NULLS LAST, invited_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"uid": user_id, "email": user_email},
+            )
+            frow = fallback.fetchone()
+            if not frow:
+                raise HTTPException(status_code=404, detail="No pending invite")
+            team_id = frow[0]
+        else:
+            team_id = row[0]
 
         await session.execute(
             text(
                 """
                 UPDATE team_members
                 SET user_id = :uid, accepted_at = CURRENT_TIMESTAMP
-                WHERE team_id = :team AND invited_email = :email
+                WHERE team_id = :team AND lower(invited_email) = lower(:email)
                 """
             ),
             {"team": team_id, "email": user_email, "uid": user_id},

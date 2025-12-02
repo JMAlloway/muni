@@ -60,7 +60,7 @@ def _nav_links_html(user_email: Optional[str]) -> str:
 
 def _account_links_html() -> str:
     return """
-        <div class="nav-label" style="margin-top: 24px;">ACCOUNT</div>
+        <div class="nav-label" style="margin-top: 24px;">Account</div>
         <nav class="navlinks">
             <a href="/account" class="nav-link">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -349,7 +349,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
 <link rel="stylesheet" href="/static/css/base.css">
-<link rel="stylesheet" href="/static/css/pages.css">
+<link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
 <div class="app-shell">
@@ -484,6 +484,27 @@ __NOTIF_JS__
 
 </script>
 
+<script>
+// Auto-highlight current nav link to match /account sidebar behavior
+(function() {
+  try {
+    const path = window.location.pathname || "/";
+    const links = document.querySelectorAll(".sidebar .nav-link[href]");
+    links.forEach((link) => {
+      const href = link.getAttribute("href");
+      if (!href) return;
+      if (path === href || path.startsWith(href + "/")) {
+        link.classList.add("active", "is-active");
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.classList.remove("active", "is-active");
+        link.removeAttribute("aria-current");
+      }
+    });
+  } catch (e) { /* noop */ }
+})();
+</script>
+
 
 </body>
 </html>
@@ -518,6 +539,7 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>__TITLE__</title>
   <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/marketing.css">
 </head>
 <body class="marketing-body">
@@ -613,6 +635,7 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>__TITLE__</title>
   <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/auth.css">
 </head>
 <body class="auth-body">

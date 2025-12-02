@@ -68,6 +68,7 @@ from app.core.db_migrations import (
     ensure_user_tier_column,
     ensure_billing_schema,
     ensure_company_profile_schema,
+    ensure_tracker_team_schema,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -285,6 +286,7 @@ async def on_startup():
         await ensure_user_tier_column(engine)
         await ensure_billing_schema(engine)
         await ensure_company_profile_schema(engine)
+        await ensure_tracker_team_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 

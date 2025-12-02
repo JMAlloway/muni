@@ -162,8 +162,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border-radius: 16px;
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
@@ -221,6 +221,86 @@ body {
 .nav-text {
   position: relative;
   z-index: 1;
+}
+
+/* Force consistent sidebar look across all pages (matches /account) */
+.app-shell .sidebar {
+  width: 260px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-light);
+  padding: 24px 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.app-shell .sidebar .nav-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-tertiary);
+  padding: 0 12px;
+  margin: 12px 0;
+}
+
+.app-shell .sidebar .brand {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px 12px;
+  margin-bottom: 28px;
+  justify-content: flex-start;
+}
+
+.app-shell .sidebar .brand span {
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-shell .sidebar nav a.nav-link {
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+  padding: 12px 16px;
+  margin: 0;
+  gap: 12px;
+  border-radius: var(--radius-md);
+}
+
+.app-shell .sidebar nav a.nav-link:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.app-shell .sidebar nav a.nav-link.active,
+.app-shell .sidebar nav a.nav-link.is-active {
+  background: var(--primary-glow) !important;
+  color: var(--primary) !important;
+  font-weight: 600;
+  border: none !important;
+}
+
+.app-shell .content {
+  margin-left: 260px;
+}
+
+body.sidebar-collapsed .app-shell .content {
+  margin-left: 64px;
 }
 
 /* ===== MAIN CONTENT ===== */
@@ -327,6 +407,13 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+.icon-btn .icon-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
 .notif-dot {
   position: absolute;
   top: -4px;
@@ -338,12 +425,16 @@ body {
   font-size: 10px;
   font-weight: 700;
   border-radius: var(--radius-full);
-  display: flex;
+  display: none; /* hide by default to match other pages */
   align-items: center;
   justify-content: center;
   padding: 0 5px;
   animation: notifPulse 2s infinite;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.icon-btn.has-notifs .notif-dot {
+  display: flex;
 }
 
 @keyframes notifPulse {
