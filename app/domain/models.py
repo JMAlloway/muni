@@ -92,3 +92,18 @@ class CompanyProfile(Base):
     data: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(TIMESTAMP(timezone=True), default=dt.datetime.utcnow)
+
+
+# Import response module models to register them with Base.metadata
+try:
+    from app.domain.response_models import (
+        CompanyContentLibrary,
+        ResponseTemplate,
+        RFPResponse,
+        ResponseQuestion,
+        ResponseComment,
+        ResponseFeedback,
+    )
+except ImportError:
+    # Response module not yet set up
+    pass
