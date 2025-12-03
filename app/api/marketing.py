@@ -208,7 +208,7 @@ async def home(request: Request):
             <h3 class="pricing-name">Professional</h3>
             <p class="pricing-desc">For growing contractors and small teams</p>
             <div class="pricing-price">
-              <span class="price">$49</span>
+              <span class="price">$79</span>
               <span class="period">/month</span>
             </div>
             <ul class="pricing-features">
@@ -226,7 +226,7 @@ async def home(request: Request):
             <h3 class="pricing-name">Team</h3>
             <p class="pricing-desc">For established firms with capture teams</p>
             <div class="pricing-price">
-              <span class="price">$149</span>
+              <span class="price">$199</span>
               <span class="period">/month</span>
             </div>
             <ul class="pricing-features">

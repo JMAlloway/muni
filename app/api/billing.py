@@ -237,10 +237,16 @@ async def stripe_webhook(request: Request):
     event_type = event.get("type")
 
     # Map payment link URLs and price IDs to tiers (avoids Stripe API calls)
+    # WARNING: These are TEST MODE payment link IDs - replace with production IDs before deploying!
+    # To find your payment link IDs:
+    # 1. Go to https://dashboard.stripe.com/payment-links
+    # 2. Click on each payment link
+    # 3. Copy the ID from the URL (starts with "plink_")
     payment_link_to_tier = {
-        "plink_1swsbrpdgbpr3k66cvbrok20": "Starter",
-        "plink_1swscopdgbpr3k662btzu4vu": "Professional",
-        "plink_1swsanpdgbpr3k66wmh1u0oa": "Enterprise",
+        # TODO: Replace these with production payment link IDs from Stripe dashboard
+        # "plink_1swsbrpdgbpr3k66cvbrok20": "Starter",      # TEST - REPLACE ME
+        # "plink_1swscopdgbpr3k662btzu4vu": "Professional", # TEST - REPLACE ME
+        # "plink_1swsanpdgbpr3k66wmh1u0oa": "Enterprise",   # TEST - REPLACE ME
     }
     price_to_tier = {
         (settings.STRIPE_PRICE_STARTER or "").lower(): "Starter",

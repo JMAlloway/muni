@@ -207,23 +207,22 @@ async def update_tracker(opportunity_key: str, payload: dict, user=Depends(_requ
                 {"uid": user["id"], "oid": oid, "team_id": team_id},
             )
 
-    # Now apply updates
-    fields = []
-    params = {"uid": user["id"], "oid": oid}
-    if "status" in payload:
-        fields.append("status = :status")
-        params["status"] = payload["status"]
-    if "notes" in payload:
-        fields.append("notes = :notes")
-        params["notes"] = payload["notes"]
-    if "visibility" in payload:
-        fields.append("visibility = :visibility")
-        params["visibility"] = payload["visibility"]
+    # Now apply updates - whitelist allowed fields for security
+    ALLOWED_FIELDS = {"status", "notes", "visibility"}
+    updates = {}
 
-    if fields:
+    for field in ALLOWED_FIELDS:
+        if field in payload:
+            updates[field] = payload[field]
+
+    if updates:
+        # Build SET clause with only whitelisted fields
+        set_clause = ", ".join(f"{field} = :{field}" for field in updates.keys())
+        params = {"uid": user["id"], "oid": oid, **updates}
+
         sql = f"""
             UPDATE user_bid_trackers
-            SET {", ".join(fields)}
+            SET {set_clause}
             WHERE user_id = :uid AND opportunity_id = :oid
         """
         async with engine.begin() as conn:
