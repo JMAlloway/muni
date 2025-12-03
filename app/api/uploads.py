@@ -96,6 +96,25 @@ async def upload_files(
                 "mime": mime,
                 "download_url": create_presigned_get(storage_key)
             })
+        # notify team about uploads
+        try:
+            team_res = await conn.exec_driver_sql("SELECT team_id FROM users WHERE id = :uid LIMIT 1", {"uid": user.id})
+            trow = team_res.first()
+            team_id = trow[0] if trow else None
+            if team_id and saved:
+                from app.api.notifications import send_team_notification
+
+                await send_team_notification(
+                    conn,
+                    team_id=str(team_id),
+                    exclude_user_id=user.id,
+                    notif_type="upload",
+                    title="Document uploaded",
+                    body=f"{user.email} uploaded {len(saved)} file(s)",
+                    metadata={"opportunity_id": oid},
+                )
+        except Exception:
+            pass
     return {"ok": True, "files": saved}
 
 @router.get("/list/{opportunity_id}")

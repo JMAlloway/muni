@@ -62,3 +62,25 @@ def create_presigned_get(storage_key: str, expires: int = 900) -> str:
     else:
         # Local mode: serve via FastAPI streaming route
         return f"/uploads/local/{storage_key}"
+
+
+def store_profile_file(user_id: int, field: str, data: bytes, original_name: str, content_type: Optional[str]) -> str:
+    """
+    Store a company profile file to Cloudflare R2 (or local uploads) and return the key/path.
+    Files are nested under company_profiles/{user_id}/ to keep them isolated.
+    """
+    fname = _safe_filename(original_name or field)
+    mime = content_type or mimetypes.guess_type(fname)[0] or "application/octet-stream"
+
+    if USE_S3:
+        key = f"company_profiles/{user_id}/{fname}"
+        _s3.put_object(Bucket=BUCKET, Key=key, Body=data, ContentType=mime)
+        return key
+
+    # Local disk fallback
+    base_dir = os.path.join(LOCAL_DIR, "company_profiles", str(user_id))
+    os.makedirs(base_dir, exist_ok=True)
+    key = os.path.join(base_dir, fname)
+    with open(key, "wb") as f:
+        f.write(data)
+    return key

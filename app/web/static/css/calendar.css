@@ -455,3 +455,24 @@
     flex-direction: column;
   }
 }
+
+@media (max-width: 1024px) {
+  .page.calendar-page {
+    padding: 20px;
+  }
+  .calendar-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .calendar-nav {
+    flex-wrap: wrap;
+  }
+  .calendar-content {
+    grid-template-columns: 1fr;
+  }
+  .calendar-sidebar {
+    width: 100%;
+    flex-direction: row;
+    gap: 16px;
+  }
+}

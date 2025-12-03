@@ -11,6 +11,37 @@ from app.auth.session import get_current_user_email
 from app.core.db import AsyncSessionLocal
 
 router = APIRouter(tags=["notifications"])
+async def get_team_member_ids(session, team_id: str) -> list[str]:
+    res = await session.execute(
+        text("SELECT user_id FROM team_members WHERE team_id = :t AND user_id IS NOT NULL AND accepted_at IS NOT NULL"),
+        {"t": team_id},
+    )
+    return [r[0] for r in res.fetchall() if r[0]]
+
+
+async def send_team_notification(
+    session,
+    *,
+    team_id: str,
+    exclude_user_id: Optional[str],
+    notif_type: str,
+    title: str,
+    body: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    await _ensure_table(session)
+    member_ids = await get_team_member_ids(session, team_id)
+    for uid in member_ids:
+        if exclude_user_id and str(uid) == str(exclude_user_id):
+            continue
+        await create_notification(
+            session,
+            recipient_user_id=str(uid),
+            notif_type=notif_type,
+            title=title,
+            body=body,
+            metadata=metadata or {},
+        )
 
 
 CREATE_TABLE_SQL = """

@@ -14,7 +14,7 @@ from app.auth.session import get_current_user_email
 from app.core.db import AsyncSessionLocal
 from app.core.settings import settings
 from app.core.emailer import send_email
-from app.api.notifications import create_notification
+from app.api.notifications import create_notification, send_team_notification
 
 router = APIRouter(tags=["team"])
 ALLOWED_ROLES = {"owner", "manager", "member", "viewer"}
@@ -634,6 +634,21 @@ async def add_note(request: Request, payload: dict):
                 "created_at": dt.datetime.utcnow(),
             },
         )
+        # notify team about note
+        note_title = "New bid note"
+        note_body = f"{user_email} added a note on opportunity {opportunity_id}"
+        try:
+            await send_team_notification(
+                session,
+                team_id=team_id,
+                exclude_user_id=user_id,
+                notif_type="bid_note",
+                title=note_title,
+                body=note_body,
+                metadata={"opportunity_id": opportunity_id},
+            )
+        except Exception:
+            pass
         await session.commit()
 
     return {"ok": True}

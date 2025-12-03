@@ -117,6 +117,8 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
         tracked_rows = await conn.exec_driver_sql(
             """
             SELECT
+              t.user_id,
+              u.email AS owner_email,
               t.opportunity_id,
               COALESCE(t.status, 'prospecting') AS status,
               COALESCE(t.notes, '') AS notes,
@@ -135,7 +137,17 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
               (SELECT COUNT(*) FROM user_uploads u WHERE u.opportunity_id = o.id) AS file_count
             FROM user_bid_trackers t
             JOIN opportunities o ON o.id = t.opportunity_id
-            WHERE (t.user_id = :uid OR (t.visibility = 'team' AND :team_id IS NOT NULL AND t.team_id = :team_id))
+            JOIN users u ON u.id = t.user_id
+            WHERE
+              (
+                :team_id IS NOT NULL AND t.team_id = :team_id
+              )
+              OR (
+                :team_id IS NULL AND t.user_id = :uid
+              )
+              OR (
+                :team_id IS NOT NULL AND t.team_id IS NULL AND t.user_id = :uid
+              )
             ORDER BY (o.due_date IS NULL) ASC, o.due_date ASC, t.created_at DESC
             """,
             {"uid": user_id, "team_id": team_id},
@@ -159,15 +171,19 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
 
         uploads_rows = await conn.exec_driver_sql(
             """
-            SELECT u.filename, u.created_at, u.user_id, o.title
+            SELECT u.filename, u.created_at, u.user_id, o.title, usr.email AS owner_email
             FROM user_uploads u
             JOIN opportunities o ON o.id = u.opportunity_id
-            WHERE u.user_id = :uid
-              AND u.opportunity_id IN (
-                SELECT opportunity_id FROM user_bid_trackers WHERE (user_id = :uid OR (visibility = 'team' AND :team_id IS NOT NULL AND team_id = :team_id))
+            JOIN users usr ON usr.id = u.user_id
+            WHERE
+              (
+                :team_id IS NOT NULL AND usr.team_id = :team_id
+              )
+              OR (
+                usr.team_id IS NULL AND u.user_id = :uid
               )
             ORDER BY u.created_at DESC
-            LIMIT 20
+            LIMIT 40
             """,
             {"uid": user_id, "team_id": team_id},
         )
@@ -245,7 +261,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
             when = now
         activity_entries.append(
             {
-                "who": user_email,
+                "who": it.get("owner_email") or user_email,
                 "verb": "added to tracking",
                 "obj": it.get("title") or "Untitled",
                 "when": when.isoformat(),
@@ -259,7 +275,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
             when = now
         activity_entries.append(
             {
-                "who": user_email,
+                "who": up.get("owner_email") or user_email,
                 "verb": f"uploaded {up.get('filename') or 'a file'}",
                 "obj": up.get("title") or "",
                 "when": when.isoformat(),
@@ -548,6 +564,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
 
     body_template = """
     <link rel="stylesheet" href="/static/css/vendor.css">
+    <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <div class="page dashboard-page">
       __TEAM_BAR__

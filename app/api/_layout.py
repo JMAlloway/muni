@@ -212,134 +212,8 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     if tier_info.get("source") == "team":
         team_badge = '<span class="team-badge">via team</span>'
 
-    notif_js = r"""
-// notifications drawer (dynamic)
-(function(){
-  const btn = document.getElementById('notif-btn');
-  const drawer = document.getElementById('notif-drawer');
-  const overlay = document.getElementById('notif-overlay');
-  const closeBtn = document.getElementById('notif-close');
-  const list = document.getElementById('notif-list');
-  const badge = document.querySelector('.notif-dot');
-  if (!btn || !drawer || !overlay || !list) return;
-  const getCSRF = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || "";
-  const esc = (s) => (s==null?"":String(s)).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]||c));
-  let notifications = [];
+    notif_js = '(function(){const s=document.createElement("script");s.src="/static/js/notifications.js";document.body.appendChild(s);}());'
 
-  const updateBadge = (count) => {
-    if (!badge) return;
-    if (count > 0) {
-      badge.style.display = 'inline-flex';
-      badge.textContent = count > 99 ? '99+' : String(count);
-    } else {
-      badge.style.display = 'none';
-      badge.textContent = '';
-    }
-  };
-
-  const timeAgo = (iso) => {
-    if (!iso) return '';
-    try {
-      const then = new Date(iso).getTime();
-      const now = Date.now();
-      const diff = Math.max(0, now - then) / 1000;
-      if (diff < 60) return 'Just now';
-      if (diff < 3600) return Math.floor(diff/60)+'m ago';
-      if (diff < 86400) return Math.floor(diff/3600)+'h ago';
-      return Math.floor(diff/86400)+'d ago';
-    } catch(_) { return ''; }
-  };
-
-  const render = () => {
-    if (!notifications.length) {
-      list.innerHTML = "<div class='notif-item muted'>No notifications yet.</div>";
-      return;
-    }
-    list.innerHTML = notifications.map((n) => {
-      const unread = !n.read_at;
-      const inviteActions = (n.type === 'team_invite' && !n.actioned_at)
-        ? `<div class="notif-actions">
-            <button class="notif-btn accept" data-action="accept" data-id="${n.id}">Accept</button>
-            <button class="notif-btn decline" data-action="decline" data-id="${n.id}">Decline</button>
-           </div>`
-        : '';
-      const pill = unread ? '<span class="notif-pill">New</span>' : '<span class="notif-pill muted">Seen</span>';
-      return `
-        <div class="notif-item ${unread ? 'unread' : ''}">
-          <div class="notif-line">
-            ${pill}
-            <span class="notif-time">${timeAgo(n.created_at)}</span>
-          </div>
-          <div class="notif-body"><strong>${esc(n.title||'')}</strong><br>${esc(n.body||'')}</div>
-          ${inviteActions}
-        </div>
-      `;
-    }).join('');
-  };
-
-  const fetchNotifs = async () => {
-    try {
-      const res = await fetch('/api/notifications', { credentials:'include' });
-      if (!res.ok) return;
-      const data = await res.json();
-      notifications = data.notifications || [];
-      updateBadge(data.unread_count || 0);
-      render();
-    } catch(_) {}
-  };
-
-  const markAllRead = async () => {
-    try {
-      const unread = notifications.filter(n => !n.read_at);
-      await Promise.all(unread.map(n => fetch(`/api/notifications/${n.id}/read`, {
-        method:'POST',
-        credentials:'include',
-        headers: { 'X-CSRF-Token': getCSRF() }
-      })));
-      notifications = notifications.map(n => Object.assign({}, n, { read_at: n.read_at || new Date().toISOString() }));
-      updateBadge(0);
-      render();
-    } catch(_) {}
-  };
-
-  const toggle = (open) => {
-    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-    overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
-    if (open) {
-      fetchNotifs().then(markAllRead);
-    }
-  };
-
-  list.addEventListener('click', async function(e){
-    const btnEl = e.target.closest('[data-action][data-id]');
-    if (!btnEl) return;
-    const action = btnEl.getAttribute('data-action');
-    const id = btnEl.getAttribute('data-id');
-    try {
-      const res = await fetch(`/api/notifications/${id}/action`, {
-        method:'POST',
-        credentials:'include',
-        headers: { 'Content-Type':'application/json', 'X-CSRF-Token': getCSRF() },
-        body: JSON.stringify({ action })
-      });
-      if (!res.ok) return;
-      if (action === 'accept') {
-        window.location.reload();
-        return;
-      }
-      await fetchNotifs();
-    } catch(_) {}
-  });
-
-  btn.addEventListener('click', function(){ toggle(true); });
-  if (closeBtn) closeBtn.addEventListener('click', function(){ toggle(false); });
-  overlay.addEventListener('click', function(){ toggle(false); });
-
-  // Initial load + polling
-  fetchNotifs();
-  setInterval(fetchNotifs, 30000);
-})();
-"""
 
     template = """
 <!DOCTYPE html>
@@ -386,7 +260,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
         </span>
     </div>
     <div class="topbar-right">
-        <button class="icon-btn" type="button" aria-label="Notifications" id="notif-btn">
+        <button class="icon-btn" type="button" aria-label="Notifications" id="notifBtn">
             <img src="/static/img/bell.png" alt="" class="icon-img"><span class="notif-dot" aria-hidden="true"></span>
         </button>
         <div class="top-dropdown">
@@ -419,17 +293,57 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 </div>
 <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">&lt;&lt;</button>
 
-<div id="notif-overlay" aria-hidden="true"></div>
-<aside id="notif-drawer" aria-hidden="true">
-  <header>
-    <div>
-      <div class="notif-title">Notifications</div>
-      <div class="notif-sub">Inbox • Last 14 days</div>
+<div class="notif-overlay" id="notifOverlay"></div>
+<div class="notif-sidebar" id="notifSidebar">
+  <div class="notif-header">
+    <div class="notif-header-top">
+      <h2 class="notif-title">Notifications</h2>
+      <div class="notif-header-actions">
+        <button class="notif-action-btn" id="markAllRead" title="Mark all as read">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </button>
+        <button class="notif-close-btn" id="notifCloseBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
     </div>
-    <button class="icon-btn" id="notif-close" type="button" aria-label="Close notifications">x</button>
-  </header>
-  <div class="notif-list" id="notif-list"></div>
-</aside>
+    <div class="notif-tabs">
+      <button class="notif-tab active" data-filter="all">All</button>
+      <button class="notif-tab" data-filter="unread">Unread <span class="notif-tab-count">0</span></button>
+      <button class="notif-tab" data-filter="deadlines">Deadlines</button>
+      <button class="notif-tab" data-filter="team">Team</button>
+    </div>
+  </div>
+  <div class="notif-list" id="notifList">
+    <div class="notif-date-group">
+      <div class="notif-date-label">Today</div>
+      <div class="notif-item" data-type="info">
+        <div class="notif-item-icon info">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="8"></line>
+          </svg>
+        </div>
+        <div class="notif-item-content">
+          <div class="notif-item-title">Loading notifications...</div>
+          <div class="notif-item-desc">Please wait</div>
+          <div class="notif-item-meta">
+            <span class="notif-time"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notif-footer">
+    <a href="/account#tab-notifications" class="notif-settings-link">Notification settings</a>
+  </div>
+</div>
 
 <script>
 __NOTIF_JS__
@@ -504,7 +418,7 @@ __NOTIF_JS__
   } catch (e) { /* noop */ }
 })();
 </script>
-
+<script src="/static/js/notifications.js"></script>
 
 </body>
 </html>
@@ -527,7 +441,6 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
     """
     Lightweight landing-page shell (no sidebar) styled by marketing.css.
     """
-    # Always send primary CTA to signup to avoid jumping users past the flow.
     cta_url = "/signup"
     login_url = "/login?next=/tracker/dashboard"  # always go to login first
     hero_cta = "Sign Up"
@@ -558,15 +471,11 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
         </svg>
         <span class="brand-text">EasyRFP</span>
       </div>
-      <button class="nav-toggle" aria-label="Toggle navigation">
-        <span></span><span></span><span></span>
-      </button>
       <div class="nav-links">
         <a href="#features" class="nav-link">Features</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="#pricing" class="nav-link">Pricing</a>
         <a href="#coverage" class="nav-link">Coverage</a>
-        <a href="#pricing" class="nav-link">Pricing <span class="dropdown-arrow">∨</span></a>
-        <a href="#details" class="nav-link">Resources</a>
-        <a href="#contact" class="nav-link">Help</a>
       </div>
       <div class="nav-actions">
         <a href="__LOGIN_URL__" class="btn-ghost">Log In</a>

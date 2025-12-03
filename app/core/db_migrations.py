@@ -268,6 +268,8 @@ async def ensure_billing_schema(engine) -> None:
                 await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
             if "stripe_subscription_id" not in cols:
                 await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT")
+            if "next_billing_at" not in cols:
+                await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN next_billing_at TEXT")
     except Exception:
         # Non-SQLite or insufficient permissions; ignore quietly.
         return

@@ -109,7 +109,7 @@
           </span>
         </div>
         <div class="topbar-right">
-          <button class="icon-btn" type="button" aria-label="Notifications" id="notif-btn">
+          <button class="icon-btn" type="button" aria-label="Notifications" id="notifBtn">
             <img src="/static/img/bell.png" alt="" class="icon-img"><span class="notif-dot" aria-hidden="true"></span>
           </button>
           <div class="top-dropdown">
@@ -141,7 +141,7 @@
         <div class="account-header fade-in">
           <div class="account-header-left">
             <div class="large-avatar" id="avatarInitials">
-              <span>JD</span>
+              <span>--</span>
               <button class="avatar-edit-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -150,8 +150,8 @@
               </button>
             </div>
             <div class="account-header-info">
-              <h1 class="account-name" id="accountName">John Davidson</h1>
-              <p class="account-email" id="accountEmail">john.davidson@acmecontractors.com</p>
+              <h1 class="account-name" id="accountName"></h1>
+              <p class="account-email" id="accountEmail"></p>
               <div class="account-badges">
                 <span class="badge badge-pro" id="planBadge">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -159,14 +159,23 @@
                   </svg>
                   <span id="planBadgeLabel">Professional</span>
                 </span>
-                <span class="badge badge-verified">
+                <span class="badge badge-team" id="teamBadge" style="display:none;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  <span id="teamBadgeLabel">Team Member</span>
+                </span>
+                <span class="badge badge-verified" id="verifiedBadge">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                   </svg>
                   Verified
                 </span>
-                <span class="badge badge-member">Member since Oct 2023</span>
+                <span class="badge badge-member" id="memberSince">Member since Oct 2023</span>
               </div>
             </div>
           </div>
@@ -251,29 +260,56 @@
                   <span class="plan-label">Current Plan</span>
                   <h3 class="plan-name" id="planName">Professional</h3>
                 </div>
-                <div class="plan-price">
-                  <span class="price-amount" id="planPrice">$49</span>
-                  <span class="price-period" id="planPeriod">/month</span>
+                <div class="plan-price-stack">
+                  <div class="plan-price">
+                    <span class="price-amount" id="planPrice">$49</span>
+                    <span class="price-period" id="planPeriod">/month</span>
+                  </div>
+                  <div class="plan-renewal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span class="plan-renewal-label">Next billing:</span> <span id="planNextBilling">-</span>
+                  </div>
                 </div>
-              </div>
+                </div>
                 <div class="plan-features">
                   <div class="plan-feature">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    <span>Unlimited bid tracking</span>
+                    <span>Real-time opportunity updates</span>
                   </div>
                   <div class="plan-feature">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    <span>Up to 5 team members</span>
+                    <span>Track unlimited bids</span>
                   </div>
                   <div class="plan-feature">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    <span>Advanced analytics</span>
+                    <span>Daily digests</span>
+                  </div>
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Email alerts for keywords</span>
+                  </div>
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>File uploads (5GB)</span>
+                  </div>
+                  <div class="plan-feature">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Calendar integration</span>
                   </div>
                   <div class="plan-feature">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -283,15 +319,7 @@
                   </div>
                 </div>
                 <div class="plan-actions">
-                  <button class="btn-primary">Upgrade to Enterprise</button>
-                  <button class="btn-ghost">Compare Plans</button>
-                </div>
-                <div class="plan-renewal">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
-                  Next billing: December 15, 2024
+                  <a href="/billing" class="btn-primary" data-action="compare-plans">Compare Plans</a>
                 </div>
               </div>
 
@@ -304,37 +332,37 @@
                 <div class="usage-item">
                   <div class="usage-info">
                     <span class="usage-label">Active Bids</span>
-                    <span class="usage-value" id="usageBids">12 / Unlimited</span>
+                    <span class="usage-value" id="usageBids">--</span>
                   </div>
                   <div class="usage-bar">
-                    <div class="usage-fill" id="usageBidsFill" style="width: 100%; background: var(--primary-gradient);"></div>
+                    <div class="usage-fill" id="usageBidsFill" style="width: 0%; background: var(--primary-gradient);"></div>
                   </div>
                 </div>
                 <div class="usage-item">
                   <div class="usage-info">
                     <span class="usage-label">Team Members</span>
-                    <span class="usage-value" id="usageTeam">3 / 5</span>
+                    <span class="usage-value" id="usageTeam">--</span>
                   </div>
                   <div class="usage-bar">
-                    <div class="usage-fill" id="usageTeamFill" style="width: 60%;"></div>
+                    <div class="usage-fill" id="usageTeamFill" style="width: 0%;"></div>
                   </div>
                 </div>
                 <div class="usage-item">
                   <div class="usage-info">
                     <span class="usage-label">Documents Stored</span>
-                    <span class="usage-value" id="usageDocs">847 MB / 5 GB</span>
+                    <span class="usage-value" id="usageDocs">--</span>
                   </div>
                   <div class="usage-bar">
-                    <div class="usage-fill" id="usageDocsFill" style="width: 17%;"></div>
+                    <div class="usage-fill" id="usageDocsFill" style="width: 0%;"></div>
                   </div>
                 </div>
                 <div class="usage-item">
                   <div class="usage-info">
                     <span class="usage-label">API Calls</span>
-                    <span class="usage-value" id="usageTokens">0 / 10,000</span>
+                    <span class="usage-value" id="usageTokens">--</span>
                   </div>
                   <div class="usage-bar">
-                    <div class="usage-fill" id="usageTokensFill" style="width: 12%;"></div>
+                    <div class="usage-fill" id="usageTokensFill" style="width: 0%;"></div>
                   </div>
                 </div>
               </div>
@@ -392,57 +420,7 @@
                   <h3 class="card-title">Recent Activity</h3>
                   <a href="#" class="card-link">View All</a>
                 </div>
-                <div class="activity-list">
-                  <div class="activity-item">
-                    <div class="activity-icon green">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    </div>
-                    <div class="activity-content">
-                      <span class="activity-text">Submitted bid for <strong>HVAC Services Contract</strong></span>
-                      <span class="activity-time">2 hours ago</span>
-                    </div>
-                  </div>
-                  <div class="activity-item">
-                    <div class="activity-icon blue">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                      </svg>
-                    </div>
-                    <div class="activity-content">
-                      <span class="activity-text">Uploaded 3 documents to <strong>Yard Waste RFP</strong></span>
-                      <span class="activity-time">5 hours ago</span>
-                    </div>
-                  </div>
-                  <div class="activity-item">
-                    <div class="activity-icon purple">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="8.5" cy="7" r="4"></circle>
-                        <line x1="20" y1="8" x2="20" y2="14"></line>
-                        <line x1="23" y1="11" x2="17" y2="11"></line>
-                      </svg>
-                    </div>
-                    <div class="activity-content">
-                      <span class="activity-text">Invited <strong>Sarah Kim</strong> to join the team</span>
-                      <span class="activity-time">Yesterday</span>
-                    </div>
-                  </div>
-                  <div class="activity-item">
-                    <div class="activity-icon orange">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                    </div>
-                    <div class="activity-content">
-                      <span class="activity-text">Set reminder for <strong>Safety Boots deadline</strong></span>
-                      <span class="activity-time">2 days ago</span>
-                    </div>
-                  </div>
-                </div>
+                <div class="activity-list" id="activityList"></div>
               </div>
 
               <div class="account-card team-preview-card fade-in stagger-4">
@@ -474,256 +452,970 @@
                 <div class="form-row">
                   <div class="form-group">
                     <label>First Name</label>
-                    <input type="text" value="John" class="form-input">
+                    <input type="text" value="" class="form-input" id="profileFirstName">
                   </div>
                   <div class="form-group">
                     <label>Last Name</label>
-                    <input type="text" value="Davidson" class="form-input">
+                    <input type="text" value="" class="form-input" id="profileLastName">
                   </div>
                 </div>
                 <div class="form-group">
                   <label>Email Address</label>
-                  <input type="email" value="john.davidson@acmecontractors.com" class="form-input">
+                  <input type="email" value="" class="form-input" id="profileEmail">
                   <span class="form-hint">This is your primary login email</span>
                 </div>
                 <div class="form-group">
                   <label>Phone Number</label>
-                  <input type="tel" value="(614) 555-0123" class="form-input">
+                  <input type="tel" value="" class="form-input" id="profilePhone" placeholder="Optional">
                 </div>
                 <div class="form-group">
                   <label>Job Title</label>
-                  <input type="text" value="Business Development Manager" class="form-input">
+                  <input type="text" value="" class="form-input" id="profileJobTitle" placeholder="Optional">
                 </div>
                 <div class="form-actions">
-                  <button class="btn-primary">Save Changes</button>
-                  <button class="btn-ghost">Cancel</button>
+                  <button class="btn-primary" type="button" id="savePersonalInfo">Save Changes</button>
+                  <button class="btn-ghost" type="button" id="resetPersonalInfo">Cancel</button>
+                  <span class="form-hint" id="personalInfoStatus" aria-live="polite"></span>
                 </div>
               </div>
             </div>
 
-            <div class="settings-section fade-in stagger-1">
-              <div class="settings-header">
-                <h3>Organization Details</h3>
-                <p>Information about your company for bid submissions.</p>
+            <div class="company-profile-section fade-in stagger-1" id="companyProfileCard">
+              <div class="section-intro">
+                <h2>Company Profile</h2>
+                <p>Complete your company profile for AI auto-fill on RFQ forms, vendor portals, and bid templates.</p>
               </div>
-              <div class="settings-form">
-                <div class="form-group">
-                  <label>Company Name</label>
-                  <input type="text" value="Acme Contractors LLC" class="form-input">
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Industry</label>
-                    <select class="form-select">
-                      <option>Construction</option>
-                      <option selected>General Contracting</option>
-                      <option>HVAC Services</option>
-                      <option>Electrical</option>
-                      <option>Plumbing</option>
-                    </select>
+              <div class="profile-panels" id="companyProfileForm">
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">1</span>
+                      <h3>Company Information</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Company Size</label>
-                    <select class="form-select">
-                      <option>1-10 employees</option>
-                      <option selected>11-50 employees</option>
-                      <option>51-200 employees</option>
-                      <option>200+ employees</option>
-                    </select>
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Legal Business Name</label>
+                        <input type="text" name="legal_name" class="form-input" required>
+                      </div>
+                      <div class="form-group">
+                        <label>DBA (optional)</label>
+                        <input type="text" name="dba" class="form-input">
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>FEIN / EIN</label>
+                        <input type="text" name="ein" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>DUNS Number (optional)</label>
+                        <input type="text" name="duns" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>SAM.gov UEI</label>
+                        <input type="text" name="uei" class="form-input">
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Business Type</label>
+                        <select name="business_type" class="form-select">
+                          <option value="">Select</option>
+                          <option>LLC</option>
+                          <option>Corporation</option>
+                          <option>Sole Proprietor</option>
+                          <option>Partnership</option>
+                          <option>Nonprofit</option>
+                          <option>Other</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>State of Incorporation</label>
+                        <select name="state_incorp" class="form-select">
+                          <option value="">Select state</option>
+                          <option value="AL">Alabama</option>
+                          <option value="AK">Alaska</option>
+                          <option value="AZ">Arizona</option>
+                          <option value="AR">Arkansas</option>
+                          <option value="CA">California</option>
+                          <option value="CO">Colorado</option>
+                          <option value="CT">Connecticut</option>
+                          <option value="DE">Delaware</option>
+                          <option value="DC">District of Columbia</option>
+                          <option value="FL">Florida</option>
+                          <option value="GA">Georgia</option>
+                          <option value="HI">Hawaii</option>
+                          <option value="ID">Idaho</option>
+                          <option value="IL">Illinois</option>
+                          <option value="IN">Indiana</option>
+                          <option value="IA">Iowa</option>
+                          <option value="KS">Kansas</option>
+                          <option value="KY">Kentucky</option>
+                          <option value="LA">Louisiana</option>
+                          <option value="ME">Maine</option>
+                          <option value="MD">Maryland</option>
+                          <option value="MA">Massachusetts</option>
+                          <option value="MI">Michigan</option>
+                          <option value="MN">Minnesota</option>
+                          <option value="MS">Mississippi</option>
+                          <option value="MO">Missouri</option>
+                          <option value="MT">Montana</option>
+                          <option value="NE">Nebraska</option>
+                          <option value="NV">Nevada</option>
+                          <option value="NH">New Hampshire</option>
+                          <option value="NJ">New Jersey</option>
+                          <option value="NM">New Mexico</option>
+                          <option value="NY">New York</option>
+                          <option value="NC">North Carolina</option>
+                          <option value="ND">North Dakota</option>
+                          <option value="OH">Ohio</option>
+                          <option value="OK">Oklahoma</option>
+                          <option value="OR">Oregon</option>
+                          <option value="PA">Pennsylvania</option>
+                          <option value="RI">Rhode Island</option>
+                          <option value="SC">South Carolina</option>
+                          <option value="SD">South Dakota</option>
+                          <option value="TN">Tennessee</option>
+                          <option value="TX">Texas</option>
+                          <option value="UT">Utah</option>
+                          <option value="VT">Vermont</option>
+                          <option value="VA">Virginia</option>
+                          <option value="WA">Washington</option>
+                          <option value="WV">West Virginia</option>
+                          <option value="WI">Wisconsin</option>
+                          <option value="WY">Wyoming</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Year Founded</label>
+                        <input type="number" name="year_founded" class="form-input" min="1800" max="2100">
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Ohio Secretary of State Registration Number</label>
+                        <input type="text" name="ohio_reg" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Ohio "Good Standing" Status</label>
+                        <div class="toggle-row">
+                          <label class="toggle">
+                            <input type="checkbox" name="ohio_good_standing">
+                            <span class="toggle-slider"></span>
+                          </label>
+                          <span class="toggle-label">In Good Standing</span>
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Ohio Certificate of Good Standing</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="ohio_certificate" id="upload-ohio_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
+                          <label for="upload-ohio_certificate" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Click to upload or drag and drop</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="ohio_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="form-group">
-                  <label>Address</label>
-                  <input type="text" value="1234 Construction Ave, Columbus, OH 43215" class="form-input">
-                </div>
-                <div class="form-actions">
-                  <button class="btn-primary">Save Changes</button>
-                  <button class="btn-ghost">Cancel</button>
-                </div>
-              </div>
-            </div>
+                  </div>
+                </section>
 
-            <div class="settings-section fade-in stagger-2" id="companyProfileCard">
-              <div class="settings-header">
-                <h3>Company Profile (AI Auto-Fill)</h3>
-                <p>Store the info we need to auto-fill government bid forms.</p>
-              </div>
-              <div class="settings-form" id="companyProfileForm">
-                <div class="form-group">
-                  <label>Legal Business Name</label>
-                  <input type="text" name="legal_name" class="form-input">
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>DBA (optional)</label>
-                    <input type="text" name="dba" class="form-input">
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">2</span>
+                      <h3>Business Classification &amp; Diversity Certifications</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>FEIN / EIN</label>
-                    <input type="text" name="ein" class="form-input">
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Is your business certified MBE / WBE / DBE?</label>
+                        <div class="radio-group">
+                          <label class="radio-label">
+                            <input type="radio" name="cert_status" value="yes">
+                            <span>Yes</span>
+                          </label>
+                          <label class="radio-label">
+                            <input type="radio" name="cert_status" value="no">
+                            <span>No</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label>Certification Type(s)</label>
+                        <div class="checkbox-grid">
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="MBE" data-multi="true">
+                            <span>MBE (Minority Business Enterprise)</span>
+                          </label>
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="WBE" data-multi="true">
+                            <span>WBE (Women Business Enterprise)</span>
+                          </label>
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="DBE" data-multi="true">
+                            <span>DBE (Disadvantaged Business Enterprise)</span>
+                          </label>
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="SDVOSB" data-multi="true">
+                            <span>SDVOSB (Service-Disabled Veteran)</span>
+                          </label>
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="HUBZone" data-multi="true">
+                            <span>HUBZone</span>
+                          </label>
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="8(a)" data-multi="true">
+                            <span>8(a) Certified</span>
+                          </label>
+                          <label class="checkbox-label" data-multi-group="cert_types">
+                            <input type="checkbox" name="cert_types" value="Other" data-multi="true">
+                            <span>Other</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Certification Number</label>
+                        <input type="text" name="cert_number" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Certification Expiration Date</label>
+                        <input type="date" name="cert_expiry" class="form-input">
+                      </div>
+                    <div class="form-group">
+                      <label>Upload - Certification Documents</label>
+                      <div class="file-upload-area">
+                        <input type="file" name="cert_upload" id="upload-cert_upload" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
+                        <label for="upload-cert_upload" class="file-upload-label">
+                          <span class="upload-icon">⭱</span>
+                          <span class="upload-text">Upload certification documents</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                        </label>
+                      </div>
+                      <a class="file-link" data-file-link="cert_upload" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label>SAM UEI</label>
-                    <input type="text" name="uei" class="form-input">
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>DUNS (optional)</label>
-                    <input type="text" name="duns" class="form-input">
                   </div>
-                  <div class="form-group">
-                    <label>Business Type</label>
-                    <select name="business_type" class="form-select">
-                      <option value="">Select</option>
-                      <option>LLC</option>
-                      <option>Corporation</option>
-                      <option>Sole Proprietor</option>
-                      <option>Partnership</option>
-                      <option>Non-Profit</option>
-                    </select>
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">3</span>
+                      <h3>Business Addresses</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>State of Incorporation</label>
-                    <input type="text" name="state_incorp" class="form-input" placeholder="OH">
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-group">
+                      <label>Headquarters Address</label>
+                      <input type="text" name="hq_address" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label>Mailing Address (if different)</label>
+                      <input type="text" name="mailing_address" class="form-input">
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>City</label>
+                        <input type="text" name="city" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>State</label>
+                        <select name="state" class="form-select">
+                          <option value="">Select state</option>
+                          <option value="AL">Alabama</option>
+                          <option value="AK">Alaska</option>
+                          <option value="AZ">Arizona</option>
+                          <option value="AR">Arkansas</option>
+                          <option value="CA">California</option>
+                          <option value="CO">Colorado</option>
+                          <option value="CT">Connecticut</option>
+                          <option value="DE">Delaware</option>
+                          <option value="DC">District of Columbia</option>
+                          <option value="FL">Florida</option>
+                          <option value="GA">Georgia</option>
+                          <option value="HI">Hawaii</option>
+                          <option value="ID">Idaho</option>
+                          <option value="IL">Illinois</option>
+                          <option value="IN">Indiana</option>
+                          <option value="IA">Iowa</option>
+                          <option value="KS">Kansas</option>
+                          <option value="KY">Kentucky</option>
+                          <option value="LA">Louisiana</option>
+                          <option value="ME">Maine</option>
+                          <option value="MD">Maryland</option>
+                          <option value="MA">Massachusetts</option>
+                          <option value="MI">Michigan</option>
+                          <option value="MN">Minnesota</option>
+                          <option value="MS">Mississippi</option>
+                          <option value="MO">Missouri</option>
+                          <option value="MT">Montana</option>
+                          <option value="NE">Nebraska</option>
+                          <option value="NV">Nevada</option>
+                          <option value="NH">New Hampshire</option>
+                          <option value="NJ">New Jersey</option>
+                          <option value="NM">New Mexico</option>
+                          <option value="NY">New York</option>
+                          <option value="NC">North Carolina</option>
+                          <option value="ND">North Dakota</option>
+                          <option value="OH">Ohio</option>
+                          <option value="OK">Oklahoma</option>
+                          <option value="OR">Oregon</option>
+                          <option value="PA">Pennsylvania</option>
+                          <option value="RI">Rhode Island</option>
+                          <option value="SC">South Carolina</option>
+                          <option value="SD">South Dakota</option>
+                          <option value="TN">Tennessee</option>
+                          <option value="TX">Texas</option>
+                          <option value="UT">Utah</option>
+                          <option value="VT">Vermont</option>
+                          <option value="VA">Virginia</option>
+                          <option value="WA">Washington</option>
+                          <option value="WV">West Virginia</option>
+                          <option value="WI">Wisconsin</option>
+                          <option value="WY">Wyoming</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Zip Code</label>
+                        <input type="text" name="zip" class="form-input">
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Company Website</label>
+                        <input type="url" name="website" class="form-input" placeholder="https://">
+                      </div>
+                      <div class="form-group">
+                        <label>General Business Email</label>
+                        <input type="email" name="business_email" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Billing / AP Email</label>
+                        <input type="email" name="billing_email" class="form-input">
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Ohio Registration Number</label>
-                    <input type="text" name="ohio_reg" class="form-input">
                   </div>
-                  <div class="form-group">
-                    <label>NAICS Codes (comma separated)</label>
-                    <input type="text" name="naics" class="form-input" placeholder="236220, 238220">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">4</span>
+                      <h3>Primary Contacts</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>UNSPSC Codes (comma separated)</label>
-                    <input type="text" name="unspsc" class="form-input">
+                  <div class="panel-content">
+                    <div class="contact-grid">
+                    <div class="contact-card">
+                      <div class="contact-label">Primary Representative</div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Full Name</label>
+                          <input type="text" name="primary_name" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Job Title</label>
+                          <input type="text" name="primary_title" class="form-input">
+                        </div>
+                      </div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Email</label>
+                          <input type="email" name="primary_email" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Phone</label>
+                          <input type="tel" name="primary_phone" class="form-input">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="contact-card">
+                      <div class="contact-label">Secondary Representative (optional)</div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Full Name</label>
+                          <input type="text" name="secondary_name" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Job Title</label>
+                          <input type="text" name="secondary_title" class="form-input">
+                        </div>
+                      </div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Email</label>
+                          <input type="email" name="secondary_email" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Phone</label>
+                          <input type="tel" name="secondary_phone" class="form-input">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="contact-card">
+                      <div class="contact-label">Bid Submission Contact (if different)</div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Full Name</label>
+                          <input type="text" name="bid_name" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Job Title</label>
+                          <input type="text" name="bid_title" class="form-input">
+                        </div>
+                      </div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Email</label>
+                          <input type="email" name="bid_email" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Phone</label>
+                          <input type="tel" name="bid_phone" class="form-input">
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>MBE/WBE/DBE Certification</label>
-                    <select name="cert_status" class="form-select">
-                      <option value="">Select</option>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </select>
                   </div>
-                  <div class="form-group">
-                    <label>Certification Types</label>
-                    <input type="text" name="cert_types" class="form-input" placeholder="MBE, WBE, DBE">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">5</span>
+                      <h3>Experience &amp; Capability Statement</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Certification Number</label>
-                    <input type="text" name="cert_number" class="form-input">
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Years of Experience</label>
+                        <input type="number" name="years_experience" class="form-input" min="0">
+                      </div>
+                      <div class="form-group">
+                        <label>Warranty Service Capabilities</label>
+                        <input type="text" name="warranty" class="form-input" placeholder="Response times, onsite coverage">
+                      </div>
+                      <div class="form-group">
+                        <label>Manufacturer Relationships (optional)</label>
+                        <input type="text" name="manufacturers" class="form-input" placeholder="OEMs, authorized dealer status">
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label>Description of Company Experience</label>
+                      <textarea name="experience" class="form-input" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                      <label>Description of Services / Product Offerings</label>
+                      <textarea name="offerings" class="form-input" rows="3"></textarea>
+                    </div>
+                    <div class="form-row">
+                    <div class="form-group">
+                      <label>Upload - Capability Statement PDF</label>
+                      <div class="file-upload-area">
+                        <input type="file" name="capability_statement" id="upload-capability_statement" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
+                        <label for="upload-capability_statement" class="file-upload-label">
+                          <span class="upload-icon">⭱</span>
+                          <span class="upload-text">Upload capability statement</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                        </label>
+                      </div>
+                      <a class="file-link" data-file-link="capability_statement" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                    </div>
+                    <div class="form-group">
+                      <label>Upload - Product Catalogs / Literature (optional)</label>
+                      <div class="file-upload-area">
+                        <input type="file" name="product_catalogs" id="upload-product_catalogs" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                        <label for="upload-product_catalogs" class="file-upload-label">
+                          <span class="upload-icon">⭱</span>
+                          <span class="upload-text">Upload product catalogs</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                        </label>
+                      </div>
+                      <a class="file-link" data-file-link="product_catalogs" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label>Certification Expiration</label>
-                    <input type="date" name="cert_expiry" class="form-input">
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Primary Contact</label>
-                    <input type="text" name="primary_contact" class="form-input" placeholder="Name, Title, Email, Phone">
                   </div>
-                  <div class="form-group">
-                    <label>Secondary Contact</label>
-                    <input type="text" name="secondary_contact" class="form-input" placeholder="Name, Title, Email, Phone">
+                </section>
+
+                                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">6</span>
+                      <h3>References (3-5 Required)</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Bid Submission Contact</label>
-                    <input type="text" name="bid_contact" class="form-input" placeholder="Name, Title, Email, Phone">
+                  <div class="panel-content">
+                    <div id="referencesContainer" class="references-container">
+                      <div class="reference-entry" data-index="1">
+                        <div class="reference-header">
+                          <h4>Reference #1</h4>
+                          <button type="button" class="remove-btn" onclick="removeReference(this)" style="display: none;">Remove</button>
+                        </div>
+                        <div class="form-row">
+                          <div class="form-group">
+                            <label>Business Name <span class="required">*</span></label>
+                            <input type="text" name="ref1_business" class="form-input" placeholder="Client company name">
+                          </div>
+                          <div class="form-group">
+                            <label>Contact Name <span class="required">*</span></label>
+                            <input type="text" name="ref1_contact" class="form-input" placeholder="Contact person">
+                          </div>
+                        </div>
+                        <div class="form-row">
+                          <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" name="ref1_title" class="form-input" placeholder="Job title">
+                          </div>
+                          <div class="form-group">
+                            <label>Email <span class="required">*</span></label>
+                            <input type="email" name="ref1_email" class="form-input" placeholder="contact@company.com">
+                          </div>
+                        </div>
+                        <div class="form-row">
+                          <div class="form-group">
+                            <label>Phone <span class="required">*</span></label>
+                            <input type="tel" name="ref1_phone" class="form-input" placeholder="(xxx) xxx-xxxx">
+                          </div>
+                          <div class="form-group">
+                            <label>Address</label>
+                            <input type="text" name="ref1_address" class="form-input" placeholder="City, State">
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label>Project / Contract Description <span class="required">*</span></label>
+                          <textarea class="form-textarea" name="ref1_description" rows="2" placeholder="Brief description of work performed..."></textarea>
+                        </div>
+                        <div class="form-row">
+                          <div class="form-group">
+                            <label>Contract Amount</label>
+                            <input type="text" name="ref1_amount" class="form-input" placeholder="$XXX,XXX (optional)">
+                          </div>
+                          <div class="form-group">
+                            <label>Contract Dates</label>
+                            <input type="text" name="ref1_dates" class="form-input" placeholder="MM/YYYY - MM/YYYY">
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label>Reference Letter</label>
+                          <div class="file-upload-area small">
+                            <input type="file" name="ref1_letter" id="ref1_letter" accept=".pdf,.jpg,.png,.docx" hidden>
+                            <label class="file-upload-label small" for="ref1_letter">
+                              <span class="upload-text">Upload letter (optional)</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <button class="add-entry-btn" type="button" id="addReferenceBtn"><span>+</span> Add Another Reference</button>
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Headquarters Address</label>
-                    <input type="text" name="hq_address" class="form-input">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">7</span>
+                      <h3>Subcontractor Information (optional)</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Mailing Address</label>
-                    <input type="text" name="mailing_address" class="form-input">
+                  <div class="panel-content">
+                    <div class="repeatable-list" id="subcontractorList">
+                    <div class="repeatable-card">
+                      <div class="repeatable-title">Subcontractor 1</div>
+                      <div class="form-row three-col">
+                        <div class="form-group">
+                          <label>Subcontractor Business Name</label>
+                          <input type="text" name="sub1_name" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Contact Person</label>
+                          <input type="text" name="sub1_contact" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Email</label>
+                          <input type="email" name="sub1_email" class="form-input">
+                        </div>
+                      </div>
+                      <div class="form-row three-col">
+                        <div class="form-group">
+                          <label>Phone</label>
+                          <input type="tel" name="sub1_phone" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Address</label>
+                          <input type="text" name="sub1_address" class="form-input">
+                        </div>
+                        <div class="form-group">
+                          <label>Work Performed / Scope</label>
+                          <input type="text" name="sub1_scope" class="form-input">
+                        </div>
+                      </div>
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Contract Compliance Certification Number (if applicable)</label>
+                          <input type="text" name="sub1_compliance" class="form-input">
+                        </div>
+                      <div class="form-group">
+                        <label>Upload - Subcontractor Compliance Certificate (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="sub1_certificate" id="upload-sub1_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-sub1_certificate" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload compliance certificate</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="sub1_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Website</label>
-                    <input type="text" name="website" class="form-input">
+                  <button class="add-row-btn" type="button">+ Add Subcontractor</button>
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label>Business Email</label>
-                    <input type="email" name="business_email" class="form-input">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">8</span>
+                      <h3>Insurance &amp; Bonding</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Billing Email</label>
-                    <input type="email" name="billing_email" class="form-input">
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>General Liability Coverage</label>
+                        <select name="gl_coverage" class="form-select">
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Workers Compensation Coverage</label>
+                        <select name="wc_coverage" class="form-select">
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Auto Liability Coverage</label>
+                        <select name="auto_coverage" class="form-select">
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Bonding Capacity</label>
+                        <input type="text" name="bonding_capacity" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Bonding Company Name</label>
+                        <input type="text" name="bonding_company" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Certificate of Insurance</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="insurance_certificate" id="upload-insurance_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
+                          <label for="upload-insurance_certificate" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload certificate of insurance</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="insurance_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label>Upload - Bonding Letter (optional)</label>
+                      <div class="file-upload-area">
+                        <input type="file" name="bonding_letter" id="upload-bonding_letter" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                        <label for="upload-bonding_letter" class="file-upload-label">
+                          <span class="upload-icon">⭱</span>
+                          <span class="upload-text">Upload bonding letter</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                        </label>
+                      </div>
+                      <a class="file-link" data-file-link="bonding_letter" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                    </div>
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Years in Business</label>
-                    <input type="number" name="years_business" class="form-input" min="0">
                   </div>
-                  <div class="form-group">
-                    <label>Bonding Capacity</label>
-                    <input type="text" name="bonding" class="form-input">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">9</span>
+                      <h3>Tax &amp; Legal Compliance Attestations</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Insurance Coverage</label>
-                    <input type="text" name="insurance" class="form-input" placeholder="GL / WC / Auto">
+                  <div class="panel-content">
+                    <div class="checkbox-list">
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="attest_wage_theft">
+                      <span>Complies with Wage Theft Prevention Policies</span>
+                    </label>
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="attest_income_tax">
+                      <span>Complies with Columbus Income Tax Withholding</span>
+                    </label>
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="attest_campaign">
+                      <span>Certifies campaign contribution compliance (ORC 3517.13)</span>
+                    </label>
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="attest_public_records">
+                      <span>Acknowledges public records disclosure requirements</span>
+                    </label>
+                    <label class="checkbox-item">
+                      <input type="checkbox" name="attest_eo_clause">
+                      <span>Accepts Equal Opportunity Clause</span>
+                    </label>
                   </div>
-                </div>
-                <div class="form-group">
-                  <label>Experience & Capabilities</label>
-                  <textarea name="experience" class="form-input" rows="3" placeholder="Describe services, warranty support, manufacturer relationships"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>References (comma or line separated)</label>
-                  <textarea name="references" class="form-input" rows="3" placeholder="Business, Contact, Email, Phone, Contract value, Dates"></textarea>
-                </div>
-                <div class="form-group">
-                  <label>Subcontractors (comma or line separated)</label>
-                  <textarea name="subcontractors" class="form-input" rows="3" placeholder="Name, Work, Contact, Certification #"></textarea>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Payment Terms</label>
-                    <input type="text" name="payment_terms" class="form-input" placeholder="Net 30">
                   </div>
-                  <div class="form-group">
-                    <label>Delivery Lead Time</label>
-                    <input type="text" name="delivery_time" class="form-input" placeholder="e.g., 10 business days">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">10</span>
+                      <h3>Pricing &amp; Delivery Defaults</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                  <div class="form-group">
-                    <label>Minimum Order</label>
-                    <input type="text" name="min_order" class="form-input">
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Standard Payment Terms</label>
+                        <select name="payment_terms" class="form-select">
+                          <option value="">Select</option>
+                          <option>Net 15</option>
+                          <option>Net 30</option>
+                          <option>Net 45</option>
+                          <option>Net 60</option>
+                          <option>Net 90</option>
+                          <option>Due on Receipt</option>
+                          <option>Custom</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Standard Delivery Lead Time</label>
+                        <input type="text" name="delivery_time" class="form-input" placeholder="e.g., 10 business days">
+                      </div>
+                      <div class="form-group">
+                        <label>Minimum Order Requirement</label>
+                        <input type="text" name="min_order" class="form-input">
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Default Discount / Markup Structure</label>
+                        <input type="text" name="discount_structure" class="form-input" placeholder="Volume discounts, GSA schedules">
+                      </div>
+                      <div class="form-group">
+                        <label>Link to Price List or Website</label>
+                        <input type="url" name="price_link" class="form-input" placeholder="https://">
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label>Upload - Price List PDF / Catalog</label>
+                      <div class="file-upload-area">
+                        <input type="file" name="price_list_upload" id="upload-price_list_upload" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
+                        <label for="upload-price_list_upload" class="file-upload-label">
+                          <span class="upload-icon">⭱</span>
+                          <span class="upload-text">Upload price list or catalog</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                        </label>
+                      </div>
+                      <a class="file-link" data-file-link="price_list_upload" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                    </div>
                   </div>
-                </div>
-                <div class="form-group">
-                  <label>Pricing / Discounts / Catalog Link</label>
-                  <textarea name="pricing" class="form-input" rows="2" placeholder="Discount structure, markup, link to catalog"></textarea>
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Authorized Signer</label>
-                    <input type="text" name="signer" class="form-input" placeholder="Name, Title">
                   </div>
-                  <div class="form-group">
-                    <label>Compliance Attestations</label>
-                    <input type="text" name="attestations" class="form-input" placeholder="Wage theft, income tax, ORC 3517.13, public records">
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">11</span>
+                      <h3>Additional Company Documents</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
                   </div>
-                </div>
-                <div class="form-actions">
-                  <button class="btn-primary" type="button" id="saveCompanyProfile">Save Profile</button>
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Upload - W-9 Form</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="w9_upload" id="upload-w9_upload" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-w9_upload" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload W-9</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="w9_upload" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Business License</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="business_license" id="upload-business_license" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-business_license" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload business license</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="business_license" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Safety Sheets / SDS (if applicable)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="safety_sheets" id="upload-safety_sheets" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-safety_sheets" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload safety sheets</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="safety_sheets" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Upload - Warranty Information</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="warranty_info" id="upload-warranty_info" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-warranty_info" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload warranty info</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="warranty_info" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Previous Contract PDFs (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="previous_contracts" id="upload-previous_contracts" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-previous_contracts" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload previous contracts</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="previous_contracts" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Organizational Chart (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="org_chart" id="upload-org_chart" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-org_chart" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload org chart</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="org_chart" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                </section>
+
+                <section class="profile-panel">
+                  <div class="panel-header">
+                    <div class="panel-title">
+                      <span class="panel-icon">12</span>
+                      <h3>Authorized Signer Information</h3>
+                    </div>
+                    <span class="panel-toggle">+</span>
+                  </div>
+                  <div class="panel-content">
+                    <div class="settings-form">
+                    <div class="form-row three-col">
+                      <div class="form-group">
+                        <label>Authorized Signer Name</label>
+                        <input type="text" name="signer_name" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" name="signer_title" class="form-input">
+                      </div>
+                      <div class="form-group">
+                        <label>Signature Block Text</label>
+                        <input type="text" name="signature_block" class="form-input" placeholder="Name, Title, Company, Date">
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Digital Signature File (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="digital_signature" id="upload-digital_signature" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-digital_signature" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload digital signature</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="digital_signature" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                      <div class="form-group">
+                        <label>Upload - Signature Image (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="signature_image" id="upload-signature_image" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-signature_image" class="file-upload-label">
+                            <span class="upload-icon">⭱</span>
+                            <span class="upload-text">Upload signature image</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          </label>
+                        </div>
+                        <a class="file-link" data-file-link="signature_image" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                </section>
+
+                <div class="form-actions sticky-actions">
+                  <button class="btn-primary" type="button" id="saveCompanyProfile">Save Company Profile</button>
                   <button class="btn-ghost" type="button" id="resetCompanyProfile">Reset</button>
+                  <span class="form-hint" id="companyProfileStatus" aria-live="polite"></span>
                 </div>
               </div>
             </div>
           </div>
-
           <div class="tab-content" id="tab-billing">
             <div class="billing-overview fade-in">
               <div class="billing-plan-card">
@@ -1204,6 +1896,13 @@
 
       const tabs = document.querySelectorAll('.account-tab');
       const tabContents = document.querySelectorAll('.tab-content');
+      const goToTeamTab = () => {
+        const tab = document.querySelector('.account-tab[data-tab="team"]');
+        const teamContent = document.getElementById('tab-team');
+        if (!tab || !teamContent) return;
+        tab.click();
+        setTimeout(() => teamContent.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      };
 
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -1294,6 +1993,11 @@
         }
       });
 
+      // Invite/Team shortcuts
+      document.getElementById('qaInviteMember')?.addEventListener('click', goToTeamTab);
+      document.getElementById('teamInviteBtn')?.addEventListener('click', goToTeamTab);
+      document.getElementById('teamInviteCardBtn')?.addEventListener('click', goToTeamTab);
+
       // Dynamic wiring -------------------------------------------------
       const planPricing = {
         free: { amount: '$0', period: '/month', limit: 1 },
@@ -1301,6 +2005,36 @@
         professional: { amount: '$99', period: '/month', limit: 5 },
         enterprise: { amount: '$299', period: '/month', limit: 50 },
       };
+      const fileFields = [
+        'ohio_certificate',
+        'cert_upload',
+        'capability_statement',
+        'product_catalogs',
+        'ref1_letter',
+        'ref2_letter',
+        'ref3_letter',
+        'ref4_letter',
+        'ref5_letter',
+        'sub1_certificate',
+        'sub2_certificate',
+        'sub3_certificate',
+        'sub4_certificate',
+        'sub5_certificate',
+        'insurance_certificate',
+        'bonding_letter',
+        'price_list_upload',
+        'w9_upload',
+        'business_license',
+        'safety_sheets',
+        'warranty_info',
+        'previous_contracts',
+        'org_chart',
+        'digital_signature',
+        'signature_image',
+      ];
+      const panelSaveStoreKey = 'company_profile_panel_saves';
+      const personalDraftKey = 'account_personal_info_draft';
+      let personalSnapshot = {};
 
       function getCSRF() {
         try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || ''; } catch (_) { return ''; }
@@ -1314,6 +2048,179 @@
         return str.slice(0, 2).toUpperCase();
       }
 
+      function formatMonthYear(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+      }
+
+      function personalFormValues() {
+        return {
+          first_name: (document.getElementById('profileFirstName')?.value || '').trim(),
+          last_name: (document.getElementById('profileLastName')?.value || '').trim(),
+          email: (document.getElementById('profileEmail')?.value || '').trim(),
+          phone: (document.getElementById('profilePhone')?.value || '').trim(),
+          title: (document.getElementById('profileJobTitle')?.value || '').trim(),
+        };
+      }
+
+      function applyPersonalValues(values = {}) {
+        const { first_name, last_name, email, phone, title } = values;
+        const pf = document.getElementById('profileFirstName');
+        const pl = document.getElementById('profileLastName');
+        const pe = document.getElementById('profileEmail');
+        const pp = document.getElementById('profilePhone');
+        const pj = document.getElementById('profileJobTitle');
+        if (pf && first_name !== undefined && first_name !== null) pf.value = first_name;
+        if (pl && last_name !== undefined && last_name !== null) pl.value = last_name;
+        if (pe && email !== undefined && email !== null) pe.value = email;
+        if (pp && phone !== undefined && phone !== null) pp.value = phone;
+        if (pj && title !== undefined && title !== null) pj.value = title;
+      }
+
+      function loadPersonalDraft(preferWhenMissing = false) {
+        try {
+          const raw = localStorage.getItem(personalDraftKey);
+          if (!raw) return;
+          const draft = JSON.parse(raw);
+          if (preferWhenMissing) {
+            const current = personalFormValues();
+            applyPersonalValues({
+              first_name: current.first_name || draft.first_name,
+              last_name: current.last_name || draft.last_name,
+              email: current.email || draft.email,
+              phone: current.phone || draft.phone,
+              title: current.title || draft.title,
+            });
+          } else {
+            applyPersonalValues(draft);
+          }
+        } catch (_) { /* ignore */ }
+      }
+
+      function savePersonalDraft(values) {
+        try {
+          localStorage.setItem(personalDraftKey, JSON.stringify(values));
+        } catch (_) { /* ignore */ }
+      }
+
+      function markFileSelection(input, displayName) {
+        if (!input) return;
+        const label = input.closest('.file-upload-area')?.querySelector('.file-upload-label');
+        const text = label?.querySelector('.upload-text');
+        const hint = label?.querySelector('.upload-hint');
+        if (text && displayName) {
+          text.textContent = displayName;
+          text.style.color = '#126a45';
+        }
+        if (hint) {
+          hint.textContent = 'Ready to upload';
+        }
+      }
+
+      function showExistingFile(field, name, url) {
+        const link = document.querySelector(`[data-file-link="${field}"]`);
+        if (link && name) {
+          link.textContent = name;
+          link.style.display = 'inline-flex';
+          if (url) {
+            link.href = url;
+          } else {
+            link.removeAttribute('href');
+          }
+        }
+        const input = document.querySelector(`input[name="${field}"]`);
+        if (input && name) {
+          markFileSelection(input, name);
+        }
+        updatePanelStatuses();
+      }
+
+      function loadPanelSaveTimes() {
+        try {
+          const raw = localStorage.getItem(panelSaveStoreKey);
+          return raw ? JSON.parse(raw) : {};
+        } catch (_) {
+          return {};
+        }
+      }
+
+      function savePanelSaveTimes(map) {
+        try {
+          localStorage.setItem(panelSaveStoreKey, JSON.stringify(map));
+        } catch (_) { /* ignore */ }
+      }
+
+      function formatSaveTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString();
+      }
+
+      function updatePanelSaveMeta(panelKey, ts) {
+        document.querySelectorAll(`[data-panel-save="${panelKey}"]`).forEach((el) => {
+          el.textContent = ts ? `Last saved ${formatSaveTime(ts)}` : '';
+        });
+      }
+
+      function recordPanelSave(panelKey) {
+        if (!panelKey) return;
+        const map = loadPanelSaveTimes();
+        const now = new Date().toISOString();
+        map[panelKey] = now;
+        savePanelSaveTimes(map);
+        updatePanelSaveMeta(panelKey, now);
+      }
+
+      function recordAllPanelSaves() {
+        const map = loadPanelSaveTimes();
+        const now = new Date().toISOString();
+        document.querySelectorAll('[data-panel-save]').forEach((el) => {
+          const key = el.getAttribute('data-panel-save');
+          if (key) {
+            map[key] = now;
+            updatePanelSaveMeta(key, now);
+          }
+        });
+        savePanelSaveTimes(map);
+      }
+
+      function panelStatus(panel) {
+        const inputs = Array.from(panel.querySelectorAll('input, textarea, select')).filter((el) => {
+          if (!el.closest('.panel-content')) return false;
+          if (el.type === 'hidden') return false;
+          return true;
+        });
+        const total = inputs.length;
+        if (!total) return 'red';
+        let filled = 0;
+        inputs.forEach((el) => {
+          if (el.type === 'file') {
+            const hasFile = (el.files && el.files.length) || !!panel.querySelector(`[data-file-link="${el.name}"]:not([style*="display:none"])`);
+            if (hasFile) filled += 1;
+            return;
+          }
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            if (el.checked) filled += 1;
+            return;
+          }
+          if ((el.value || '').trim()) filled += 1;
+        });
+        if (filled === 0) return 'red';
+        if (filled === total) return 'green';
+        return 'yellow';
+      }
+
+      function updatePanelStatuses() {
+        document.querySelectorAll('.company-profile-section .profile-panel').forEach((panel) => {
+          const status = panelStatus(panel);
+          panel.classList.remove('panel-status-green', 'panel-status-yellow', 'panel-status-red');
+          panel.classList.add(`panel-status-${status}`);
+        });
+      }
+
       function setUsage(textEl, fillEl, used, limit, gradient) {
         if (!textEl || !fillEl) return;
         const unlimited = !limit || limit === Infinity;
@@ -1321,6 +2228,46 @@
         const pct = unlimited ? 100 : Math.min(100, Math.round((used / limit) * 100));
         fillEl.style.width = `${pct}%`;
         if (gradient) fillEl.style.background = gradient;
+      }
+
+      async function savePersonalInfo() {
+        const status = document.getElementById('personalInfoStatus');
+        const btn = document.getElementById('savePersonalInfo');
+        const values = personalFormValues();
+        if (status) status.textContent = '';
+        if (!values.first_name || !values.last_name) {
+          if (status) status.textContent = 'First and last name are required.';
+          return;
+        }
+        btn && (btn.disabled = true);
+        try {
+          const res = await fetch('/api/account/profile', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': getCSRF(),
+            },
+            body: JSON.stringify({
+              first_name: values.first_name,
+              last_name: values.last_name,
+            }),
+          });
+          if (!res.ok) throw new Error('save failed');
+          personalSnapshot = { ...values };
+          savePersonalDraft(values);
+          if (status) status.textContent = 'Saved.';
+        } catch (_) {
+          if (status) status.textContent = 'Could not save right now.';
+        } finally {
+          btn && (btn.disabled = false);
+        }
+      }
+
+      function resetPersonalInfo() {
+        applyPersonalValues(personalSnapshot);
+        const status = document.getElementById('personalInfoStatus');
+        if (status) status.textContent = '';
       }
 
       function renderTeam(members, seatLimit) {
@@ -1403,6 +2350,46 @@
               <div class="member-info">
                 <span class="member-name">${m.name || m.email}</span>
                 <span class="member-role">${role.charAt(0).toUpperCase() + role.slice(1)}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function formatActivityTime(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      function renderActivity(entries) {
+        const list = document.getElementById('activityList');
+        if (!list) return;
+        if (!entries || !entries.length) {
+          list.innerHTML = "<div class='muted'>No recent activity yet.</div>";
+          return;
+        }
+        const iconFor = (type) => {
+          if (type === 'upload') return 'blue';
+          return 'green';
+        };
+        list.innerHTML = entries.slice(0, 5).map((a) => {
+          const color = iconFor(a.type);
+          const who = a.who || '';
+          const verb = a.verb || '';
+          const obj = a.obj || '';
+          const when = formatActivityTime(a.when);
+          return `
+            <div class="activity-item">
+              <div class="activity-icon ${color}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div class="activity-content">
+                <span class="activity-text">${who ? `<strong>${who}</strong> ` : ''}${verb} ${obj ? `<strong>${obj}</strong>` : ''}</span>
+                <span class="activity-time">${when}</span>
               </div>
             </div>
           `;
@@ -1520,27 +2507,17 @@
         }
       }
 
-      async function inviteFlow() {
-        const email = prompt('Enter teammate email to invite:');
-        if (!email) return;
-        try {
-          const res = await fetch('/api/team/invite', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-            body: JSON.stringify({ email }),
-          });
-          if (!res.ok) throw new Error('Invite failed');
-          alert('Invite sent (if seats available).');
-          await loadAccount();
-        } catch (err) {
-          alert('Invite failed. Check your plan seats or try again.');
-        }
-      }
+      const inviteFlow = () => {
+        // Skip the email prompt; send users to the Team tab to manage invites.
+        document.querySelector('.account-tab[data-tab=\"team\"]')?.click();
+      };
 
       async function loadAccount() {
         const res = await fetch('/api/account/overview', { credentials: 'include' });
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.error('Failed to load account overview', res.status);
+          return;
+        }
         const data = await res.json();
         const user = data.user || {};
         const plan = data.plan || {};
@@ -1551,6 +2528,20 @@
         if (nameEl) nameEl.textContent = name;
         const emailEl = document.getElementById('accountEmail');
         if (emailEl) emailEl.textContent = user.email || '';
+        const pf = document.getElementById('profileFirstName');
+        if (pf) pf.value = user.first_name || '';
+        const pl = document.getElementById('profileLastName');
+        if (pl) pl.value = user.last_name || '';
+        const pe = document.getElementById('profileEmail');
+        if (pe) pe.value = user.email || '';
+        personalSnapshot = {
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
+          email: user.email || '',
+          phone: document.getElementById('profilePhone')?.value || '',
+          title: document.getElementById('profileJobTitle')?.value || '',
+        };
+        loadPersonalDraft(true);
         const avatar = document.getElementById('avatarInitials');
         if (avatar && avatar.querySelector('span')) avatar.querySelector('span').textContent = initials(name);
         const topAvatar = document.getElementById('topAvatar');
@@ -1559,6 +2550,34 @@
         const badgeLabel = document.getElementById('planBadgeLabel');
         if (badgeLabel) badgeLabel.textContent = plan.label || '';
         if (badge && !badgeLabel) badge.textContent = plan.label || '';
+        const teamBadge = document.getElementById('teamBadge');
+        const teamBadgeLabel = document.getElementById('teamBadgeLabel');
+        if (teamBadge) {
+          const isTeam = !!(data.team && data.team.team_id);
+          const roleLabel = (user.role || '').toLowerCase();
+          if (isTeam) {
+            teamBadge.style.display = 'inline-flex';
+            if (teamBadgeLabel) teamBadgeLabel.textContent = roleLabel === 'owner' ? 'Team Owner' : 'Team Member';
+          } else {
+            teamBadge.style.display = 'none';
+          }
+        }
+        const verifiedBadge = document.getElementById('verifiedBadge');
+        if (verifiedBadge) {
+          verifiedBadge.style.display = user.email_verified ? 'inline-flex' : 'none';
+        }
+        const memberSinceEl = document.getElementById('memberSince');
+        if (memberSinceEl) {
+          const niceDate = formatMonthYear(user.created_at);
+          memberSinceEl.textContent = niceDate ? `Member since ${niceDate}` : 'Member';
+        }
+        const usagePeriodEl = document.querySelector('.usage-card .card-period');
+        if (usagePeriodEl) {
+          const now = new Date();
+          const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const month = now.toLocaleString('en-US', { month: 'short' });
+          usagePeriodEl.textContent = `${month} 1 - ${month} ${end}`;
+        }
         const planNameEl = document.getElementById('planName');
         if (planNameEl) planNameEl.textContent = plan.label || '';
         const planPriceEl = document.getElementById('planPrice');
@@ -1567,6 +2586,16 @@
         if (planPeriodEl) planPeriodEl.textContent = plan.period || '/month';
         const topTierLabel = document.getElementById('topTierLabel');
         if (topTierLabel) topTierLabel.textContent = plan.label || '';
+        const planNextBillingEl = document.getElementById('planNextBilling');
+        if (planNextBillingEl) {
+          const raw = plan.next_billing || plan.next_billing_at || plan.next_invoice_at;
+          if (raw) {
+            const d = new Date(raw);
+            planNextBillingEl.textContent = isNaN(d.getTime()) ? raw : d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+          } else {
+            planNextBillingEl.textContent = '—';
+          }
+        }
         const tierKey = (user.tier_key || '').toLowerCase();
         const seatLimit = (planPricing[tierKey] || {}).limit || usage.team || 5;
         setUsage(document.getElementById('usageBids'), document.getElementById('usageBidsFill'), usage.tracked || 0, Infinity, 'var(--primary-gradient)');
@@ -1583,73 +2612,369 @@
         renderTeam(teamMembers, seatLimit);
         renderTeamPreview(teamMembers);
         renderPendingInvites(teamMembers);
+        renderActivity(data.activity || []);
       }
 
       async function loadCompanyProfile() {
         try {
+          const status = document.getElementById('companyProfileStatus');
+          if (status) status.textContent = '';
           const res = await fetch('/api/company-profile', { credentials: 'include' });
           if (!res.ok) return;
           const data = await res.json();
           const payload = data.data || {};
+          const files = data.files || {};
           const form = document.getElementById('companyProfileForm');
           if (!form) return;
           Array.from(form.querySelectorAll('[name]')).forEach((el) => {
             const key = el.getAttribute('name');
             if (!key) return;
             if (el.type === 'checkbox') {
-              el.checked = !!payload[key];
+              if (el.dataset.multi === 'true') {
+                const values = (payload[key] || '').split(',').map((v) => v.trim());
+                el.checked = values.includes(el.value);
+              } else {
+                el.checked = !!payload[key];
+              }
+            } else if (el.type === 'radio') {
+              el.checked = payload[key] === el.value;
+            } else if (el.multiple && el.tagName === 'SELECT') {
+              const values = (payload[key] || '').split(',').map((v) => v.trim()).filter(Boolean);
+              Array.from(el.options).forEach((opt) => { opt.selected = values.includes(opt.value); });
             } else {
               el.value = payload[key] || '';
             }
           });
+
+          // show file links
+          Object.entries(files).forEach(([field, meta]) => {
+            const link = document.querySelector(`[data-file-link="${field}"]`);
+            if (link && meta?.url) {
+              link.href = meta.url;
+              link.textContent = meta.name || 'Download';
+              link.style.display = 'inline-flex';
+            }
+            const input = document.querySelector(`input[name="${field}"]`);
+            if (input && meta?.name) {
+              markFileSelection(input, meta.name);
+            }
+          });
+          // Also reflect stored filenames even if no URL available
+          Object.keys(data || {}).forEach((key) => {
+            if (!key.endsWith('_name')) return;
+            const field = key.replace(/_name$/, '');
+            const existingName = data[key];
+            if (existingName) {
+              const meta = files[field] || {};
+              showExistingFile(field, existingName, meta.url);
+            }
+          });
+          // Fallback: if we have a stored key but no name, still show something
+          Object.keys(data || {}).forEach((key) => {
+            if (key.endsWith('_name')) return;
+            if (!fileFields.includes(key)) return;
+            const meta = files[key] || {};
+            const displayName = meta.name || data[`${key}_name`] || data[key] || 'Uploaded file';
+            showExistingFile(key, displayName, meta.url);
+          });
+          updatePanelStatuses();
         } catch (_) { /* noop */ }
       }
 
       function collectCompanyProfile() {
         const form = document.getElementById('companyProfileForm');
-        if (!form) return {};
-        const data = {};
+        if (!form) return new FormData();
+        const data = new FormData();
+        const multi = {};
         Array.from(form.querySelectorAll('[name]')).forEach((el) => {
           const key = el.getAttribute('name');
           if (!key) return;
-          if (el.type === 'checkbox') {
-            data[key] = el.checked;
-          } else {
-            data[key] = el.value || '';
+          if (el.dataset.multi === 'true') {
+            if (!multi[key]) multi[key] = [];
+            if (el.checked) multi[key].push(el.value);
+            return;
           }
+          if (el.type === 'radio') {
+            if (el.checked) data.append(key, el.value || '');
+            return;
+          }
+          if (el.type === 'checkbox') {
+            data.append(key, el.checked ? 'true' : 'false');
+          } else if (el.type === 'file') {
+            if (el.files && el.files.length) {
+              Array.from(el.files).forEach((file) => data.append(key, file));
+            }
+          } else if (el.multiple && el.tagName === 'SELECT') {
+            const selected = Array.from(el.selectedOptions).map((o) => o.value).filter(Boolean);
+            data.append(key, selected.join(','));
+          } else {
+            data.append(key, el.value || '');
+          }
+        });
+        Object.entries(multi).forEach(([key, values]) => {
+          data.append(key, values.join(','));
         });
         return data;
       }
 
-      async function saveCompanyProfile() {
+      async function saveCompanyProfile(panelKey) {
         const btn = document.getElementById('saveCompanyProfile');
+        const status = document.getElementById('companyProfileStatus');
+        if (status) status.textContent = '';
         if (btn) btn.disabled = true;
         try {
           const payload = collectCompanyProfile();
           const res = await fetch('/api/company-profile', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
-            body: JSON.stringify(payload),
+            headers: { 'X-CSRF-Token': getCSRF() },
+            body: payload,
           });
           if (!res.ok) throw new Error('Save failed');
-          alert('Company profile saved.');
+          if (status) status.textContent = 'Company profile saved.';
+          if (panelKey) {
+            recordPanelSave(panelKey);
+          } else {
+            recordAllPanelSaves();
+          }
         } catch (_) {
-          alert('Could not save company profile.');
+          if (status) status.textContent = 'Could not save company profile.';
         } finally {
           if (btn) btn.disabled = false;
         }
       }
 
-      document.getElementById('saveCompanyProfile')?.addEventListener('click', saveCompanyProfile);
+      document.getElementById('saveCompanyProfile')?.addEventListener('click', () => saveCompanyProfile());
       document.getElementById('resetCompanyProfile')?.addEventListener('click', loadCompanyProfile);
+
+      function bindFilePreviews() {
+        document.querySelectorAll('.company-profile-section input[type="file"]').forEach((input) => {
+          input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            if (file) {
+              markFileSelection(input, file.name);
+            }
+          });
+        });
+      }
+
+      function addPanelSaveButtons() {
+        document.querySelectorAll('.company-profile-section .profile-panel').forEach((panel, idx) => {
+          if (panel.querySelector('.panel-save-actions')) return;
+          const content = panel.querySelector('.panel-content');
+          if (!content) return;
+          const wrapper = document.createElement('div');
+          wrapper.className = 'panel-save-actions';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn-primary';
+          btn.textContent = 'Save this section';
+          const key = (panel.querySelector('.panel-title h3')?.textContent || `panel-${idx + 1}`)
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9\-]/g, '');
+          btn.dataset.panelKey = key;
+          const meta = document.createElement('span');
+          meta.className = 'panel-save-meta';
+          meta.setAttribute('data-panel-save', key);
+          const savedMap = loadPanelSaveTimes();
+          if (savedMap[key]) {
+            meta.textContent = `Last saved ${formatSaveTime(savedMap[key])}`;
+          }
+          btn.addEventListener('click', () => saveCompanyProfile(key));
+          wrapper.appendChild(btn);
+          wrapper.appendChild(meta);
+          content.appendChild(wrapper);
+        });
+        updatePanelStatuses();
+      }
+
+      // Dynamic repeatables for references and subcontractors
+      let referenceCount = document.querySelectorAll('#referencesContainer .reference-entry').length || 1;
+
+      function addReference() {
+        const container = document.getElementById('referencesContainer');
+        if (!container) return;
+        const current = container.querySelectorAll('.reference-entry').length;
+        if (current >= 5) {
+          alert('Maximum of 5 references.');
+          return;
+        }
+        const n = current + 1;
+        referenceCount = n;
+        const entry = document.createElement('div');
+        entry.className = 'reference-entry';
+        entry.dataset.index = n;
+        entry.innerHTML = `
+          <div class="reference-header">
+            <h4>Reference #${n}</h4>
+            <button type="button" class="remove-btn" onclick="removeReference(this)">Remove</button>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Name <span class="required">*</span></label>
+              <input type="text" name="ref${n}_business" class="form-input" placeholder="Client company name">
+            </div>
+            <div class="form-group">
+              <label>Contact Name <span class="required">*</span></label>
+              <input type="text" name="ref${n}_contact" class="form-input" placeholder="Contact person">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" name="ref${n}_title" class="form-input" placeholder="Job title">
+            </div>
+            <div class="form-group">
+              <label>Email <span class="required">*</span></label>
+              <input type="email" name="ref${n}_email" class="form-input" placeholder="contact@company.com">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Phone <span class="required">*</span></label>
+              <input type="tel" name="ref${n}_phone" class="form-input" placeholder="(xxx) xxx-xxxx">
+            </div>
+            <div class="form-group">
+              <label>Address</label>
+              <input type="text" name="ref${n}_address" class="form-input" placeholder="City, State">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Project / Contract Description <span class="required">*</span></label>
+            <textarea class="form-textarea" name="ref${n}_description" rows="2" placeholder="Brief description of work performed..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contract Amount</label>
+              <input type="text" name="ref${n}_amount" class="form-input" placeholder="$XXX,XXX (optional)">
+            </div>
+            <div class="form-group">
+              <label>Contract Dates</label>
+              <input type="text" name="ref${n}_dates" class="form-input" placeholder="MM/YYYY - MM/YYYY">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Reference Letter</label>
+            <div class="file-upload-area small">
+              <input type="file" name="ref${n}_letter" id="ref${n}_letter" accept=".pdf,.jpg,.png,.docx" hidden>
+              <label class="file-upload-label small" for="ref${n}_letter">
+                <span class="upload-text">Upload letter (optional)</span>
+              </label>
+            </div>
+          </div>
+        `;
+        entry.querySelectorAll('input, textarea, select').forEach((el) => {
+          el.addEventListener('input', updatePanelStatuses);
+          el.addEventListener('change', updatePanelStatuses);
+        });
+        entry.querySelectorAll('input[type="file"]').forEach((input) => {
+          input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            if (file) {
+              markFileSelection(input, file.name);
+            }
+          });
+        });
+        container.appendChild(entry);
+        updatePanelStatuses();
+      }
+
+      function removeReference(btn) {
+        const entry = btn.closest('.reference-entry');
+        const container = document.getElementById('referencesContainer');
+        if (!entry || !container) return;
+        if (container.querySelectorAll('.reference-entry').length <= 1) return;
+        entry.remove();
+        updatePanelStatuses();
+      }
+
+      function createSubcontractorCard(n) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'repeatable-card';
+        wrapper.innerHTML = `
+          <div class="repeatable-title">Subcontractor ${n}</div>
+          <div class="form-row three-col">
+            <div class="form-group">
+              <label>Subcontractor Business Name</label>
+              <input type="text" name="sub${n}_name" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Contact Person</label>
+              <input type="text" name="sub${n}_contact" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" name="sub${n}_email" class="form-input">
+            </div>
+          </div>
+          <div class="form-row three-col">
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" name="sub${n}_phone" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Address</label>
+              <input type="text" name="sub${n}_address" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Work Performed / Scope</label>
+              <input type="text" name="sub${n}_scope" class="form-input">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contract Compliance Certification Number (if applicable)</label>
+              <input type="text" name="sub${n}_compliance" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Upload - Subcontractor Compliance Certificate (optional)</label>
+              <div class="file-upload-area">
+                <input type="file" name="sub${n}_certificate" id="upload-sub${n}_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                <label for="upload-sub${n}_certificate" class="file-upload-label">
+                  <span class="upload-icon">⭱</span>
+                  <span class="upload-text">Upload compliance certificate</span>
+                  <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        `;
+        return wrapper;
+      }
+
+      (function bindRepeatables() {
+        document.getElementById('addReferenceBtn')?.addEventListener('click', addReference);
+
+        const subList = document.getElementById('subcontractorList');
+        const subBtn = subList?.querySelector('.add-row-btn');
+        let subCount = subList ? subList.querySelectorAll('.repeatable-card').length : 0;
+        subBtn?.addEventListener('click', () => {
+          if (!subList) return;
+          subCount += 1;
+          subList.insertBefore(createSubcontractorCard(subCount), subBtn);
+        });
+      })();
 
       // Bind actions
       document.getElementById('qaEditProfile')?.addEventListener('click', () => {
         document.querySelector('[data-tab=\"profile\"]')?.click();
       });
       document.getElementById('qaInviteMember')?.addEventListener('click', inviteFlow);
-      document.getElementById('qaUpdatePayment')?.addEventListener('click', () => window.location.href = '/billing');
+      document.getElementById('qaUpdatePayment')?.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/billing/portal', { credentials: 'include' });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          if (data?.url) {
+            window.open(data.url, '_blank', 'noopener');
+          } else {
+            alert('Could not open Stripe portal right now.');
+          }
+        } catch (_) {
+          alert('Could not open Stripe portal right now.');
+        }
+      });
       document.getElementById('qaExportData')?.addEventListener('click', () => window.location.href = '/billing');
       document.getElementById('teamInviteBtn')?.addEventListener('click', inviteFlow);
       document.getElementById('teamInviteCardBtn')?.addEventListener('click', inviteFlow);
@@ -1690,10 +3015,77 @@
         });
       })();
 
+      document.getElementById('savePersonalInfo')?.addEventListener('click', savePersonalInfo);
+      document.getElementById('resetPersonalInfo')?.addEventListener('click', () => {
+        resetPersonalInfo();
+        loadPersonalDraft(true);
+      });
+      document.querySelectorAll('#profileFirstName, #profileLastName, #profileEmail, #profilePhone, #profileJobTitle').forEach((el) => {
+        el.addEventListener('input', () => savePersonalDraft(personalFormValues()));
+      });
+      bindFilePreviews();
+      addPanelSaveButtons();
+      document.querySelectorAll('.company-profile-section input, .company-profile-section textarea, .company-profile-section select').forEach((el) => {
+        el.addEventListener('input', updatePanelStatuses);
+        el.addEventListener('change', updatePanelStatuses);
+      });
+
       bindTeamHandlers();
       loadAccount();
       loadCompanyProfile();
     });
   </script>
+  <div class="notif-overlay" id="notifOverlay"></div>
+  <div class="notif-sidebar" id="notifSidebar">
+    <div class="notif-header">
+      <div class="notif-header-top">
+        <h2 class="notif-title">Notifications</h2>
+        <div class="notif-header-actions">
+          <button class="notif-action-btn" id="markAllRead" title="Mark all as read">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+          <button class="notif-close-btn" id="notifCloseBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="notif-tabs">
+        <button class="notif-tab active" data-filter="all">All</button>
+        <button class="notif-tab" data-filter="unread">Unread <span class="notif-tab-count">0</span></button>
+        <button class="notif-tab" data-filter="deadlines">Deadlines</button>
+        <button class="notif-tab" data-filter="team">Team</button>
+      </div>
+    </div>
+    <div class="notif-list" id="notifList">
+      <div class="notif-date-group">
+        <div class="notif-date-label">Today</div>
+        <div class="notif-item" data-type="info">
+          <div class="notif-item-icon info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="8"></line>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">Loading notifications...</div>
+            <div class="notif-item-desc">Please wait</div>
+            <div class="notif-item-meta">
+              <span class="notif-time"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notif-footer">
+      <a href="/account#tab-notifications" class="notif-settings-link">Notification settings</a>
+    </div>
+  </div>
+  <script src="/static/js/notifications.js"></script>
 </body>
 </html>

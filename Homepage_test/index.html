@@ -1,29 +1,44 @@
-# app/routers/marketing.py
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyRFP - Win More Government Contracts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="10" fill="url(#gradient)"/>
+          <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#126a45"/>
+              <stop offset="100%" stop-color="#0f8b5a"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="brand-text">EasyRFP</span>
+      </div>
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="#pricing" class="nav-link">Pricing</a>
+        <a href="#coverage" class="nav-link">Coverage</a>
+      </div>
+      <div class="nav-actions">
+        <a href="/dashboard-demo.html" class="btn-ghost">Log In</a>
+        <a href="#signup" class="btn-primary">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-
-from app.api._layout import marketing_shell, page_shell
-from app.auth.session import get_current_user_email
-from app.services.opportunity_feed import fetch_landing_snapshot
-
-router = APIRouter(tags=["marketing"])
-
-
-@router.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    user_email = get_current_user_email(request)
-    try:
-        stats, _ = await fetch_landing_snapshot()
-    except Exception:
-        stats, _ = {"total_open": 0, "closing_soon": 0, "added_recent": 0}, []
-
-    cta_url = "/signup"
-    active_opps = stats.get("total_open", 0)
-    closing_soon = stats.get("closing_soon", 0)
-    recently_added = stats.get("added_recent", 0)
-
-    body_html = f"""
+  <main>
     <section class="hero">
       <div class="container">
         <div class="hero-content">
@@ -36,12 +51,12 @@ async def home(request: Request):
             EasyRFP monitors 21 government portals across Central Ohio, delivers plain-English summaries, and helps your team respond faster with built-in collaboration tools.
           </p>
           <div class="hero-buttons">
-            <a href="{cta_url}" class="btn-cta">Start Free Trial</a>
-            <a href="/opportunities" class="btn-secondary">View Live Opportunities</a>
+            <a href="#signup" class="btn-cta">Start Free Trial</a>
+            <a href="/opportunities.html" class="btn-secondary">View Live Opportunities</a>
           </div>
           <div class="hero-metrics">
             <div class="metric">
-              <span class="metric-value">{active_opps}</span>
+              <span class="metric-value">142</span>
               <span class="metric-label">Active Opportunities</span>
             </div>
             <div class="metric">
@@ -79,20 +94,20 @@ async def home(request: Request):
       <div class="container">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-number">{active_opps}</div>
-            <div class="stat-text">Active opportunities right now</div>
+            <div class="stat-number">$12M+</div>
+            <div class="stat-text">Contracts won by our users</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">{closing_soon}</div>
-            <div class="stat-text">Closing within 7 days</div>
+            <div class="stat-number">150+</div>
+            <div class="stat-text">Active contractor teams</div>
           </div>
           <div class="stat-card">
             <div class="stat-number">21</div>
             <div class="stat-text">Government portals tracked</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number">+{recently_added}</div>
-            <div class="stat-text">Newly added today</div>
+            <div class="stat-number">80%</div>
+            <div class="stat-text">Time saved on research</div>
           </div>
         </div>
       </div>
@@ -200,7 +215,7 @@ async def home(request: Request):
               <li>Basic search & filters</li>
               <li>7-day bid history</li>
             </ul>
-            <a href="{cta_url}" class="pricing-btn secondary">Get Started Free</a>
+            <a href="#signup" class="pricing-btn secondary">Get Started Free</a>
           </div>
 
           <div class="pricing-card featured">
@@ -219,7 +234,7 @@ async def home(request: Request):
               <li>Document storage (5GB)</li>
               <li>Calendar integration</li>
             </ul>
-            <a href="{cta_url}" class="pricing-btn">Start 14-Day Trial</a>
+            <a href="#signup" class="pricing-btn">Start 14-Day Trial</a>
           </div>
 
           <div class="pricing-card">
@@ -237,7 +252,7 @@ async def home(request: Request):
               <li>Team activity dashboard</li>
               <li>Dedicated account manager</li>
             </ul>
-            <a href="/contact" class="pricing-btn secondary">Contact Sales</a>
+            <a href="#signup" class="pricing-btn secondary">Contact Sales</a>
           </div>
         </div>
       </div>
@@ -317,28 +332,41 @@ async def home(request: Request):
           <h2 class="cta-title">Ready to win more government contracts?</h2>
           <p class="cta-description">Join 150+ contractors who use EasyRFP to find opportunities faster and submit winning proposals on time.</p>
           <div class="cta-buttons">
-            <a href="{cta_url}" class="btn-cta">Start Your Free Trial</a>
-            <a href="/opportunities" class="btn-secondary">View Live Opportunities</a>
+            <a href="#" class="btn-cta">Start Your Free Trial</a>
+            <a href="/opportunities.html" class="btn-secondary">View Live Opportunities</a>
           </div>
           <p class="cta-note">No credit card required. 14-day free trial on Professional plan.</p>
         </div>
       </div>
     </section>
-    """
+  </main>
 
-    return HTMLResponse(
-        marketing_shell(body_html, title="EasyRFP - Win Local Bids Faster", user_email=user_email)
-    )
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <svg class="logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="10" fill="url(#gradient2)"/>
+            <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="gradient2" x1="0" y1="0" x2="40" y2="40">
+                <stop offset="0%" stop-color="#126a45"/>
+                <stop offset="100%" stop-color="#0f8b5a"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="brand-text">EasyRFP</span>
+        </div>
+        <div class="footer-links">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Contact</a>
+        </div>
+        <p class="footer-copy">&copy; 2024 EasyRFP. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
 
-
-@router.get("/landing-test", response_class=HTMLResponse)
-async def landing_test(request: Request):
-    user_email = get_current_user_email(request)
-    body_html = """
-    <section class="card" style="text-align:center;">
-        <h2 class="section-heading">Simple landing test</h2>
-        <p class="subtext">This is a lightweight preview route kept for development.</p>
-        <a class="button-primary" href="/signup">Try it free</a>
-    </section>
-    """
-    return HTMLResponse(page_shell(body_html, title="EasyRFP - Preview", user_email=user_email))
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -42,6 +44,15 @@ async def _sync_tier_from_stripe(user_email: str | None) -> None:
             return
         sub = items[0]
         price_id = ((sub.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id", "")
+        next_bill_ts = sub.get("current_period_end")
+        next_bill_iso = None
+        try:
+            if next_bill_ts:
+                import datetime as _dt
+
+                next_bill_iso = _dt.datetime.fromtimestamp(next_bill_ts).isoformat()
+        except Exception:
+            next_bill_iso = None
         price_to_tier = {
             (settings.STRIPE_PRICE_STARTER or "").lower(): "Starter",
             (settings.STRIPE_PRICE_PROFESSIONAL or "").lower(): "Professional",
@@ -57,11 +68,12 @@ async def _sync_tier_from_stripe(user_email: str | None) -> None:
                     UPDATE users
                     SET tier = :tier,
                         stripe_customer_id = COALESCE(stripe_customer_id, :cid),
-                        stripe_subscription_id = :sid
+                        stripe_subscription_id = :sid,
+                        next_billing_at = COALESCE(:next_billing_at, next_billing_at)
                     WHERE lower(email) = lower(:email)
                     """
                 ),
-                {"tier": tier, "email": user_email, "cid": customer_id, "sid": sub.get("id")},
+                {"tier": tier, "email": user_email, "cid": customer_id, "sid": sub.get("id"), "next_billing_at": next_bill_iso},
             )
             await db.commit()
         try:
@@ -120,168 +132,31 @@ def _plan_card(name: str, price: str, highlights: list[str], cta_href: str, cta_
 @router.get("/billing", response_class=HTMLResponse)
 async def billing_page(request: Request):
     user_email = get_current_user_email(request)
-    tier_info = _get_user_tier_info(user_email)
-    current_tier = tier_info.get("effective", "Free")
-
     # Restrict billing to team owner (or platform admin) when the user belongs to a team.
     if user_email:
-        await _ensure_billing_owner(user_email)
-
-    payment_links = {
-        "Starter": "https://buy.stripe.com/test_6oUfZj4DeaNkdzO3NXcV201",
-        "Professional": "https://buy.stripe.com/test_dRm00ld9K08G7bqbgpcV202",
-        "Enterprise": "https://buy.stripe.com/test_aFa9AVglW2gOanCcktcV200",
-    }
-
-    plans = [
-        {
-            "name": "Free",
-            "price": "$0",
-            "highlights": [
-                "View opportunities (24h delay)",
-                "Track up to 3 bids",
-                "Weekly digest emails",
-            ],
-        },
-        {
-            "name": "Starter",
-            "price": "$29/mo",
-            "highlights": [
-                "Real-time opportunity updates",
-                "Track unlimited bids",
-                "Daily digests",
-                "Email alerts for keywords",
-                "File uploads (5GB)",
-            ],
-        },
-        {
-            "name": "Professional",
-            "price": "$99/mo",
-            "highlights": [
-                "Everything in Starter",
-                "AI-powered bid matching",
-                "Proposal templates",
-                "Team collaboration (3 users)",
-                "Priority support",
-                "Vendor registration guides",
-            ],
-        },
-        {
-            "name": "Enterprise",
-            "price": "$299/mo",
-            "highlights": [
-                "Everything in Pro",
-                "Unlimited team members",
-                "Custom agency coverage",
-                "API access",
-                "Win/loss analytics",
-            ],
-        },
-    ]
-
-    cards = []
-    for plan in plans:
-        name = plan["name"]
-        current = current_tier.lower() == name.lower()
-        href = payment_links.get(name, "#")
-        label = "Current plan" if current else "Upgrade"
-        cards.append(
-            _plan_card(
-                name=name,
-                price=plan["price"],
-                highlights=plan["highlights"],
-                cta_href=href,
-                cta_label=label,
-                current=current,
-            )
-        )
-
-    cards_html = "".join(cards)
-    script_html = """
-<script>
-(function(){
-  const links = document.querySelectorAll('.plan-card .btn');
-  links.forEach(function(btn){
-    if (btn.getAttribute('aria-disabled') === 'true') return;
-    btn.addEventListener('click', function(ev){
-      ev.preventDefault();
-      const url = btn.getAttribute('href');
-      if (!url) return;
-      window.open(url, '_blank', 'noopener');
-    });
-  });
-  async function syncTier(){
-    try {
-      const res = await fetch('/billing/debug-tier', { credentials:'include' });
-      if (!res.ok) return;
-      const data = await res.json();
-      const tier = (data.tier || '').toString();
-      if (!tier) return;
-      const pill = document.querySelector('.top-tier strong');
-      if (pill) pill.textContent = tier;
-      document.querySelectorAll('.plan-card').forEach(function(card){
-        const nameEl = card.querySelector('.plan-name');
-        const btn = card.querySelector('.btn, .btn-secondary');
-        if (!nameEl || !btn) return;
-        const isCurrent = (nameEl.textContent||'').toLowerCase().includes(tier.toLowerCase());
-        if (isCurrent){
-          btn.className = 'btn-secondary';
-          btn.setAttribute('aria-disabled','true');
-          btn.setAttribute('tabindex','-1');
-          btn.textContent = 'Current plan';
-        } else {
-          btn.className = 'btn';
-          btn.removeAttribute('aria-disabled');
-          btn.removeAttribute('tabindex');
-          btn.textContent = 'Upgrade';
-        }
-      });
-    } catch(e){}
-  }
-  syncTier();
-  const manageBtn = document.getElementById('manage-sub');
-  if (manageBtn) {
-    manageBtn.addEventListener('click', async function(){
-      try {
-        const res = await fetch('/billing/portal', { credentials:'include' });
-        if (!res.ok) throw new Error('Portal unavailable');
-        const data = await res.json();
-        if (data && data.url) {
-          window.open(data.url, '_blank', 'noopener');
-        }
-      } catch(_) { alert('Could not open subscription management.'); }
-    });
-  }
-})();
-</script>
+        try:
+            await _ensure_billing_owner(user_email)
+        except HTTPException as exc:
+            if exc.status_code == 403:
+                # Return a friendly page instead of an unhandled server error.
+                body = """
+<section class="card">
+  <h2 class="section-heading">Billing is restricted</h2>
+  <p class="subtext">Only the team owner (or an admin) can manage billing. Please ask your workspace owner for help.</p>
+</section>
 """
-    style_html = """
-"""
+                return HTMLResponse(page_shell(body, title="Billing", user_email=user_email), status_code=exc.status_code)
+            raise
+
     status = request.query_params.get("status")
-    banner = ""
     if status == "success":
         await _sync_tier_from_stripe(user_email)
-        banner = '<div class="alert success">Payment received. Your plan will update shortly.</div>'
-    elif status == "cancel":
-        banner = '<div class="alert muted">Checkout canceled.</div>'
 
-    body = f"""
-<section class="card">
-  <h2 class="section-heading">Billing & Plans</h2>
-  <p class="subtext">Choose the plan that fits your team. Upgrade links open Stripe payment pages.</p>
-  {banner}
-  <div style="margin-bottom:10px;">
-    <button class="btn-secondary" type="button" id="manage-sub">Manage / cancel subscription</button>
-  </div>
-  <div class="plan-grid">
-    {cards_html}
-  </div>
-</section>
-{script_html}
-{style_html}
-    """
-
-    return HTMLResponse(page_shell(body, title="Billing", user_email=user_email))
+    html_path = Path("app/web/static/billing.html")
+    if not html_path.exists():
+        raise HTTPException(status_code=500, detail="Billing page missing")
+    html = html_path.read_text(encoding="utf-8")
+    return HTMLResponse(html)
 
 
 @router.get("/billing/checkout")
@@ -380,6 +255,8 @@ async def stripe_webhook(request: Request):
     customer_id = data.get("customer") or None
     subscription_id = data.get("subscription") or None
 
+    next_billing_at = None
+
     if event_type == "checkout.session.completed":
         email = (
             data.get("customer_details", {}) or {}
@@ -393,6 +270,12 @@ async def stripe_webhook(request: Request):
         if meta_plan:
             tier = meta_plan.title()
         price_id_dbg = (data.get("line_items") or [{}])[0].get("price", "") if not tier else price_id_dbg
+        if subscription_id:
+            try:
+                sub_obj = stripe.Subscription.retrieve(subscription_id)
+                next_billing_at = sub_obj.get("current_period_end")
+            except Exception:
+                next_billing_at = None
 
     if event_type in {"invoice.paid", "invoice.payment_succeeded"}:
         email = data.get("customer_email") or email
@@ -403,8 +286,12 @@ async def stripe_webhook(request: Request):
             price_id = (lines[0].get("price") or {}).get("id", "")
             price_id_dbg = price_id
             tier = price_to_tier.get(price_id.lower())
+            period_end = (lines[0].get("period") or {}).get("end")
+            next_billing_at = period_end or next_billing_at
+        if not next_billing_at:
+            next_billing_at = data.get("period_end") or data.get("next_payment_attempt")
 
-    if email and (tier or customer_id or subscription_id):
+    if email and (tier or customer_id or subscription_id or next_billing_at):
         updates = {"email": email}
         set_parts = []
         if tier:
@@ -416,6 +303,9 @@ async def stripe_webhook(request: Request):
         if subscription_id:
             updates["stripe_subscription_id"] = subscription_id
             set_parts.append("stripe_subscription_id = :stripe_subscription_id")
+        if next_billing_at:
+            updates["next_billing_at"] = next_billing_at
+            set_parts.append("next_billing_at = :next_billing_at")
         if set_parts:
             async with AsyncSessionLocal() as db:
                 await db.execute(

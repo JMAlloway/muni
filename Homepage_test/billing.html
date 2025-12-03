@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billing & Plans - EasyRFP</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="billing.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="12" fill="url(#grad1)"/>
+          <path d="M10 20L17 27L30 13" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#126a45"/>
+              <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>EasyRFP</span>
+      </div>
+
+      <div class="nav-label">Main Menu</div>
+      <nav class="navlinks">
+        <a href="index.html" class="nav-link">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="opportunities.html" class="nav-link">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-text">Discover Bids</span>
+        </a>
+        <a href="dashboard-demo.html" class="nav-link">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">My Dashboard</span>
+        </a>
+        <a href="documents.html" class="nav-link">
+          <span class="nav-icon">📁</span>
+          <span class="nav-text">Documents</span>
+        </a>
+        <a href="calendar.html" class="nav-link">
+          <span class="nav-icon">📅</span>
+          <span class="nav-text">Calendar</span>
+        </a>
+        <a href="account.html" class="nav-link">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">My Account</span>
+        </a>
+      </nav>
+
+      <div class="nav-label" style="margin-top: 24px;">Account</div>
+      <nav class="navlinks">
+        <a href="settings.html" class="nav-link">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">Support</span>
+        </a>
+      </nav>
+    </aside>
+
+    <div class="content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="top-pill" href="account.html">
+            <span>←</span>
+            <span class="top-label">Back to Account</span>
+          </a>
+          <span class="top-pill">
+            <span>Tier:</span>
+            <strong>Professional</strong>
+            <span class="current-badge">Current</span>
+          </span>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn" id="notifBtn">🔔<span class="notif-dot">3</span></button>
+          <button class="icon-btn">❓</button>
+          <button class="avatar-button">
+            <span class="avatar-circle">AD</span>
+            <span style="font-size: 10px; color: #94a3b8;">▼</span>
+          </button>
+        </div>
+      </div>
+
+      <main class="page billing-page">
+        <div class="billing-header">
+          <div class="billing-header-content">
+            <h1>Billing & Plans</h1>
+            <p>Choose the plan that fits your team. Upgrade links open Stripe payment pages.</p>
+          </div>
+          <button class="btn-secondary" onclick="window.open('#', '_blank')">
+            <span>Manage / cancel subscription</span>
+          </button>
+        </div>
+
+        <div class="plans-grid">
+          <div class="plan-card">
+            <div class="plan-header">
+              <h2 class="plan-name">Free</h2>
+              <div class="plan-price">
+                <span class="price-amount">$0</span>
+                <span class="price-period">/month</span>
+              </div>
+            </div>
+            <p class="plan-description">For individuals exploring government opportunities</p>
+            <ul class="plan-features">
+              <li>
+                <span class="check-icon">✓</span>
+                <span>View opportunities (24h delay)</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Track up to 3 bids</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Weekly digest emails</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Basic search & filters</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>7-day bid history</span>
+              </li>
+            </ul>
+            <button class="btn-plan btn-outline">Downgrade</button>
+          </div>
+
+          <div class="plan-card plan-current">
+            <div class="current-plan-badge">Current Plan</div>
+            <div class="plan-header">
+              <h2 class="plan-name">Professional</h2>
+              <div class="plan-price">
+                <span class="price-amount">$49</span>
+                <span class="price-period">/month</span>
+              </div>
+            </div>
+            <p class="plan-description">For growing contractors and small teams</p>
+            <ul class="plan-features">
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Real-time opportunity updates</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Track unlimited bids</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Daily digests</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Email alerts for keywords</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>File uploads (5GB)</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Calendar integration</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Priority support</span>
+              </li>
+            </ul>
+            <button class="btn-plan btn-current" disabled>Current plan</button>
+          </div>
+
+          <div class="plan-card plan-featured">
+            <div class="popular-badge">Most Popular</div>
+            <div class="plan-header">
+              <h2 class="plan-name">Team</h2>
+              <div class="plan-price">
+                <span class="price-amount">$149</span>
+                <span class="price-period">/month</span>
+              </div>
+            </div>
+            <p class="plan-description">For established firms with capture teams</p>
+            <ul class="plan-features">
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Everything in Professional</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Up to 10 team members</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Role-based permissions</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Team activity dashboard</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Document storage (50GB)</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Dedicated account manager</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>API access</span>
+              </li>
+            </ul>
+            <button class="btn-plan btn-primary">Upgrade to Team</button>
+          </div>
+
+          <div class="plan-card plan-enterprise">
+            <div class="plan-header">
+              <h2 class="plan-name">Enterprise</h2>
+              <div class="plan-price">
+                <span class="price-amount">Custom</span>
+              </div>
+            </div>
+            <p class="plan-description">For large organizations with custom needs</p>
+            <ul class="plan-features">
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Everything in Team</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Unlimited team members</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Custom agency coverage</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>SSO / SAML integration</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Audit logs</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Win/loss analytics</span>
+              </li>
+              <li>
+                <span class="check-icon">✓</span>
+                <span>Onboarding & training</span>
+              </li>
+            </ul>
+            <button class="btn-plan btn-outline">Contact Sales</button>
+          </div>
+        </div>
+
+        <section class="billing-section">
+          <h2 class="section-title">Compare Features</h2>
+          <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Free</th>
+                  <th>Professional</th>
+                  <th>Team</th>
+                  <th>Enterprise</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Tracked Opportunities</td>
+                  <td>3</td>
+                  <td>Unlimited</td>
+                  <td>Unlimited</td>
+                  <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Real-time Updates</td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="check-green">✓</span></td>
+                  <td><span class="check-green">✓</span></td>
+                  <td><span class="check-green">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Team Members</td>
+                  <td>1</td>
+                  <td>1</td>
+                  <td>Up to 10</td>
+                  <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Document Storage</td>
+                  <td><span class="x-icon">—</span></td>
+                  <td>5 GB</td>
+                  <td>50 GB</td>
+                  <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Email Alerts</td>
+                  <td>Weekly</td>
+                  <td>Daily</td>
+                  <td>Real-time</td>
+                  <td>Real-time</td>
+                </tr>
+                <tr>
+                  <td>Calendar Integration</td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="check-green">✓</span></td>
+                  <td><span class="check-green">✓</span></td>
+                  <td><span class="check-green">✓</span></td>
+                </tr>
+                <tr>
+                  <td>API Access</td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="check-green">✓</span></td>
+                  <td><span class="check-green">✓</span></td>
+                </tr>
+                <tr>
+                  <td>Dedicated Support</td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="check-green">✓</span></td>
+                  <td><span class="check-green">✓</span></td>
+                </tr>
+                <tr>
+                  <td>SSO / SAML</td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="x-icon">—</span></td>
+                  <td><span class="check-green">✓</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="billing-section">
+          <h2 class="section-title">Frequently Asked Questions</h2>
+          <div class="faq-grid">
+            <div class="faq-item">
+              <h3>Can I change plans at any time?</h3>
+              <p>Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate your billing.</p>
+            </div>
+            <div class="faq-item">
+              <h3>Is there a free trial?</h3>
+              <p>Yes! Professional and Team plans come with a 14-day free trial. No credit card required to start.</p>
+            </div>
+            <div class="faq-item">
+              <h3>How do I cancel my subscription?</h3>
+              <p>You can cancel anytime from this page. Click "Manage / cancel subscription" to access the Stripe portal.</p>
+            </div>
+            <div class="faq-item">
+              <h3>What payment methods do you accept?</h3>
+              <p>We accept all major credit cards (Visa, Mastercard, Amex) and ACH bank transfers for annual plans.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="notifications-sidebar" id="notificationsSidebar">
+    <div class="notifications-header">
+      <h2>Notifications</h2>
+      <button class="close-notifications" id="closeNotifications">×</button>
+    </div>
+    <div class="notifications-content">
+      <div class="notification-item">
+        <span class="notification-dot urgent"></span>
+        <div class="notification-body">
+          <p class="notification-text">Bid deadline tomorrow: City of Columbus IT Services</p>
+          <span class="notification-time">2 hours ago</span>
+        </div>
+      </div>
+      <div class="notification-item">
+        <span class="notification-dot success"></span>
+        <div class="notification-body">
+          <p class="notification-text">New opportunity matches your keywords</p>
+          <span class="notification-time">5 hours ago</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notifications-overlay" id="notificationsOverlay"></div>
+
+  <script src="notifications.js"></script>
+</body>
+</html>

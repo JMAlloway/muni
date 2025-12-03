@@ -1,11 +1,12 @@
 # app/routers/auth_web.py
-from fastapi import APIRouter, Request, Form, HTTPException
+from fastapi import APIRouter, Request, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 import secrets
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy import text
 from typing import Optional
 import json
+import datetime as dt
 from pathlib import Path
 
 from app.core.db import AsyncSessionLocal
@@ -13,6 +14,45 @@ from app.security import hash_password, verify_password
 from app.auth.session import create_session_token, get_current_user_email, SESSION_COOKIE_NAME
 from app.core.settings import settings
 from app.api.team import _ensure_team_feature_access
+from sqlalchemy.exc import SQLAlchemyError
+from app.storage import store_profile_file, create_presigned_get, USE_S3
+
+PROFILE_ALLOWED_EXT = {"pdf", "jpg", "jpeg", "png", "doc", "docx"}
+PROFILE_ALLOWED_MIME = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+PROFILE_MAX_MB = 25
+FILE_FIELDS = {
+    "ohio_certificate",
+    "cert_upload",
+    "capability_statement",
+    "product_catalogs",
+    "ref1_letter",
+    "ref2_letter",
+    "ref3_letter",
+    "ref4_letter",
+    "ref5_letter",
+    "sub1_certificate",
+    "sub2_certificate",
+    "sub3_certificate",
+    "sub4_certificate",
+    "sub5_certificate",
+    "insurance_certificate",
+    "bonding_letter",
+    "price_list_upload",
+    "w9_upload",
+    "business_license",
+    "safety_sheets",
+    "warranty_info",
+    "previous_contracts",
+    "org_chart",
+    "digital_signature",
+    "signature_image",
+}
 
 from app.api._layout import auth_shell, page_shell
 from app.onboarding.interests import DEFAULT_INTEREST_KEY, list_interest_options
@@ -46,6 +86,85 @@ async def _get_user_id(email: str) -> Optional[str]:
         )
         row = res.fetchone()
         return row[0] if row else None
+
+
+async def _auto_accept_invite(email: str) -> None:
+    """
+    Best-effort: if there's a pending team invite for this email, accept it and link team_id.
+    Runs on login/signup to avoid a manual accept step.
+    """
+    if not email:
+        return
+    try:
+        async with AsyncSessionLocal() as session:
+            user_res = await session.execute(
+                text("SELECT id FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+                {"email": email},
+            )
+            urow = user_res.fetchone()
+            if not urow:
+                return
+            user_id = urow[0]
+
+            invite_res = await session.execute(
+                text(
+                    """
+                    SELECT team_id FROM team_members
+                    WHERE accepted_at IS NULL AND lower(invited_email) = lower(:email)
+                    ORDER BY invited_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"email": email},
+            )
+            invite_row = invite_res.fetchone()
+            team_id = invite_row[0] if invite_row else None
+
+            # If already linked, fall back to most recent membership record.
+            if not team_id:
+                fallback_res = await session.execute(
+                    text(
+                        """
+                        SELECT team_id FROM team_members
+                        WHERE user_id = :uid OR lower(invited_email) = lower(:email)
+                        ORDER BY accepted_at DESC NULLS LAST, invited_at DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"uid": user_id, "email": email},
+                )
+                frow = fallback_res.fetchone()
+                if not frow:
+                    return
+                team_id = frow[0]
+
+            await session.execute(
+                text(
+                    """
+                    UPDATE team_members
+                    SET user_id = :uid, accepted_at = COALESCE(accepted_at, CURRENT_TIMESTAMP)
+                    WHERE team_id = :team AND lower(invited_email) = lower(:email)
+                    """
+                ),
+                {"team": team_id, "email": email, "uid": user_id},
+            )
+            await session.execute(
+                text("UPDATE users SET team_id = :team WHERE id = :uid"),
+                {"team": team_id, "uid": user_id},
+            )
+            await session.execute(
+                text(
+                    """
+                    DELETE FROM team_members
+                    WHERE invited_email = :email AND accepted_at IS NULL AND team_id != :team
+                    """
+                ),
+                {"email": email, "team": team_id},
+            )
+            await session.commit()
+    except SQLAlchemyError:
+        # Don't block auth on invite acceptance failures.
+        return
 
 
 # --- signup ----------------------------------------------------------
@@ -286,6 +405,7 @@ async def signup_submit(
 
     await set_primary_interest(email_clean, interest_choice)
     await record_milestone(email_clean, "signup", {"source": "signup_form"})
+    await _auto_accept_invite(email_clean)
 
     token = create_session_token(email_clean)
     paid_flag = (paid or "").strip()
@@ -407,6 +527,8 @@ async def login_submit(
             status_code=401,
         )
 
+    await _auto_accept_invite(email_clean)
+
     # Set cookie and redirect
     token = create_session_token(email_clean)
     redirect_to = next if (next and not next.startswith("/login")) else "/tracker/dashboard"
@@ -446,26 +568,105 @@ async def account_overview(request: Request):
         "professional": {"label": "Professional", "amount": "$99", "period": "/month"},
         "enterprise": {"label": "Enterprise", "amount": "$299", "period": "/month"},
     }
+    tier_order = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
 
     async with AsyncSessionLocal() as db:
-        res = await db.execute(
-            text(
-                """
-                SELECT id, email, first_name, last_name, COALESCE(Tier, tier) AS tier, team_id,
-                       stripe_customer_id, stripe_subscription_id
-                FROM users
-                WHERE lower(email) = lower(:email)
-                LIMIT 1
-                """
-            ),
-            {"email": user_email},
-        )
-        row = res.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="User not found")
-        user_id, email, first_name, last_name, tier_raw, team_id, stripe_customer_id, stripe_subscription_id = row
+        def _to_iso(val):
+            if val is None:
+                return None
+            if isinstance(val, dt.datetime):
+                return val.isoformat()
+            try:
+                parsed = dt.datetime.fromisoformat(str(val))
+                return parsed.isoformat()
+            except Exception:
+                return str(val)
+
+        next_billing_at = None
+        try:
+            res = await db.execute(
+                text(
+                    """
+                    SELECT id, email, first_name, last_name, is_active, created_at,
+                           COALESCE(Tier, tier) AS tier, team_id,
+                           stripe_customer_id, stripe_subscription_id, next_billing_at
+                    FROM users
+                    WHERE lower(email) = lower(:email)
+                    LIMIT 1
+                    """
+                ),
+                {"email": user_email},
+            )
+            row = res.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="User not found")
+            (
+                user_id,
+                email,
+                first_name,
+                last_name,
+                is_active,
+                created_at,
+                tier_raw,
+                team_id,
+                stripe_customer_id,
+                stripe_subscription_id,
+                next_billing_at,
+            ) = row
+        except Exception:
+            # Fallback for older DBs without next_billing_at
+            res = await db.execute(
+                text(
+                    """
+                    SELECT id, email, first_name, last_name, is_active, created_at,
+                           COALESCE(Tier, tier) AS tier, team_id,
+                           stripe_customer_id, stripe_subscription_id
+                    FROM users
+                    WHERE lower(email) = lower(:email)
+                    LIMIT 1
+                    """
+                ),
+                {"email": user_email},
+            )
+            row = res.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="User not found")
+            (
+                user_id,
+                email,
+                first_name,
+                last_name,
+                is_active,
+                created_at,
+                tier_raw,
+                team_id,
+                stripe_customer_id,
+                stripe_subscription_id,
+            ) = row
         tier_key = (tier_raw or "free").strip().lower()
-        plan = plan_prices.get(tier_key, plan_prices["free"])
+        owner_tier_key = None
+        if team_id:
+            try:
+                owner_res = await db.execute(
+                    text(
+                        """
+                        SELECT COALESCE(u.Tier, u.tier)
+                        FROM teams t
+                        LEFT JOIN users u ON u.id = t.owner_user_id
+                        WHERE t.id = :team
+                        LIMIT 1
+                        """
+                    ),
+                    {"team": team_id},
+                )
+                owner_tier_key = (owner_res.scalar() or "").strip().lower()
+            except Exception:
+                owner_tier_key = None
+        effective_key = tier_key
+        if owner_tier_key and tier_order.get(owner_tier_key, 0) > tier_order.get(tier_key, 0):
+            effective_key = owner_tier_key
+        plan = plan_prices.get(effective_key, plan_prices["free"]).copy()
+        plan["next_billing"] = _to_iso(next_billing_at)
 
         tracked_res = await db.execute(
             text(
@@ -525,12 +726,73 @@ async def account_overview(request: Request):
         except Exception:
             members = []
 
-    usage = {
-        "tracked": tracked_count,
-        "documents": {"count": upload_count, "bytes": upload_size},
-        "team": len(members) if members else (1 if user_email else 0),
-        "token_calls": 0,
-    }
+        usage = {
+            "tracked": tracked_count,
+            "documents": {"count": upload_count, "bytes": upload_size},
+            "team": len(members) if members else (1 if user_email else 0),
+            "token_calls": 0,
+        }
+
+        # Recent activity (limit 5, team-aware)
+        activity_entries: list[dict] = []
+        tracked_rows = await db.execute(
+            text(
+                """
+                SELECT t.created_at, u.email AS who, o.title
+                FROM user_bid_trackers t
+                JOIN users u ON u.id = t.user_id
+                JOIN opportunities o ON o.id = t.opportunity_id
+                WHERE (t.user_id = :uid OR (:team_id IS NOT NULL AND t.team_id = :team_id))
+                ORDER BY t.created_at DESC
+                LIMIT 10
+                """
+            ),
+            {"uid": user_id, "team_id": team_id},
+        )
+        for r in tracked_rows.fetchall():
+            activity_entries.append(
+                {
+                    "who": r._mapping.get("who"),
+                    "verb": "added to tracking",
+                    "obj": r._mapping.get("title"),
+                    "when": r._mapping.get("created_at"),
+                    "type": "track",
+                }
+            )
+        upload_rows = await db.execute(
+            text(
+                """
+                SELECT u.created_at, usr.email AS who, o.title, u.filename
+                FROM user_uploads u
+                JOIN users usr ON usr.id = u.user_id
+                JOIN opportunities o ON o.id = u.opportunity_id
+                WHERE (u.user_id = :uid OR (:team_id IS NOT NULL AND usr.team_id = :team_id))
+                ORDER BY u.created_at DESC
+                LIMIT 10
+                """
+            ),
+            {"uid": user_id, "team_id": team_id},
+        )
+        for r in upload_rows.fetchall():
+            activity_entries.append(
+                {
+                    "who": r._mapping.get("who"),
+                    "verb": f"uploaded {r._mapping.get('filename') or 'a file'}",
+                    "obj": r._mapping.get("title"),
+                    "when": r._mapping.get("created_at"),
+                    "type": "upload",
+                }
+            )
+        # Sort and trim
+        try:
+            activity_entries.sort(
+                key=lambda x: x.get("when") or dt.datetime.utcnow(), reverse=True
+            )
+        except Exception:
+            activity_entries = activity_entries[:]
+        activity_entries = activity_entries[:5]
+        for entry in activity_entries:
+            entry["when"] = _to_iso(entry.get("when"))
 
     return {
         "user": {
@@ -541,6 +803,8 @@ async def account_overview(request: Request):
             "tier": plan["label"],
             "tier_key": tier_key,
             "role": user_role,
+            "email_verified": bool(is_active),
+            "created_at": _to_iso(created_at),
         },
         "plan": {
             "label": plan["label"],
@@ -555,6 +819,7 @@ async def account_overview(request: Request):
             "members": members,
             "team_id": team_id_val,
         },
+        "activity": activity_entries,
     }
 
 
@@ -599,17 +864,83 @@ async def get_company_profile(request: Request):
         )
         row = res.fetchone()
         data = row[0] if row else {}
-        return {"data": data or {}}
+        # Stored as JSON text; ensure we return a dict for consumers
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:
+                data = {}
+        data = data or {}
+        files = {}
+        for field in FILE_FIELDS:
+            key = data.get(field)
+            if not key:
+                continue
+            files[field] = {
+                "key": key,
+                "name": data.get(f"{field}_name", ""),
+                "url": create_presigned_get(key),
+            }
+        return {"data": data, "files": files}
 
 
 @router.post("/api/company-profile", response_class=JSONResponse)
-async def save_company_profile(request: Request, payload: dict):
+async def save_company_profile(request: Request):
     user_email = get_current_user_email(request)
     if not user_email:
         raise HTTPException(status_code=401, detail="Login required")
     user_id = await _get_user_id(user_email)
     if not user_id:
         raise HTTPException(status_code=404, detail="User not found")
+
+    content_type = request.headers.get("content-type", "").lower()
+    payload = {}
+    files_meta = {}
+
+    if content_type.startswith("application/json"):
+        # Fallback for older clients
+        payload = await request.json()
+    else:
+        form = await request.form()
+        for key, val in form.multi_items():
+            if isinstance(val, UploadFile):
+                if not val.filename:
+                    continue
+                safe_name = (val.filename or "").strip()
+                ext = safe_name.rsplit(".", 1)[-1].lower() if "." in safe_name else ""
+                if ext and ext not in PROFILE_ALLOWED_EXT:
+                    raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
+                mime = (val.content_type or "").lower()
+                if mime and PROFILE_ALLOWED_MIME and mime not in PROFILE_ALLOWED_MIME:
+                    raise HTTPException(status_code=400, detail=f"Unsupported MIME type: {mime}")
+                data = await val.read()
+                if not data:
+                    continue
+                if len(data) > PROFILE_MAX_MB * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail=f"File too large (> {PROFILE_MAX_MB} MB)")
+                storage_key = store_profile_file(user_id, key, data, val.filename, val.content_type)
+                payload[key] = storage_key
+                payload[f"{key}_name"] = safe_name
+                files_meta[key] = {
+                    "key": storage_key,
+                    "name": safe_name,
+                    "url": create_presigned_get(storage_key),
+                }
+            else:
+                # Handle repeated keys by joining into comma-separated string
+                if key in payload:
+                    if isinstance(payload[key], list):
+                        payload[key].append(str(val))
+                    else:
+                        payload[key] = [payload[key], str(val)]
+                else:
+                    payload[key] = str(val)
+
+        # Flatten any lists to comma-separated strings
+        for k, v in list(payload.items()):
+            if isinstance(v, list):
+                payload[k] = ",".join(v)
+
     async with AsyncSessionLocal() as db:
         await db.execute(
             text(
@@ -624,7 +955,7 @@ async def save_company_profile(request: Request, payload: dict):
             {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(payload or {})},
         )
         await db.commit()
-    return {"ok": True}
+    return {"ok": True, "files": files_meta}
 
 
 # --- minimal /account (optional) ------------------------------------

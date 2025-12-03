@@ -50,7 +50,11 @@
 
       <div class="nav-label" style="margin-top: 24px;">Account</div>
       <nav class="navlinks">
-        <a href="#" class="nav-link">
+        <a href="account.html" class="nav-link">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">My Account</span>
+        </a>
+        <a href="settings.html" class="nav-link">
           <span class="nav-icon">⚙️</span>
           <span class="nav-text">Settings</span>
         </a>
@@ -76,7 +80,7 @@
           </span>
         </div>
         <div class="topbar-right">
-          <button class="icon-btn tooltip" data-tooltip="Notifications" type="button">
+          <button class="icon-btn tooltip" data-tooltip="Notifications" type="button" id="notifBtn">
             🔔
             <span class="notif-dot">3</span>
           </button>
@@ -655,6 +659,219 @@
     </div>
   </div>
 
+  <div class="notif-overlay" id="notifOverlay"></div>
+  <div class="notif-sidebar" id="notifSidebar">
+    <div class="notif-header">
+      <div class="notif-header-top">
+        <h2 class="notif-title">Notifications</h2>
+        <div class="notif-header-actions">
+          <button class="notif-action-btn" id="markAllRead" title="Mark all as read">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+          <button class="notif-close-btn" id="notifCloseBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="notif-tabs">
+        <button class="notif-tab active" data-filter="all">All</button>
+        <button class="notif-tab" data-filter="unread">Unread <span class="notif-tab-count">3</span></button>
+        <button class="notif-tab" data-filter="deadlines">Deadlines</button>
+        <button class="notif-tab" data-filter="team">Team</button>
+      </div>
+    </div>
+
+    <div class="notif-list" id="notifList">
+      <div class="notif-date-group">
+        <div class="notif-date-label">Today</div>
+        
+        <div class="notif-item unread urgent" data-type="deadlines">
+          <div class="notif-item-icon urgent">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">Bid deadline in 24 hours</div>
+            <div class="notif-item-desc">HVAC Maintenance Contract #2024-089 is due tomorrow at 2:00 PM</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">2 hours ago</span>
+              <span class="notif-tag urgent">Urgent</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="notif-item unread" data-type="team">
+          <div class="notif-item-icon team">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">Sarah K. uploaded a document</div>
+            <div class="notif-item-desc">Pricing spreadsheet added to HVAC Maintenance Contract</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">3 hours ago</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="notif-item unread" data-type="deadlines">
+          <div class="notif-item-icon warning">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">Bid deadline approaching</div>
+            <div class="notif-item-desc">Yard Waste Collection RFP due in 3 days</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">5 hours ago</span>
+              <span class="notif-tag warning">Due Soon</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="notif-date-group">
+        <div class="notif-date-label">Yesterday</div>
+        
+        <div class="notif-item" data-type="team">
+          <div class="notif-item-icon success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">Mike R. completed site visit</div>
+            <div class="notif-item-desc">Site assessment finished for Yard Waste Collection RFP</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">Yesterday at 3:45 PM</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="notif-item" data-type="team">
+          <div class="notif-item-icon comment">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">New comment on proposal</div>
+            <div class="notif-item-desc">Sarah K. commented on IT Services Modernization draft</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">Yesterday at 11:20 AM</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="notif-date-group">
+        <div class="notif-date-label">This Week</div>
+        
+        <div class="notif-item" data-type="deadlines">
+          <div class="notif-item-icon success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="8" r="7"></circle>
+              <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">Contract awarded!</div>
+            <div class="notif-item-desc">Congratulations! You won the Fleet Maintenance Services bid</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">2 days ago</span>
+              <span class="notif-tag success">Won</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="notif-item" data-type="deadlines">
+          <div class="notif-item-icon info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">New opportunity matches your criteria</div>
+            <div class="notif-item-desc">Building Security Systems RFP from Franklin County</div>
+            <div class="notif-item-meta">
+              <span class="notif-time">3 days ago</span>
+              <span class="notif-tag info">New</span>
+            </div>
+          </div>
+          <button class="notif-item-action" title="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="notif-footer">
+      <a href="settings.html#notifications" class="notif-settings-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        Notification Settings
+      </a>
+    </div>
+  </div>
+
   <div class="drawer-overlay" id="drawerOverlay"></div>
   <div class="chat-drawer" id="chatDrawer">
     <div class="drawer-header">
@@ -896,6 +1113,75 @@
       const scrollHeight = content.scrollHeight - content.clientHeight;
       const progress = (scrollTop / scrollHeight) * 100;
       scrollProgress.style.width = progress + '%';
+    });
+
+    // Notifications Sidebar Functionality
+    const notifBtn = document.getElementById('notifBtn');
+    const notifSidebar = document.getElementById('notifSidebar');
+    const notifOverlay = document.getElementById('notifOverlay');
+    const notifCloseBtn = document.getElementById('notifCloseBtn');
+    const markAllRead = document.getElementById('markAllRead');
+    const notifTabs = document.querySelectorAll('.notif-tab');
+    const notifItems = document.querySelectorAll('.notif-item');
+
+    function openNotifSidebar() {
+      notifSidebar.classList.add('active');
+      notifOverlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeNotifSidebar() {
+      notifSidebar.classList.remove('active');
+      notifOverlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    notifBtn?.addEventListener('click', openNotifSidebar);
+    notifCloseBtn?.addEventListener('click', closeNotifSidebar);
+    notifOverlay?.addEventListener('click', closeNotifSidebar);
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && notifSidebar?.classList.contains('active')) {
+        closeNotifSidebar();
+      }
+    });
+
+    notifTabs.forEach(tab => {
+      tab.addEventListener('click', function() {
+        notifTabs.forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        const filter = this.dataset.filter;
+        notifItems.forEach(item => {
+          if (filter === 'all') {
+            item.style.display = 'flex';
+          } else if (filter === 'unread') {
+            item.style.display = item.classList.contains('unread') ? 'flex' : 'none';
+          } else {
+            item.style.display = item.dataset.type === filter ? 'flex' : 'none';
+          }
+        });
+      });
+    });
+
+    markAllRead?.addEventListener('click', function() {
+      notifItems.forEach(item => {
+        item.classList.remove('unread', 'urgent');
+      });
+      const unreadTab = document.querySelector('.notif-tab[data-filter="unread"] .notif-tab-count');
+      if (unreadTab) unreadTab.textContent = '0';
+      const notifDot = document.querySelector('.notif-dot');
+      if (notifDot) notifDot.style.display = 'none';
+    });
+
+    document.querySelectorAll('.notif-item-action').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const item = this.closest('.notif-item');
+        item.style.opacity = '0';
+        item.style.transform = 'translateX(20px)';
+        setTimeout(() => item.remove(), 200);
+      });
     });
 
     // Chat Drawer Functionality
