@@ -157,7 +157,27 @@
     open: {}, // oid -> bool
     fetching: new Set(),
   };
-  function setAssignee(){ /* server-backed assignee not yet wired */ }
+  async function setAssignee(oid, assignee){
+    if (!oid) return;
+    try {
+      const res = await fetch(`/tracker/${encodeURIComponent(oid)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': (getCSRF()||'') },
+        body: JSON.stringify({ assignee: assignee })
+      });
+      if (!res.ok) throw new Error('Assignee update failed');
+      // Update local item state on success
+      const item = items.find(x => String(x.opportunity_id) === String(oid));
+      if (item) {
+        item.assignee = assignee;
+        render();
+      }
+    } catch(err) {
+      console.error('Failed to update assignee:', err);
+      alert('Could not update assignee.');
+    }
+  }
   function collabFor(){ return {}; }
   async function updateVisibility(oid, nextVis){
     const res = await fetch(`/tracker/${encodeURIComponent(oid)}`, {
@@ -904,7 +924,6 @@
     const assign = e.target.closest('input[data-action="assign"]');
     if (assign && grid.contains(assign)) {
       const oid = assign.getAttribute('data-oid');
-      // TODO: Implement server-side assignee sync; for now local state only
       setAssignee(oid, assign.value);
     }
   });
