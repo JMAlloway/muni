@@ -1,0 +1,34 @@
+# Exclude debug/test files from Heroku slug
+debug_shots/
+docs/
+Homepage_test/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local databases
+*.db
+muni_local.db
+app.db
+
+# Git history (Heroku doesn't need this)
+.git/
+.gitignore
+.gitattributes
+
+# Development files
+.vscode/
+.editorconfig
+README.md
+
+# Test/development only
+*_test.py
+test_*.py
+
+# Large data files that shouldn't be in production
+ohiobuys.txt
+*.html
+logs/
