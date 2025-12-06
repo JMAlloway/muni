@@ -1,0 +1,81 @@
+# fly.toml app configuration file
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = "muni-easyrfp"
+primary_region = "ord"
+
+# Kill signal (graceful shutdown)
+kill_signal = "SIGINT"
+kill_timeout = "5s"
+
+# Build configuration
+[build]
+
+[env]
+  PORT = "8000"
+  PYTHONUNBUFFERED = "1"
+
+# HTTP service (web process)
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["web"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+# Web process group
+[[services]]
+  protocol = "tcp"
+  internal_port = 8000
+  processes = ["web"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
+
+# Machine configurations
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["web"]
+
+[[vm]]
+  memory = "1024mb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["worker"]
+
+# Process groups
+[processes]
+  web = "gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --log-level info"
+  worker = "python -m app.core.scheduler"
+
+# Health checks
+[[checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/"
+  processes = ["web"]
+
+# Deploy settings
+[deploy]
+  strategy = "rolling"

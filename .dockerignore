@@ -1,0 +1,70 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Local databases
+*.db
+muni_local.db
+app.db
+
+# Environment files
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Development files
+debug_shots/
+logs/
+docs/
+Homepage_test/
+*.html
+ohiobuys.txt
+
+# Tests
+test_*
+*_test.py
+pytest_cache/
+.pytest_cache/
+
+# Documentation
+README.md
+LICENSE
+*.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Fly.io
+fly.toml
+.dockerignore
+Dockerfile
+
+# Chrome/Selenium cache
+.wdm/
+chromedriver.exe
