@@ -159,6 +159,122 @@ async def billing_page(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/billing/summary", response_class=JSONResponse)
+async def billing_summary(request: Request):
+    """
+    Best-effort: fetch billing summary for the current user (team owner/admin).
+    Returns next billing date, payment method (brand/last4/exp), and recent invoices.
+    """
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+    await _ensure_billing_owner(user_email)
+
+    key = (settings.STRIPE_SECRET_KEY or "").strip()
+    if not key or key.startswith("pk_"):
+        raise HTTPException(status_code=503, detail="Stripe not configured")
+    try:
+        import stripe  # type: ignore
+    except ModuleNotFoundError:
+        raise HTTPException(status_code=503, detail="Stripe SDK not installed")
+    stripe.api_key = key
+
+    # Get stored customer + subscription ids + next billing from DB
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text(
+                """
+                SELECT stripe_customer_id, stripe_subscription_id, next_billing_at, tier
+                FROM users WHERE lower(email) = lower(:email) LIMIT 1
+                """
+            ),
+            {"email": user_email},
+        )
+        row = res.fetchone()
+        stored_customer_id = row[0] if row else None
+        stored_subscription_id = row[1] if row else None
+        stored_next_billing = row[2] if row else None
+        stored_tier = row[3] if row else None
+
+    customer_id = stored_customer_id
+    # If not stored, search by email (do not create customers here)
+    if not customer_id:
+        try:
+            search = stripe.Customer.search(query=f"email:'{user_email}'", limit=1)
+            customer_id = (search.get("data") or [{}])[0].get("id")
+        except Exception:
+            listing = stripe.Customer.list(email=user_email, limit=1)
+            customer_id = (listing.get("data") or [{}])[0].get("id")
+    if not customer_id:
+        raise HTTPException(status_code=404, detail="Stripe customer not found for this user")
+
+    # Determine default payment method
+    pm_info = None
+    try:
+        cust = stripe.Customer.retrieve(customer_id, expand=["invoice_settings.default_payment_method"])
+        default_pm = cust.get("invoice_settings", {}).get("default_payment_method")
+        pm_id = default_pm.get("id") if isinstance(default_pm, dict) else default_pm
+        pm_obj = None
+        if pm_id:
+            pm_obj = stripe.PaymentMethod.retrieve(pm_id)
+        else:
+            pms = stripe.PaymentMethod.list(customer=customer_id, type="card", limit=1)
+            pm_obj = (pms.get("data") or [None])[0]
+        if pm_obj:
+            card = pm_obj.get("card") or {}
+            pm_info = {
+                "brand": card.get("brand"),
+                "last4": card.get("last4"),
+                "exp_month": card.get("exp_month"),
+                "exp_year": card.get("exp_year"),
+            }
+    except Exception:
+        pm_info = None
+
+    # Next billing: prefer stored, else pull from subscription
+    next_billing_at = stored_next_billing
+    if not next_billing_at and stored_subscription_id:
+        try:
+            sub = stripe.Subscription.retrieve(stored_subscription_id)
+            next_ts = sub.get("current_period_end")
+            if next_ts:
+                import datetime as _dt
+                next_billing_at = _dt.datetime.fromtimestamp(next_ts).isoformat()
+        except Exception:
+            pass
+
+    # Recent invoices (limit 10)
+    invoices = []
+    try:
+        invs = stripe.Invoice.list(customer=customer_id, limit=10)
+        for inv in invs.get("data") or []:
+            invoices.append(
+                {
+                    "id": inv.get("id"),
+                    "status": inv.get("status"),
+                    "amount_due": inv.get("amount_due"),
+                    "amount_paid": inv.get("amount_paid"),
+                    "currency": inv.get("currency"),
+                    "hosted_invoice_url": inv.get("hosted_invoice_url"),
+                    "invoice_pdf": inv.get("invoice_pdf"),
+                    "created": inv.get("created"),
+                    "period_start": (inv.get("lines", {}).get("data") or [{}])[0].get("period", {}).get("start"),
+                    "period_end": (inv.get("lines", {}).get("data") or [{}])[0].get("period", {}).get("end"),
+                }
+            )
+    except Exception:
+        invoices = []
+
+    return {
+        "customer_id": customer_id,
+        "subscription_id": stored_subscription_id,
+        "next_billing_at": next_billing_at,
+        "tier": stored_tier,
+        "payment_method": pm_info,
+        "invoices": invoices,
+    }
+
+
 @router.get("/billing/checkout")
 async def billing_checkout(request: Request, plan: str = "starter", email: str | None = None, return_to: str | None = None):
     user_email = get_current_user_email(request) or (email or "").strip().lower()

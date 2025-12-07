@@ -34,6 +34,42 @@ async def ensure_uploads_schema(engine) -> None:
         return
 
 
+async def ensure_opportunity_scope_columns(engine) -> None:
+    """Ensure opportunities tables have summary + scope_of_work columns.
+
+    Works for both SQLite (via PRAGMA) and Postgres (via IF NOT EXISTS).
+    Covers both legacy table names: opportunities (core) and opportunity (ORM).
+    """
+    try:
+        async with engine.begin() as conn:
+            dialect = getattr(conn.engine, "dialect", None)
+            dialect_name = getattr(dialect, "name", "unknown") if dialect else "unknown"
+
+            for table in ("opportunities", "opportunity"):
+                try:
+                    if dialect_name == "sqlite":
+                        res = await conn.exec_driver_sql(f"PRAGMA table_info('{table}')")
+                        cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
+                        if not cols:
+                            continue  # table missing
+                        if "summary" not in cols:
+                            await conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN summary TEXT")
+                        if "scope_of_work" not in cols:
+                            await conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN scope_of_work TEXT")
+                    else:
+                        await conn.exec_driver_sql(
+                            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS summary TEXT"
+                        )
+                        await conn.exec_driver_sql(
+                            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS scope_of_work TEXT"
+                        )
+                except Exception:
+                    # Table might not exist in this database; skip quietly
+                    continue
+    except Exception:
+        return
+
+
 async def ensure_onboarding_schema(engine) -> None:
     """Ensure onboarding-related columns/tables exist."""
     try:

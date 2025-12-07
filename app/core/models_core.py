@@ -24,6 +24,7 @@ opportunities = Table(
     # ------------------------------------------------------
     Column("title", String, nullable=False),
     Column("summary", Text),
+    Column("scope_of_work", Text),
     Column("full_text", Text),
     Column("category", String),            # "construction", "it", etc.
     Column("ai_category", String),         # AI-normalized category (optional)

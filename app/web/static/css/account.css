@@ -1,7 +1,7 @@
 /* ===== ACCOUNT PAGE STYLES ===== */
 
 .account-page {
-  padding: 24px 32px;
+  padding: 32px;
   max-width: 1400px;
 }
 
@@ -10,15 +10,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 28px 32px;
-  min-height: 120px;
-  
+  padding: 32px;
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
-  margin-bottom: 12px;
+  margin-bottom: 24px;
   box-shadow: var(--shadow-sm);
-  gap: 16px;
 }
 
 .account-header-left {
@@ -90,7 +87,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
   margin-top: 4px;
 }
 
@@ -114,12 +110,6 @@
   color: #2563eb;
 }
 
-.badge-team {
-  background: #ecfeff;
-  color: #0ea5e9;
-  border: 1px solid #bae6fd;
-}
-
 .badge-member {
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
@@ -129,40 +119,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-@media (max-width: 768px) {
-  .account-header {
-    padding: 24px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .account-header-actions {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 1100px) {
-  .account-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .account-header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .form-row.three-col {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .panel-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 }
 
 /* ===== BUTTONS ===== */
@@ -180,7 +136,6 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   box-shadow: 0 4px 12px rgba(18, 106, 69, 0.25);
-  text-decoration: none;
 }
 
 .btn-primary:hover {
@@ -221,7 +176,6 @@
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-fast);
-  text-decoration: none;
 }
 
 .btn-ghost:hover {
@@ -316,7 +270,7 @@
   padding: 6px;
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
-  margin-bottom: 12px;
+  margin-bottom: 24px;
   overflow-x: auto;
 }
 
@@ -324,10 +278,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
-  padding: 0 18px;
+  padding: 12px 20px;
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
@@ -345,8 +298,7 @@
 .account-tab.active {
   background: var(--bg-card);
   color: var(--primary);
-  border-color: var(--border);
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .account-tab svg {
@@ -435,7 +387,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .plan-icon {
@@ -484,7 +436,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   padding: 20px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
@@ -866,11 +818,11 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   padding: 28px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .settings-header {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .settings-header h3 {
@@ -893,18 +845,10 @@
   gap: 20px;
 }
 
-.settings-form.compact {
-  gap: 16px;
-}
-
 .form-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
-}
-
-.form-row.three-col {
-  grid-template-columns: repeat(3, 1fr);
 }
 
 .form-group {
@@ -948,160 +892,6 @@
   display: flex;
   gap: 12px;
   margin-top: 8px;
-}
-
-.file-input {
-  height: auto;
-  padding: 10px 12px;
-}
-
-.upload-note {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.file-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary);
-  text-decoration: none;
-  margin-top: 4px;
-}
-
-.file-link:hover {
-  text-decoration: underline;
-}
-
-.profile-panels {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.profile-panel {
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 18px 20px;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-xs);
-}
-
-.panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.panel-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.panel-meta {
-  margin: 4px 0 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.panel-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: var(--radius-full);
-  background: var(--primary-glow);
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.contact-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-}
-
-.contact-card {
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 14px;
-  background: var(--bg-tertiary);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.contact-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.repeatable-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.repeatable-card {
-  border: 1px dashed var(--border-medium);
-  border-radius: var(--radius-md);
-  padding: 14px;
-  background: var(--bg-tertiary);
-  box-shadow: inset 0 1px 0 var(--border-light);
-}
-
-.repeatable-title {
-  font-weight: 700;
-  font-size: 14px;
-  margin-bottom: 10px;
-  color: var(--text-primary);
-}
-
-.add-row-btn {
-  align-self: flex-start;
-  padding: 10px 14px;
-  border: 1px dashed var(--border-medium);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-primary);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.add-row-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  transform: translateY(-1px);
-}
-
-.checkbox-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.checkbox-item input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-}
-
-.sticky-actions {
-  justify-content: flex-end;
 }
 
 .password-input-wrapper {
@@ -1156,7 +946,7 @@
 
 /* ===== BILLING TAB ===== */
 .billing-overview {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .billing-plan-card {
@@ -1215,7 +1005,7 @@
   padding: 24px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .billing-stat {
@@ -1414,7 +1204,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .team-header-info {
@@ -1459,7 +1249,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .team-card {
@@ -1937,617 +1727,6 @@
 .stagger-3 { transition-delay: 0.15s; }
 .stagger-4 { transition-delay: 0.2s; }
 
-/* ===== COMPANY PROFILE SECTION - Minimal Continuous Form ===== */
-.company-profile-section {
-  margin-top: 0;
-}
-
-.company-profile-section .section-intro {
-  margin-bottom: 24px;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.company-profile-section .section-intro h2,
-.company-profile-section .section-intro h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 6px 0;
-}
-
-.company-profile-section .section-intro p {
-  font-size: 14px;
-  color: #64748b;
-  margin: 0;
-}
-
-.company-profile-section .profile-panels {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.company-profile-section .profile-panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  margin-bottom: 16px;
-  overflow: visible;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  padding: 24px;
-}
-
-.company-profile-section .profile-panel:hover {
-  border-color: #cbd5e1;
-}
-
-.company-profile-section .profile-panel:last-of-type {
-  margin-bottom: 0;
-}
-
-.company-profile-section .panel-header,
-.company-profile-section .panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 0;
-  cursor: default;
-  background: transparent;
-  border-bottom: none;
-  margin-bottom: 20px;
-  margin-top: 0;
-}
-
-.company-profile-section .panel-header:hover,
-.company-profile-section .panel-heading:hover {
-  background: transparent;
-}
-
-.company-profile-section .panel-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-}
-
-.company-profile-section .panel-title h3 {
-  font-size: 15px;
-  font-weight: 600;
-  color: #126a45;
-  margin: 0;
-  border-bottom: 2px solid #126a45;
-  padding-bottom: 4px;
-}
-
-.company-profile-section .panel-icon {
-  display: none;
-}
-
-.company-profile-section .panel-toggle {
-  display: none;
-}
-
-.company-profile-section .panel-content {
-  display: block !important;
-  padding: 0;
-  border-top: none;
-}
-
-.company-profile-section .profile-panel.open .panel-content {
-  display: block;
-}
-
-.company-profile-section .required {
-  color: #ef4444;
-}
-
-.company-profile-section .form-input,
-.company-profile-section .form-textarea,
-.company-profile-section select,
-.company-profile-section .form-select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  color: #1e293b;
-  background: white;
-  transition: all 0.15s ease;
-}
-
-.company-profile-section .form-input:focus,
-.company-profile-section .form-textarea:focus,
-.company-profile-section select:focus,
-.company-profile-section .form-select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.company-profile-section .form-input::placeholder,
-.company-profile-section .form-textarea::placeholder {
-  color: #94a3b8;
-}
-
-.company-profile-section .form-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  color: #1e293b;
-  background: white;
-  resize: vertical;
-  transition: all 0.15s ease;
-}
-
-.company-profile-section .form-textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.company-profile-section .settings-form {
-  gap: 16px;
-}
-
-.company-profile-section .form-row {
-  gap: 16px;
-}
-
-.company-profile-section .form-group {
-  margin-bottom: 0;
-}
-
-.company-profile-section .form-group label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #334155;
-  margin-bottom: 6px;
-}
-
-.company-profile-section .panel-meta {
-  display: none;
-}
-
-.company-profile-section .toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.company-profile-section .toggle {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  display: inline-block;
-}
-
-.company-profile-section .toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.company-profile-section .toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #e2e8f0;
-  border-radius: 22px;
-  transition: 0.2s;
-}
-
-.company-profile-section .toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  border-radius: 50%;
-  transition: 0.2s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-
-.company-profile-section .toggle input:checked + .toggle-slider {
-  background-color: #22c55e;
-}
-
-.company-profile-section .toggle input:checked + .toggle-slider:before {
-  transform: translateX(18px);
-}
-
-.company-profile-section .toggle-label {
-  font-size: 14px;
-  color: #475569;
-}
-
-.company-profile-section .file-upload-area {
-  border: 1.5px dashed #cbd5e1;
-  border-radius: 6px;
-  padding: 16px;
-  text-align: center;
-  transition: all 0.15s ease;
-  background: #f8fafc;
-}
-
-.company-profile-section .file-upload-area:hover {
-  border-color: #94a3b8;
-  background: #f1f5f9;
-}
-
-.company-profile-section .file-upload-area.small {
-  padding: 10px 14px;
-}
-
-.company-profile-section .file-upload-label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.company-profile-section .file-upload-label.small {
-  flex-direction: row;
-  justify-content: center;
-}
-
-.company-profile-section .upload-icon {
-  font-size: 20px;
-  color: #64748b;
-}
-
-.company-profile-section .upload-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: #475569;
-}
-
-.company-profile-section .upload-hint {
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.company-profile-section .radio-group {
-  display: flex;
-  gap: 20px;
-}
-
-.company-profile-section .radio-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #334155;
-}
-
-.company-profile-section .radio-label input[type="radio"] {
-  width: 16px;
-  height: 16px;
-  accent-color: #22c55e;
-}
-
-.company-profile-section .checkbox-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-
-.company-profile-section .checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #334155;
-  padding: 0;
-  border-radius: 0;
-  transition: none;
-}
-
-.company-profile-section .checkbox-label:hover {
-  background: transparent;
-}
-
-.company-profile-section .checkbox-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: #22c55e;
-  flex-shrink: 0;
-  margin: 0;
-}
-
-.company-profile-section .checkbox-label.compliance {
-  padding: 10px 14px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.company-profile-section .contact-block {
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 20px;
-}
-
-.company-profile-section .contact-block:last-child {
-  margin-bottom: 0;
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.company-profile-section .contact-block h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 16px 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-/* Align existing contact cards to example styling */
-.company-profile-section .contact-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.company-profile-section .contact-card {
-  padding: 0 0 20px 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.company-profile-section .contact-card:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.company-profile-section .contact-card .contact-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 12px 0;
-}
-
-.company-profile-section .reference-entry,
-.company-profile-section .subcontractor-entry {
-  padding: 16px;
-  background: #ffffff;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.company-profile-section .repeatable-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: none;
-}
-
-.company-profile-section .reference-header,
-.company-profile-section .subcontractor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.company-profile-section .reference-header h4,
-.company-profile-section .subcontractor-header h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0;
-}
-
-.company-profile-section .repeatable-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 12px 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.company-profile-section .repeatable-list .form-group {
-  margin-bottom: 0;
-}
-
-.company-profile-section .remove-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #64748b;
-  background: transparent;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.company-profile-section .remove-btn:hover {
-  background: #ef4444;
-  border-color: #ef4444;
-  color: white;
-}
-
-.company-profile-section .add-entry-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 12px;
-  background: transparent;
-  border: 1.5px dashed #cbd5e1;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.company-profile-section .add-entry-btn:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.02);
-}
-
-.company-profile-section .add-entry-btn span {
-  font-size: 16px;
-  font-weight: 400;
-}
-
-.company-profile-section .add-row-btn {
-  width: 100%;
-  padding: 12px;
-  border: 1.5px dashed #cbd5e1;
-  border-radius: 6px;
-  color: #64748b;
-  background: transparent;
-  text-align: center;
-}
-
-.company-profile-section .add-row-btn:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.02);
-}
-
-.company-profile-section .insurance-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.company-profile-section .insurance-item {
-  padding: 12px 14px;
-  background: #ffffff;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-}
-
-.company-profile-section .insurance-item .toggle-row {
-  justify-content: space-between;
-}
-
-.company-profile-section .insurance-item span {
-  font-size: 14px;
-  color: #334155;
-}
-
-.company-profile-section .compliance-checklist {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.company-profile-section .documents-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.company-profile-section .document-upload-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.company-profile-section .document-upload-item label:first-child {
-  font-size: 13px;
-  font-weight: 500;
-  color: #334155;
-}
-
-.company-profile-section .profile-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.company-profile-section .btn-large {
-  padding: 12px 28px;
-  font-size: 14px;
-}
-
-.company-profile-section .save-hint {
-  font-size: 13px;
-  color: #94a3b8;
-  margin-left: auto;
-}
-
-.company-profile-section .panel-save-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-top: 24px;
-  gap: 10px;
-  align-self: flex-end;
-  margin-left: auto;
-  width: 100%;
-}
-
-.company-profile-section .panel-save-actions .btn-primary {
-  padding: 10px 20px;
-  font-size: 13px;
-}
-
-.company-profile-section .panel-save-meta {
-  font-size: 12px;
-  color: #64748b;
-  margin-left: 6px;
-}
-
-.company-profile-section .profile-panel .panel-content {
-  display: block !important;
-}
-
-/* Status accent line per panel */
-.company-profile-section .profile-panel::before {
-  content: none;
-}
-
-.company-profile-section .profile-panel.panel-status-green::before {
-  background: transparent;
-}
-
-.company-profile-section .profile-panel.panel-status-yellow::before {
-  background: transparent;
-}
-
-.company-profile-section .profile-panel.panel-status-red::before {
-  background: transparent;
-}
-
-.company-profile-section .profile-panel:hover::before {
-  width: 0;
-}
-
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1200px) {
   .account-grid {
@@ -2607,19 +1786,6 @@
   .billing-row.header {
     display: none;
   }
-
-  .profile-panel {
-    padding: 14px;
-  }
-
-  .panel-heading {
-    align-items: flex-start;
-  }
-
-  .add-row-btn {
-    width: 100%;
-    text-align: center;
-  }
   
   .team-header {
     flex-direction: column;
@@ -2638,21 +1804,531 @@
   .billing-plan-body {
     grid-template-columns: 1fr;
   }
+}
 
-  .company-profile-section .checkbox-grid {
+/* ===== COMPANY PROFILE SECTION - Minimal Continuous Form ===== */
+.company-profile-section {
+  margin-top: 0;
+}
+
+.company-profile-section .section-intro {
+  margin-bottom: 24px;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.company-profile-section .section-intro h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.company-profile-section .section-intro p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* White card panels - matching Personal Information style - SCOPED */
+.company-profile-section .profile-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: visible;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 24px;
+}
+
+.company-profile-section .profile-panel:hover {
+  border-color: #cbd5e1;
+}
+
+.company-profile-section .profile-panel:last-of-type {
+  margin-bottom: 0;
+}
+
+.company-profile-section .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  cursor: default;
+  background: transparent;
+  border-bottom: none;
+  margin-bottom: 20px;
+  margin-top: 0;
+}
+
+.company-profile-section .panel-header:hover {
+  background: transparent;
+}
+
+.company-profile-section .profile-panel:first-of-type .panel-header {
+  margin-top: 0;
+}
+
+.company-profile-section .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Hide numbered badges completely - SCOPED */
+.company-profile-section .panel-icon {
+  display: none;
+}
+
+.company-profile-section .panel-title h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #126a45;
+  margin: 0;
+  border-bottom: 2px solid #126a45;
+  padding-bottom: 4px;
+}
+
+/* Hide the toggle icon - SCOPED */
+.company-profile-section .panel-toggle {
+  display: none;
+}
+
+/* Always show content - SCOPED */
+.company-profile-section .panel-content {
+  display: block !important;
+  padding: 0;
+  border-top: none;
+}
+
+.company-profile-section .profile-panel.open .panel-content {
+  display: block;
+}
+
+.company-profile-section .required {
+  color: #ef4444;
+}
+
+/* Form inputs - subtle styling */
+.company-profile-section .form-input,
+.company-profile-section .form-textarea,
+.company-profile-section select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  background: white;
+  transition: all 0.15s ease;
+}
+
+.company-profile-section .form-input:focus,
+.company-profile-section .form-textarea:focus,
+.company-profile-section select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.company-profile-section .form-input::placeholder,
+.company-profile-section .form-textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Scoped to Company Profile section only */
+.company-profile-section .form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  background: white;
+  resize: vertical;
+  transition: all 0.15s ease;
+}
+
+.company-profile-section .form-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Toggle switch - scoped to Company Profile */
+.company-profile-section .toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.company-profile-section .toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  display: inline-block;
+}
+
+.company-profile-section .toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.company-profile-section .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e2e8f0;
+  border-radius: 22px;
+  transition: 0.2s;
+}
+
+.company-profile-section .toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.company-profile-section .toggle input:checked + .toggle-slider {
+  background-color: #22c55e;
+}
+
+.company-profile-section .toggle input:checked + .toggle-slider:before {
+  transform: translateX(18px);
+}
+
+.company-profile-section .toggle-label {
+  font-size: 14px;
+  color: #475569;
+}
+
+/* File upload - scoped to Company Profile */
+.company-profile-section .file-upload-area {
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.15s ease;
+  background: #f8fafc;
+}
+
+.company-profile-section .file-upload-area:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.company-profile-section .file-upload-area.small {
+  padding: 10px 14px;
+}
+
+.company-profile-section .file-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.company-profile-section .file-upload-label.small {
+  flex-direction: row;
+  justify-content: center;
+}
+
+.company-profile-section .upload-icon {
+  font-size: 20px;
+  color: #64748b;
+}
+
+.company-profile-section .upload-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.company-profile-section .upload-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* Radio buttons - scoped */
+.company-profile-section .radio-group {
+  display: flex;
+  gap: 20px;
+}
+
+.company-profile-section .radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #334155;
+}
+
+.company-profile-section .radio-label input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #22c55e;
+}
+
+/* Checkbox grid - scoped */
+.company-profile-section .checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.company-profile-section .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #334155;
+  padding: 0;
+  border-radius: 0;
+  transition: none;
+}
+
+.company-profile-section .checkbox-label:hover {
+  background: transparent;
+}
+
+.company-profile-section .checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #22c55e;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.company-profile-section .checkbox-label.compliance {
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+/* Contact blocks - scoped */
+.company-profile-section .contact-block {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 20px;
+}
+
+.company-profile-section .contact-block:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.company-profile-section .contact-block h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* References and subcontractors - scoped */
+.company-profile-section .reference-entry,
+.company-profile-section .subcontractor-entry {
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.company-profile-section .reference-header,
+.company-profile-section .subcontractor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.company-profile-section .reference-header h4,
+.company-profile-section .subcontractor-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.company-profile-section .remove-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.company-profile-section .remove-btn:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+}
+
+.company-profile-section .add-entry-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.company-profile-section .add-entry-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.02);
+}
+
+.company-profile-section .add-entry-btn span {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* Insurance items - scoped */
+.company-profile-section .insurance-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.company-profile-section .insurance-item {
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.company-profile-section .insurance-item .toggle-row {
+  justify-content: space-between;
+}
+
+.company-profile-section .insurance-item span {
+  font-size: 14px;
+  color: #334155;
+}
+
+/* Compliance checklist - scoped */
+.company-profile-section .compliance-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Documents grid - scoped */
+.company-profile-section .documents-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.company-profile-section .document-upload-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.company-profile-section .document-upload-item label:first-child {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+}
+
+/* Profile actions - scoped */
+.company-profile-section .profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.company-profile-section .btn-large {
+  padding: 12px 28px;
+  font-size: 14px;
+}
+
+.company-profile-section .save-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-left: auto;
+}
+
+/* Form labels in company profile */
+.company-profile-section .form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.company-profile-section .settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.company-profile-section .form-row {
+  gap: 16px;
+}
+
+.company-profile-section .form-group {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .checkbox-grid {
     flex-direction: column;
   }
   
-  .company-profile-section .documents-grid {
+  .documents-grid {
     grid-template-columns: 1fr;
   }
   
-  .company-profile-section .profile-actions {
+  .profile-actions {
     flex-direction: column;
     align-items: stretch;
   }
   
-  .company-profile-section .save-hint {
+  .save-hint {
     margin-left: 0;
     text-align: center;
   }

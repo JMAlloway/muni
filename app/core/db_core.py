@@ -79,6 +79,7 @@ async def save_opportunities(batch):
                     source_url=raw.source_url,
                     title=raw.title,
                     summary=raw.summary,
+                    scope_of_work=getattr(raw, "scope_of_work", None),
                     full_text=getattr(raw, "description", None),
 
                     # AI / taxonomy fields (centralized)
@@ -110,6 +111,7 @@ async def save_opportunities(batch):
                         # ❌ never overwrite date_added
                         "title": raw.title,
                         "summary": raw.summary,
+                        "scope_of_work": getattr(raw, "scope_of_work", None),
                         "full_text": getattr(raw, "description", None),
 
                         # re-apply AI category — if we improve the classifier,

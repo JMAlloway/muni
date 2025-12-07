@@ -19,6 +19,7 @@ class RawOpportunity:
     # ------------------------------------------------------------------
     summary: str = ""                # short blurb for table/email
     description: str = ""            # longer scope / detail text
+    scope_of_work: str = ""          # optional extracted SOW text
     category: str = ""               # "construction", "it", etc. (your AI fills this)
     agency_name: str = ""            # e.g. "City of Columbus"
     location_geo: str = ""           # e.g. "Columbus, OH"

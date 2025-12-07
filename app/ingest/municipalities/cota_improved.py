@@ -195,8 +195,9 @@ def _extract_detail_description_dates_attachments(
     soup: BeautifulSoup,
 ) -> Tuple[str, Optional[datetime], Optional[datetime], List[str]]:
     """Extract details from opportunity detail page."""
-    page_text = soup.get_text(" ", strip=True)
-    description_text = " ".join(page_text.split())
+    fallback_page_text = " ".join(soup.get_text(" ", strip=True).split())
+    description_text = ""
+    scope_of_work_text = ""
 
     posted_date = None
     due_date = None
@@ -210,6 +211,12 @@ def _extract_detail_description_dates_attachments(
 
         label = cells[0].get_text(" ", strip=True).lower()
         value_text = cells[1].get_text(" ", strip=True)
+
+        if label == "description":
+            description_text = value_text
+
+        if label in {"scope", "scope of work", "project scope"} or "scope of work" in label:
+            scope_of_work_text = value_text
 
         if any(key in label for key in ["closing", "due", "proposal due", "deadline"]):
             due_candidate = _parse_datetime(_clean_date_string(value_text))
@@ -237,15 +244,33 @@ def _extract_detail_description_dates_attachments(
             if url not in attachment_urls:
                 attachment_urls.append(url)
 
+    has_documents = bool(attachment_urls)
+
+    full_description_parts: List[str] = []
+    if description_text:
+        full_description_parts.append(description_text)
+    elif fallback_page_text:
+        full_description_parts.append(fallback_page_text)
+
+    if scope_of_work_text:
+        full_description_parts.append(f"Scope of Work: {scope_of_work_text}")
+
+    if has_documents:
+        full_description_parts.append(
+            "Note: This opportunity has one or more documents or amendments available (login required to download)."
+        )
+
     # Add pre-bid info to description
-    if prebid_date and "pre-bid" not in description_text.lower():
+    if prebid_date:
         try:
             local_hint = prebid_date.astimezone(ZoneInfo("America/New_York")).strftime("%m/%d/%Y %I:%M %p")
-            description_text = f"{description_text} Pre-bid meeting: {local_hint}".strip()
+            full_description_parts.append(f"Pre-bid meeting: {local_hint}")
         except Exception:
             pass
 
-    return (description_text, posted_date, due_date, attachment_urls)
+    full_description = "\n\n".join(part for part in full_description_parts if part).strip()
+
+    return (full_description, posted_date, due_date, attachment_urls)
 
 
 async def _fetch_detail_opportunity(

@@ -33,6 +33,7 @@ class Opportunity(Base):
     source_url: Mapped[str] = mapped_column(Text, unique=True)
     title: Mapped[str] = mapped_column(Text)
     summary: Mapped[str] = mapped_column(Text, default="")
+    scope_of_work: Mapped[str | None] = mapped_column(Text, default="")
     category: Mapped[str] = mapped_column(String, default="")
     agency_name: Mapped[str] = mapped_column(String, default="")
     location_geo: Mapped[str] = mapped_column(String, default="")

@@ -200,16 +200,6 @@
   color: var(--success);
   font-weight: 600;
   flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  line-height: 1;
-}
-
-.check-icon::before {
-  content: "\2713";
 }
 
 .btn-plan {
@@ -313,30 +303,10 @@
 .check-green {
   color: var(--success);
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  line-height: 1;
-}
-
-.check-green::before {
-  content: "\2713";
 }
 
 .x-icon {
   color: var(--text-tertiary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  line-height: 1;
-}
-
-.x-icon::before {
-  content: "\00d7";
 }
 
 .faq-grid {

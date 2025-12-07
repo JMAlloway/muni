@@ -569,6 +569,167 @@
       } else if (status === 'cancel') {
         alert('Checkout canceled.');
       }
+
+      const main = document.querySelector('.billing-page');
+
+      const ensureDynamicSections = () => {
+        if (!main) return {};
+        const firstBillingSection = main.querySelector('.billing-section');
+
+        let paymentSection = document.getElementById('payment-section');
+        if (!paymentSection) {
+          paymentSection = document.createElement('section');
+          paymentSection.className = 'billing-section';
+          paymentSection.id = 'payment-section';
+          paymentSection.innerHTML = `
+            <h2 class="section-title">Payment Method</h2>
+            <div class="card" id="payment-card">
+              <div class="muted">Loading payment method...</div>
+            </div>
+          `;
+          if (firstBillingSection) {
+            main.insertBefore(paymentSection, firstBillingSection);
+          } else {
+            main.appendChild(paymentSection);
+          }
+        }
+
+        let historySection = document.getElementById('billing-history');
+        if (!historySection) {
+          historySection = document.createElement('section');
+          historySection.className = 'billing-section';
+          historySection.id = 'billing-history';
+          historySection.innerHTML = `
+            <h2 class="section-title">Billing History</h2>
+            <div class="card">
+              <div class="table-responsive">
+                <table class="simple-table" id="billing-history-table">
+                  <thead>
+                    <tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="5" class="muted">Loading invoices...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+          if (paymentSection && paymentSection.nextSibling) {
+            main.insertBefore(historySection, paymentSection.nextSibling);
+          } else if (firstBillingSection) {
+            main.insertBefore(historySection, firstBillingSection);
+          } else {
+            main.appendChild(historySection);
+          }
+        }
+
+        return { paymentSection, historySection };
+      };
+
+      const formatMoney = (amount, currency) => {
+        if (amount == null) return '';
+        const amt = (Number(amount) || 0) / 100;
+        try {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: (currency || 'USD').toUpperCase(),
+            minimumFractionDigits: 2,
+          }).format(amt);
+        } catch (_) {
+          return `$${amt.toFixed(2)}`;
+        }
+      };
+
+      const formatDate = (val) => {
+        if (!val) return '';
+        try {
+          const dt = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
+          return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (_) {
+          return String(val);
+        }
+      };
+
+      const renderPaymentMethod = (pmInfo) => {
+        const card = document.getElementById('payment-card');
+        if (!card) return;
+        if (!pmInfo || (!pmInfo.brand && !pmInfo.last4)) {
+          card.innerHTML = '<div class="muted">No payment method on file.</div>';
+          return;
+        }
+        const { brand, last4, exp_month, exp_year } = pmInfo;
+        const exp = exp_month && exp_year ? `Expires ${String(exp_month).padStart(2, '0')}/${String(exp_year).slice(-2)}` : '';
+        card.innerHTML = `
+          <div class="payment-method-row">
+            <div class="pm-left">
+              <div class="pm-brand">${brand ? brand.toUpperCase() : 'Card'}</div>
+              <div class="pm-last4">•••• ${last4 || ''}</div>
+              <div class="pm-exp muted">${exp}</div>
+            </div>
+            <div class="pm-actions">
+              <button class="btn-secondary" type="button" id="billing-portal-btn">Edit</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('billing-portal-btn')?.addEventListener('click', async () => {
+          try {
+            const res = await fetch('/billing/portal', { credentials: 'include' });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            if (data?.url) window.open(data.url, '_blank', 'noopener');
+          } catch (_) {
+            alert('Could not open subscription management right now.');
+          }
+        });
+      };
+
+      const renderInvoices = (invoices) => {
+        const tbody = document.querySelector('#billing-history-table tbody');
+        if (!tbody) return;
+        if (!invoices || !invoices.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="muted">No invoices yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = invoices.map((inv) => {
+          const created = formatDate(inv.created || inv.period_end);
+          const desc = inv.description || 'Subscription';
+          const amt = formatMoney(inv.amount_paid ?? inv.amount_due, inv.currency);
+          const status = (inv.status || '').toLowerCase();
+          const statusLabel = status ? status.charAt(0).toUpperCase() + status.slice(1) : '';
+          const link = inv.hosted_invoice_url || inv.invoice_pdf;
+          const linkHtml = link ? `<a class="btn-ghost" href="${link}" target="_blank" rel="noopener">Download</a>` : '';
+          return `
+            <tr>
+              <td>${created}</td>
+              <td>${desc}</td>
+              <td>${amt}</td>
+              <td>${statusLabel}</td>
+              <td>${linkHtml}</td>
+            </tr>
+          `;
+        }).join('');
+      };
+
+      const loadBillingSummary = async () => {
+        ensureDynamicSections();
+        try {
+          const res = await fetch('/api/billing/summary', { credentials: 'include' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data?.tier) updateTierUI(data.tier);
+          renderPaymentMethod(data?.payment_method);
+          renderInvoices(data?.invoices || []);
+          const nextBilling = data?.next_billing_at;
+          const topTier = document.getElementById('topTierLabel');
+          if (nextBilling && topTier) {
+            topTier.dataset.nextBilling = nextBilling;
+          }
+        } catch (_) {
+          renderPaymentMethod(null);
+        }
+      };
+
+      loadBillingSummary();
     });
   </script>
 </body>

@@ -206,11 +206,6 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     """
 
     nav_links = _nav_links_html(user_email)
-    tier_info = _get_user_tier_info(user_email)
-    user_tier = tier_info.get("label", "Free")
-    team_badge = ""
-    if tier_info.get("source") == "team":
-        team_badge = '<span class="team-badge">via team</span>'
 
     notif_js = '(function(){const s=document.createElement("script");s.src="/static/js/notifications.js";document.body.appendChild(s);}());'
 
@@ -249,43 +244,26 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
     </aside>
     <div class="content">
         <div class="topbar" role="banner">
-    <div class="topbar-left">
-        <a class="top-pill top-home" href="/" aria-label="Home">
-            <span class="top-home-icon" aria-hidden="true"></span>
-            <span class="top-label">Home</span>
-        </a>
-        <span class="top-pill top-tier" role="status">
-            <span class="top-label">Tier:</span> <strong>__TIER__</strong> __TEAM_BADGE__
-            <a href="/billing" class="top-upgrade">Upgrade</a>
-        </span>
-    </div>
-    <div class="topbar-right">
-        <button class="icon-btn" type="button" aria-label="Notifications" id="notifBtn">
-            <img src="/static/img/bell.png" alt="" class="icon-img"><span class="notif-dot" aria-hidden="true"></span>
-        </button>
-        <div class="top-dropdown">
-            <button class="icon-btn" type="button" aria-label="Help" id="help-btn">?</button>
-            <div class="top-menu" id="help-menu" role="menu">
-                <a href="/privacy" role="menuitem">Privacy Policy</a>
-                <a href="/terms" role="menuitem">Terms of Service</a>
+          <div class="topbar-left">
+            <div class="breadcrumb">
+              <span class="breadcrumb-item">Home</span>
+              <span class="breadcrumb-sep">/</span>
+              <span class="breadcrumb-current">__CRUMB__</span>
             </div>
-        </div>
-        <div class="top-dropdown">
-            <button class="avatar-button" type="button" aria-haspopup="menu" aria-expanded="false" id="avatar-btn">
-                <span class="avatar-halo">
-                    <span class="avatar-circle">__AVATAR__</span>
-                </span>
-                <span class="top-caret" aria-hidden="true">&gt;</span>
+          </div>
+          <div class="topbar-right">
+            <button class="topbar-btn" id="notifBtn" aria-label="Notifications">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <span class="notification-dot notif-dot"></span>
             </button>
-            <div class="top-menu" id="avatar-menu" role="menu">
-                <a href="/account" role="menuitem">My Account</a>
-                <a href="/account/preferences" role="menuitem">Preferences</a>
-                <a href="/billing" role="menuitem">Account Billing</a>
-                <a href="/logout" role="menuitem">Logout</a>
+            <div class="user-avatar" title="Account">
+              <span>__AVATAR__</span>
             </div>
+          </div>
         </div>
-    </div>
-</div>
         <main class="page">
         __BODY__
         </main>
@@ -348,44 +326,6 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <script>
 __NOTIF_JS__
 
-// help dropdown
-(function(){
-  const btn = document.getElementById('help-btn');
-  const menu = document.getElementById('help-menu');
-  if (!btn || !menu) return;
-  const toggle = (open) => {
-    menu.style.display = open ? 'block' : 'none';
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  };
-  btn.addEventListener('click', function(){
-    const isOpen = menu.style.display === 'block';
-    toggle(!isOpen);
-  });
-  document.addEventListener('click', function(e){
-    if (!btn.contains(e.target) && !menu.contains(e.target)) toggle(false);
-  });
-})();
-
-
-// avatar dropdown
-(function(){
-  const btn = document.getElementById('avatar-btn');
-  const menu = document.getElementById('avatar-menu');
-  if (!btn || !menu) return;
-  const toggle = (open) => {
-    menu.style.display = open ? 'block' : 'none';
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  };
-  btn.addEventListener('click', function(){
-    const isOpen = menu.style.display === 'block';
-    toggle(!isOpen);
-  });
-  document.addEventListener('click', function(e){
-    if (!btn.contains(e.target) && !menu.contains(e.target)) toggle(false);
-  });
-})();
-
-
 // sidebar toggle
 (function(){
   const btn = document.getElementById('sidebar-toggle');
@@ -418,7 +358,6 @@ __NOTIF_JS__
   } catch (e) { /* noop */ }
 })();
 </script>
-<script src="/static/js/notifications.js"></script>
 
 </body>
 </html>
@@ -428,9 +367,8 @@ __NOTIF_JS__
         template.replace("__TITLE__", title)
         .replace("__NAV__", nav_links)
         .replace("__ACCOUNT__", _account_links_html())
-        .replace("__TIER__", user_tier)
-        .replace("__TEAM_BADGE__", team_badge)
         .replace("__AVATAR__", (user_email or "U")[:2].upper())
+        .replace("__CRUMB__", title)
         .replace("__BODY__", body_html)
         .replace("__NOTIF_JS__", notif_js)
     )

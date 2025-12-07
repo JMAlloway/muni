@@ -1,20 +1,39 @@
 (function () {
   function getCSRF(){ try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || null; } catch(_) { return null; } }
 
-  // Lightweight upload drawer: prompts for files and POSTs to /uploads/add
-  // then refreshes the current view. Exposed globally for reuse.
-  window.openUploadDrawer = window.openUploadDrawer || (it => {
+  // Upload drawer wiring (match Homepage_test sidebar behavior)
+  const uploadUI = {
+    overlay: document.getElementById("upload-overlay"),
+    drawer: document.getElementById("upload-drawer"),
+    form: document.getElementById("upload-form"),
+    oid: document.getElementById("upload-oid"),
+    files: document.getElementById("upload-files"),
+    cancel: document.getElementById("upload-cancel"),
+    submit: document.getElementById("upload-submit")
+  };
+  function closeUploadDrawer(){
+    if (uploadUI.overlay) uploadUI.overlay.setAttribute("aria-hidden", "true");
+    if (uploadUI.drawer) uploadUI.drawer.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+  window.openUploadDrawer = function(it){
     const oid = it && it.opportunity_id ? String(it.opportunity_id) : "";
-    if (!oid) {
-      alert("Missing opportunity id for upload.");
-      return;
-    }
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    input.onchange = async (e) => {
-      const files = Array.from(e.target.files || []);
-      if (!files.length) return;
+    if (!oid) { alert("Missing opportunity id for upload."); return; }
+    if (uploadUI.oid) uploadUI.oid.value = oid;
+    if (uploadUI.files) uploadUI.files.value = "";
+    if (uploadUI.overlay) uploadUI.overlay.setAttribute("aria-hidden", "false");
+    if (uploadUI.drawer) uploadUI.drawer.setAttribute("aria-hidden", "false");
+    if (uploadUI.files) uploadUI.files.focus();
+    document.body.style.overflow = "hidden";
+  };
+  if (uploadUI.cancel) uploadUI.cancel.addEventListener("click", closeUploadDrawer);
+  if (uploadUI.overlay) uploadUI.overlay.addEventListener("click", closeUploadDrawer);
+  if (uploadUI.form) {
+    uploadUI.form.addEventListener("submit", async function(e){
+      e.preventDefault();
+      const oid = uploadUI.oid ? uploadUI.oid.value : "";
+      const files = uploadUI.files ? Array.from(uploadUI.files.files || []) : [];
+      if (!oid || !files.length) { alert("Select a file to upload."); return; }
       const fd = new FormData();
       fd.append("opportunity_id", oid);
       files.forEach(f => fd.append("files", f, f.name));
@@ -25,17 +44,15 @@
           headers: { "X-CSRF-Token": getCSRF() || "" },
           body: fd
         });
-        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-        // optimistic refresh of files for this card if expanded
-        fileCache[oid] = null; // force refetch on next expand
-        alert("Upload complete.");
-      } catch (err) {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        fileCache[oid] = null; // refresh on next expand
+        closeUploadDrawer();
+      } catch(err){
         console.error(err);
         alert("Upload failed. Please try again.");
       }
-    };
-    input.click();
-  });
+    });
+  }
 
   const grid = document.getElementById("tracked-grid");
   let items = JSON.parse(grid.getAttribute("data-items") || "[]");

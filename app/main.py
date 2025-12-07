@@ -69,6 +69,7 @@ from app.core.db_migrations import (
     ensure_billing_schema,
     ensure_company_profile_schema,
     ensure_tracker_team_schema,
+    ensure_opportunity_scope_columns,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -282,6 +283,7 @@ async def on_startup():
             await create_admin_if_missing(db)
         await ensure_uploads_schema(engine)
         await ensure_onboarding_schema(engine)
+        await ensure_opportunity_scope_columns(engine)
         await ensure_team_schema(engine)
         await ensure_user_tier_column(engine)
         await ensure_billing_schema(engine)

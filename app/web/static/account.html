@@ -1033,7 +1033,7 @@
                   </div>
                 </section>
 
-                <section class="profile-panel">
+                                <section class="profile-panel">
                   <div class="panel-header">
                     <div class="panel-title">
                       <span class="panel-icon">7</span>
@@ -1043,57 +1043,60 @@
                   </div>
                   <div class="panel-content">
                     <div class="repeatable-list" id="subcontractorList">
-                    <div class="repeatable-card">
-                      <div class="repeatable-title">Subcontractor 1</div>
-                      <div class="form-row three-col">
-                        <div class="form-group">
-                          <label>Subcontractor Business Name</label>
-                          <input type="text" name="sub1_name" class="form-input">
+                      <div class="repeatable-card subcontractor-entry" data-index="1">
+                        <div class="subcontractor-header reference-header">
+                          <h4>Subcontractor #1</h4>
+                          <button type="button" class="remove-btn" onclick="removeSubcontractor(this)" style="display: none;">Remove</button>
                         </div>
-                        <div class="form-group">
-                          <label>Contact Person</label>
-                          <input type="text" name="sub1_contact" class="form-input">
+                        <div class="form-row three-col">
+                          <div class="form-group">
+                            <label>Subcontractor Business Name</label>
+                            <input type="text" name="sub1_name" class="form-input">
+                          </div>
+                          <div class="form-group">
+                            <label>Contact Person</label>
+                            <input type="text" name="sub1_contact" class="form-input">
+                          </div>
+                          <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="sub1_email" class="form-input">
+                          </div>
                         </div>
-                        <div class="form-group">
-                          <label>Email</label>
-                          <input type="email" name="sub1_email" class="form-input">
+                        <div class="form-row three-col">
+                          <div class="form-group">
+                            <label>Phone</label>
+                            <input type="tel" name="sub1_phone" class="form-input">
+                          </div>
+                          <div class="form-group">
+                            <label>Address</label>
+                            <input type="text" name="sub1_address" class="form-input">
+                          </div>
+                          <div class="form-group">
+                            <label>Work Performed / Scope</label>
+                            <input type="text" name="sub1_scope" class="form-input">
+                          </div>
                         </div>
-                      </div>
-                      <div class="form-row three-col">
-                        <div class="form-group">
-                          <label>Phone</label>
-                          <input type="tel" name="sub1_phone" class="form-input">
+                        <div class="form-row">
+                          <div class="form-group">
+                            <label>Contract Compliance Certification Number (if applicable)</label>
+                            <input type="text" name="sub1_compliance" class="form-input">
+                          </div>
+                          <div class="form-group">
+                            <label>Upload - Subcontractor Compliance Certificate (optional)</label>
+                            <div class="file-upload-area">
+                              <input type="file" name="sub1_certificate" id="upload-sub1_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                              <label for="upload-sub1_certificate" class="file-upload-label">
+                                <span class="upload-icon">�-�</span>
+                                <span class="upload-text">Upload compliance certificate</span>
+                                <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                              </label>
+                            </div>
+                            <a class="file-link" data-file-link="sub1_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                          </div>
                         </div>
-                        <div class="form-group">
-                          <label>Address</label>
-                          <input type="text" name="sub1_address" class="form-input">
-                        </div>
-                        <div class="form-group">
-                          <label>Work Performed / Scope</label>
-                          <input type="text" name="sub1_scope" class="form-input">
-                        </div>
-                      </div>
-                      <div class="form-row">
-                        <div class="form-group">
-                          <label>Contract Compliance Certification Number (if applicable)</label>
-                          <input type="text" name="sub1_compliance" class="form-input">
-                        </div>
-                      <div class="form-group">
-                        <label>Upload - Subcontractor Compliance Certificate (optional)</label>
-                        <div class="file-upload-area">
-                          <input type="file" name="sub1_certificate" id="upload-sub1_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
-                          <label for="upload-sub1_certificate" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
-                            <span class="upload-text">Upload compliance certificate</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
-                          </label>
-                        </div>
-                        <a class="file-link" data-file-link="sub1_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
                       </div>
                     </div>
-                  </div>
-                  <button class="add-row-btn" type="button">+ Add Subcontractor</button>
-                    </div>
+                    <button class="add-row-btn" type="button" id="addSubcontractorBtn">+ Add Subcontractor</button>
                   </div>
                 </section>
 
@@ -1422,31 +1425,31 @@
                 <div class="billing-plan-header">
                   <div class="billing-plan-badge">Current Plan</div>
                   <div class="billing-plan-info">
-                    <h2>Professional</h2>
-                    <p>Perfect for growing teams</p>
+                    <h2 id="billingPlanName">Professional</h2>
+                    <p id="billingPlanCopy">Perfect for growing teams</p>
                   </div>
                   <div class="billing-plan-price">
-                    <span class="price-big">$49</span>
-                    <span class="price-period">/month</span>
+                    <span class="price-big" id="billingPlanPrice">$49</span>
+                    <span class="price-period" id="billingPlanPeriod">/month</span>
                   </div>
                 </div>
                 <div class="billing-plan-body">
                   <div class="billing-stat">
-                    <span class="billing-stat-value">$588</span>
+                    <span class="billing-stat-value" id="billingAnnualCost">$588</span>
                     <span class="billing-stat-label">Annual cost</span>
                   </div>
                   <div class="billing-stat">
-                    <span class="billing-stat-value">Dec 15</span>
+                    <span class="billing-stat-value" id="billingNextBilling">Dec 15</span>
                     <span class="billing-stat-label">Next billing</span>
                   </div>
                   <div class="billing-stat">
-                    <span class="billing-stat-value">Monthly</span>
+                    <span class="billing-stat-value" id="billingCycle">Monthly</span>
                     <span class="billing-stat-label">Billing cycle</span>
                   </div>
                 </div>
                 <div class="billing-plan-actions">
-                  <button class="btn-primary">Upgrade Plan</button>
-                  <button class="btn-secondary">Switch to Annual (Save 20%)</button>
+                  <button class="btn-primary" id="billingUpgradeBtn">Upgrade Plan</button>
+                  <button class="btn-secondary" id="billingAnnualBtn">Switch to Annual (Save 20%)</button>
                 </div>
               </div>
             </div>
@@ -1456,28 +1459,8 @@
                 <h3>Payment Method</h3>
                 <p>Manage your payment information.</p>
               </div>
-              <div class="payment-methods">
-                <div class="payment-card active">
-                  <div class="payment-card-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                      <rect x="1" y="4" width="22" height="16" rx="3" fill="#1A1F71"/>
-                      <text x="12" y="14" text-anchor="middle" fill="white" font-size="6" font-weight="bold">VISA</text>
-                    </svg>
-                  </div>
-                  <div class="payment-card-info">
-                    <span class="payment-card-number">•••• •••• •••• 4242</span>
-                    <span class="payment-card-expiry">Expires 08/26</span>
-                  </div>
-                  <span class="payment-card-default">Default</span>
-                  <button class="payment-card-edit">Edit</button>
-                </div>
-                <button class="add-payment-btn">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Add Payment Method
-                </button>
+              <div class="payment-methods" id="billingPaymentMethods">
+                <div class="muted">Loading payment method...</div>
               </div>
             </div>
 
@@ -1494,44 +1477,10 @@
                   <span>Status</span>
                   <span></span>
                 </div>
-                <div class="billing-row">
-                  <span>Nov 15, 2024</span>
-                  <span>Professional Plan - Monthly</span>
-                  <span>$49.00</span>
-                  <span class="status-badge paid">Paid</span>
-                  <button class="download-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                  </button>
-                </div>
-                <div class="billing-row">
-                  <span>Oct 15, 2024</span>
-                  <span>Professional Plan - Monthly</span>
-                  <span>$49.00</span>
-                  <span class="status-badge paid">Paid</span>
-                  <button class="download-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                  </button>
-                </div>
-                <div class="billing-row">
-                  <span>Sep 15, 2024</span>
-                  <span>Professional Plan - Monthly</span>
-                  <span>$49.00</span>
-                  <span class="status-badge paid">Paid</span>
-                  <button class="download-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                  </button>
+                <div id="billingHistoryRows">
+                  <div class="billing-row">
+                    <span class="muted">Loading invoices...</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2791,6 +2740,7 @@
 
       // Dynamic repeatables for references and subcontractors
       let referenceCount = document.querySelectorAll('#referencesContainer .reference-entry').length || 1;
+      let subCount = document.querySelectorAll('#subcontractorList .subcontractor-entry').length || 1;
 
       function addReference() {
         const container = document.getElementById('referencesContainer');
@@ -2864,6 +2814,10 @@
             </div>
           </div>
         `;
+        const removeBtn = entry.querySelector('.remove-btn');
+        if (n === 1 && removeBtn) {
+          removeBtn.style.display = 'none';
+        }
         entry.querySelectorAll('input, textarea, select').forEach((el) => {
           el.addEventListener('input', updatePanelStatuses);
           el.addEventListener('change', updatePanelStatuses);
@@ -2884,16 +2838,56 @@
         const entry = btn.closest('.reference-entry');
         const container = document.getElementById('referencesContainer');
         if (!entry || !container) return;
-        if (container.querySelectorAll('.reference-entry').length <= 1) return;
         entry.remove();
+        const remaining = container.querySelectorAll('.reference-entry').length;
+        if (remaining === 0) {
+          referenceCount = 0;
+          addReference();
+        } else {
+          updatePanelStatuses();
+        }
+      }
+
+      function removeSubcontractor(btn) {
+        const entry = btn.closest('.subcontractor-entry');
+        const container = document.getElementById('subcontractorList');
+        if (!entry || !container) return;
+        entry.remove();
+        const remaining = container.querySelectorAll('.subcontractor-entry').length;
+        if (remaining === 0) {
+          subCount = 0;
+          addSubcontractor();
+        } else {
+          updatePanelStatuses();
+        }
+      }
+
+      function addSubcontractor() {
+        const container = document.getElementById('subcontractorList');
+        if (!container) return;
+        const current = container.querySelectorAll('.subcontractor-entry').length;
+        const n = current + 1;
+        subCount = n;
+        const card = createSubcontractorCard(n);
+        container.appendChild(card);
         updatePanelStatuses();
       }
 
-      function createSubcontractorCard(n) {
+      // expose reference handlers for inline buttons
+      window.addReference = addReference;
+      window.removeReference = removeReference;
+      window.removeSubcontractor = removeSubcontractor;
+      window.addSubcontractor = addSubcontractor;
+
+            function createSubcontractorCard(n) {
         const wrapper = document.createElement('div');
-        wrapper.className = 'repeatable-card';
+        wrapper.className = 'repeatable-card subcontractor-entry';
+        wrapper.dataset.index = n;
         wrapper.innerHTML = `
-          <div class="repeatable-title">Subcontractor ${n}</div>
+          <div class="subcontractor-header reference-header">
+            <h4>Subcontractor #${n}</h4>
+            <button type="button" class="remove-btn" onclick="removeSubcontractor(this)">Remove</button>
+          </div>
           <div class="form-row three-col">
             <div class="form-group">
               <label>Subcontractor Business Name</label>
@@ -2932,7 +2926,7 @@
               <div class="file-upload-area">
                 <input type="file" name="sub${n}_certificate" id="upload-sub${n}_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                 <label for="upload-sub${n}_certificate" class="file-upload-label">
-                  <span class="upload-icon">⭱</span>
+                  <span class="upload-icon">�-�</span>
                   <span class="upload-text">Upload compliance certificate</span>
                   <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                 </label>
@@ -2940,20 +2934,28 @@
             </div>
           </div>
         `;
+        if (n === 1) {
+          const removeBtn = wrapper.querySelector('.remove-btn');
+          if (removeBtn) removeBtn.style.display = 'none';
+        }
+        wrapper.querySelectorAll('input, textarea, select').forEach((el) => {
+          el.addEventListener('input', updatePanelStatuses);
+          el.addEventListener('change', updatePanelStatuses);
+        });
+        wrapper.querySelectorAll('input[type="file"]').forEach((input) => {
+          input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            if (file) {
+              markFileSelection(input, file.name);
+            }
+          });
+        });
         return wrapper;
       }
-
-      (function bindRepeatables() {
+(function bindRepeatables() {
         document.getElementById('addReferenceBtn')?.addEventListener('click', addReference);
 
-        const subList = document.getElementById('subcontractorList');
-        const subBtn = subList?.querySelector('.add-row-btn');
-        let subCount = subList ? subList.querySelectorAll('.repeatable-card').length : 0;
-        subBtn?.addEventListener('click', () => {
-          if (!subList) return;
-          subCount += 1;
-          subList.insertBefore(createSubcontractorCard(subCount), subBtn);
-        });
+        document.getElementById('addSubcontractorBtn')?.addEventListener('click', addSubcontractor);
       })();
 
       // Bind actions
@@ -2978,6 +2980,170 @@
       document.getElementById('qaExportData')?.addEventListener('click', () => window.location.href = '/billing');
       document.getElementById('teamInviteBtn')?.addEventListener('click', inviteFlow);
       document.getElementById('teamInviteCardBtn')?.addEventListener('click', inviteFlow);
+
+      // Billing summary (Stripe) in /account Billing tab
+      let billingLoaded = false;
+      const formatMoney = (amount, currency) => {
+        if (amount == null) return '';
+        const amt = (Number(amount) || 0) / 100;
+        try {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: (currency || 'USD').toUpperCase(),
+            minimumFractionDigits: 2,
+          }).format(amt);
+        } catch (_) {
+          return `$${amt.toFixed(2)}`;
+        }
+      };
+      const formatDate = (val) => {
+        if (!val) return '';
+        try {
+          const dt = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
+          return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch (_) {
+          return String(val);
+        }
+      };
+      const renderBillingPlan = (data) => {
+        const tier = (data?.tier || '').trim() || 'Professional';
+        const invoices = data?.invoices || [];
+        const latest = invoices[0] || null;
+        const price = latest ? formatMoney(latest.amount_paid ?? latest.amount_due, latest.currency) : '$—';
+        const cycle = 'Monthly';
+        const annualCost = latest ? formatMoney(((latest.amount_paid ?? latest.amount_due) || 0) * 12, latest.currency) : '$—';
+        const nextBilling = data?.next_billing_at ? formatDate(data.next_billing_at) : '—';
+        const map = {
+          starter: 'Starter',
+          professional: 'Professional',
+          enterprise: 'Enterprise',
+        };
+        const friendlyTier = map[tier.toLowerCase()] || tier;
+        const planNameEl = document.getElementById('billingPlanName');
+        const priceEl = document.getElementById('billingPlanPrice');
+        const periodEl = document.getElementById('billingPlanPeriod');
+        const annualEl = document.getElementById('billingAnnualCost');
+        const nextEl = document.getElementById('billingNextBilling');
+        const cycleEl = document.getElementById('billingCycle');
+        const topTier = document.getElementById('topTierLabel');
+        const planBadge = document.getElementById('planBadgeLabel');
+        const planName = document.getElementById('planName');
+        const planPrice = document.getElementById('planPrice');
+        const planPeriod = document.getElementById('planPeriod');
+        if (planNameEl) planNameEl.textContent = friendlyTier;
+        if (priceEl) priceEl.textContent = price;
+        if (periodEl) periodEl.textContent = '/month';
+        if (annualEl) annualEl.textContent = annualCost;
+        if (nextEl) nextEl.textContent = nextBilling;
+        if (cycleEl) cycleEl.textContent = cycle;
+        if (topTier) topTier.textContent = friendlyTier;
+        if (planBadge) planBadge.textContent = friendlyTier;
+        if (planName) planName.textContent = friendlyTier;
+        if (planPrice) planPrice.textContent = price;
+        if (planPeriod) planPeriod.textContent = '/month';
+      };
+      const renderPaymentMethod = (pmInfo) => {
+        const container = document.getElementById('billingPaymentMethods');
+        if (!container) return;
+        if (!pmInfo || (!pmInfo.brand && !pmInfo.last4)) {
+          container.innerHTML = '<div class="muted">No payment method on file.</div>';
+          return;
+        }
+        const { brand, last4, exp_month, exp_year } = pmInfo;
+        const exp = exp_month && exp_year ? `Expires ${String(exp_month).padStart(2, '0')}/${String(exp_year).slice(-2)}` : '';
+        container.innerHTML = `
+          <div class="payment-card active">
+            <div class="payment-card-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <rect x="1" y="4" width="22" height="16" rx="3" fill="#1A1F71"></rect>
+                <text x="12" y="14" text-anchor="middle" fill="white" font-size="6" font-weight="bold">${(brand || 'CARD').toUpperCase()}</text>
+              </svg>
+            </div>
+            <div class="payment-card-info">
+              <span class="payment-card-number">•••• •••• •••• ${last4 || ''}</span>
+              <span class="payment-card-expiry">${exp}</span>
+            </div>
+            <span class="payment-card-default">Default</span>
+            <button class="payment-card-edit" id="billingPortalBtn">Edit</button>
+          </div>
+          <button class="add-payment-btn" id="billingPortalAddBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Manage Payment Methods
+          </button>
+        `;
+        const openPortal = async () => {
+          try {
+            const res = await fetch('/billing/portal', { credentials: 'include' });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            if (data?.url) window.open(data.url, '_blank', 'noopener');
+          } catch (_) {
+            alert('Could not open subscription management right now.');
+          }
+        };
+        document.getElementById('billingPortalBtn')?.addEventListener('click', openPortal);
+        document.getElementById('billingPortalAddBtn')?.addEventListener('click', openPortal);
+      };
+      const renderInvoices = (invoices) => {
+        const body = document.getElementById('billingHistoryRows');
+        if (!body) return;
+        if (!invoices || !invoices.length) {
+          body.innerHTML = '<div class="billing-row"><span class="muted">No invoices yet.</span></div>';
+          return;
+        }
+        body.innerHTML = invoices.map((inv) => {
+          const created = formatDate(inv.created || inv.period_end);
+          const desc = inv.description || 'Subscription';
+          const amt = formatMoney(inv.amount_paid ?? inv.amount_due, inv.currency);
+          const status = (inv.status || '').toLowerCase();
+          const statusCls = status === 'paid' ? 'paid' : '';
+          const url = inv.hosted_invoice_url || inv.invoice_pdf;
+          const downloadBtn = url ? `
+            <a class="download-btn" href="${url}" target="_blank" rel="noopener" aria-label="Download invoice">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </a>` : '';
+          return `
+            <div class="billing-row">
+              <span>${created}</span>
+              <span>${desc}</span>
+              <span>${amt}</span>
+              <span class="status-badge ${statusCls}">${status ? status.charAt(0).toUpperCase() + status.slice(1) : ''}</span>
+              ${downloadBtn}
+            </div>
+          `;
+        }).join('');
+      };
+      const loadBillingSummary = async () => {
+        if (billingLoaded) return;
+        billingLoaded = true;
+        try {
+          const res = await fetch('/api/billing/summary', { credentials: 'include' });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          renderBillingPlan(data);
+          renderPaymentMethod(data?.payment_method);
+          renderInvoices(data?.invoices || []);
+        } catch (_) {
+          const pm = document.getElementById('billingPaymentMethods');
+          const inv = document.getElementById('billingHistoryRows');
+          if (pm) pm.innerHTML = '<div class="muted">Could not load payment method.</div>';
+          if (inv) inv.innerHTML = '<div class="billing-row"><span class="muted">Could not load invoices.</span></div>';
+        }
+      };
+
+      // Trigger billing load when tab is opened
+      document.querySelector('[data-tab=\"billing\"]')?.addEventListener('click', () => {
+        loadBillingSummary();
+      });
+      // Also load eagerly for logged-in users
+      loadBillingSummary();
 
       // Help dropdown toggle (match shared layout)
       (function(){
