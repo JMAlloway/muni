@@ -10,30 +10,12 @@
   {{TABLE_HTML}}
 </main>
 
-<!-- vendor sidebar markup -->
-<div id="vendor-overlay" onclick="closeVendorGuide()"></div>
-<div id="vendor-guide-panel">
-  <div id="vendor-guide-header">
-    <div>
-      <h2>How to bid</h2>
-      <div id="vendor-guide-agency" style="font-size:12px;color:#64748b;">City of Columbus</div>
-    </div>
-    <button onclick="closeVendorGuide()" style="border:0;background:#e2e8f0;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer;">&times;</button>
-  </div>
-  <div id="vendor-guide-content">Loading...</div>
-</div>
-
 {{MODAL_HTML}}
-<link rel="stylesheet" href="/static/css/vendor.css"> 
-<link rel="stylesheet" href="/static/css/highlight.css"> 
 <link rel="stylesheet" href="/static/css/dashboard.css"> 
-<link rel="stylesheet" href="/static/css/bid_tracker.css"> 
 <link rel="stylesheet" href="/static/css/opportunities.css"> 
 
-<script src="/static/js/vendor.js"></script>
 <script src="/static/js/highlight.js"></script>
 <script src="/static/js/rfq_modal.js"></script>
-<script src="/static/js/bid_tracker.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Animate stat counts if data-count is present

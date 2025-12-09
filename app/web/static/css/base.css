@@ -1,26 +1,47 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
-    --bg-page: #f9fafb;
-    --bg-card: #ffffff;
-    --border-card: #e5e7eb;
-    --text-main: #111827;
-    --text-dim: #6b7280;
-    --accent-bg: #126a45;
-    --accent-bg-hover: #0f8b5a;
-    --accent-text: #126a45;
-    --pill-bg: #ecfdf3;
-    --pill-border: #bbf7d0;
-    --pill-text: #126a45;
+    /* Homepage_test token set */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-dark: #0f172a;
+    --accent-primary: #126a45;
+    --accent-light: #22c55e;
+    --accent-blue: #3b82f6;
+    --accent-orange: #f59e0b;
+    --accent-purple: #8b5cf6;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border-light: #e2e8f0;
+    --border-medium: #cbd5e1;
+    --gradient-primary: linear-gradient(135deg, #126a45 0%, #22c55e 100%);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+    /* Compat aliases for existing app shell */
+    --bg-page: var(--bg-secondary);
+    --bg-card: var(--bg-primary);
+    --border-card: var(--border-light);
+    --text-main: var(--text-primary);
+    --text-dim: var(--text-secondary);
+    --accent-bg: var(--accent-primary);
+    --accent-bg-hover: var(--accent-light);
+    --accent-text: var(--accent-primary);
+    --pill-bg: rgba(18,106,69,0.08);
+    --pill-border: var(--border-light);
+    --pill-text: var(--accent-primary);
     --radius-card: 16px;
     --radius-pill: 999px;
-    --shadow-card: 0 20px 40px rgba(0,0,0,0.06);
+    --shadow-card: var(--shadow-lg);
     --focus-ring: 0 0 0 3px rgba(18,106,69,0.25);
     --focus-color: #0f8b5a;
     --skeleton-base: #e5e7eb;
     --skeleton-highlight: #f3f4f6;
-    --font-body: 'Inter', 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --landing-night: #0b132b;
     --landing-ink: #0f172a;
     --landing-sky: #22d3ee;

@@ -48,6 +48,33 @@ class OllamaGenerateClient:
         return data.get("response", "").strip()
 
 
+class OpenAIChatClient:
+    """
+    Adapter that exposes a .chat(messages, temperature) interface
+    compatible with callers expecting Ollama-like semantics.
+    """
+
+    def __init__(self, api_key: str, model: str):
+        from openai import OpenAI
+
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+
+    def chat(self, messages, temperature=0, format=None):
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                response_format={"type": "json_object"} if format == "json" else None,
+            )
+            content = resp.choices[0].message.content if resp.choices else ""
+            return (content or "").strip()
+        except Exception as exc:
+            print(f"[AI client] OpenAI chat error: {exc}")
+            return ""
+
+
 def get_llm_client():
     """
     Build an Ollama or OpenAI client, unless AI is disabled via settings.
@@ -61,14 +88,13 @@ def get_llm_client():
 
     # if someone explicitly wants OpenAI, honor it
     if provider == "openai":
-        from openai import OpenAI
-
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             print("[AI client] OPENAI selected but no key -> rule-based")
             return None
-        print("[AI client] Using OpenAI")
-        return OpenAI(api_key=api_key)
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        print(f"[AI client] Using OpenAI model={model}")
+        return OpenAIChatClient(api_key=api_key, model=model)
 
     # otherwise: default to local Ollama
     base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")

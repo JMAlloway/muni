@@ -39,6 +39,12 @@ def _nav_links_html(user_email: Optional[str]) -> str:
           </svg>
           <span class="nav-text">Documents</span>
         </a>
+        <a href="/ai-tools" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 3l1.84 3.73L18 8.27l-3 2.92.71 4.14L12 13.77l-3.71 1.95L9 11.19l-3-2.92 4.16-.54L12 3z"/>
+          </svg>
+          <span class="nav-text">AI Studio</span>
+        </a>
         <a href="/calendar" class="nav-link">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -217,7 +223,6 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
-<link rel="stylesheet" href="/static/css/base.css">
 <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
@@ -389,7 +394,6 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>__TITLE__</title>
-  <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/marketing.css">
 </head>
@@ -481,7 +485,6 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>__TITLE__</title>
-  <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/auth.css">
 </head>

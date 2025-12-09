@@ -104,7 +104,7 @@
             <span class="top-label">Home</span>
           </a>
           <span class="top-pill top-tier" role="status">
-            <span class="top-label">Tier:</span> <strong id="topTierLabel">Free</strong>
+            <span class="top-label">Tier:</span> <strong id="topTierLabel">--</strong>
             <a href="/billing" class="top-upgrade">Upgrade</a>
           </span>
         </div>
@@ -122,7 +122,7 @@
           <div class="top-dropdown">
             <button class="avatar-button" type="button" aria-haspopup="menu" aria-expanded="false" id="avatar-btn">
               <span class="avatar-halo">
-                <span class="avatar-circle" id="topAvatar">JD</span>
+                <span class="avatar-circle" id="topAvatar">--</span>
               </span>
               <span class="top-caret" aria-hidden="true">&gt;</span>
             </button>
@@ -153,11 +153,11 @@
               <h1 class="account-name" id="accountName"></h1>
               <p class="account-email" id="accountEmail"></p>
               <div class="account-badges">
-                <span class="badge badge-pro" id="planBadge">
+                <span class="badge badge-pro" id="planBadge" style="display:none;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                   </svg>
-                  <span id="planBadgeLabel">Professional</span>
+                  <span id="planBadgeLabel"></span>
                 </span>
                 <span class="badge badge-team" id="teamBadge" style="display:none;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -168,14 +168,14 @@
                   </svg>
                   <span id="teamBadgeLabel">Team Member</span>
                 </span>
-                <span class="badge badge-verified" id="verifiedBadge">
+                <span class="badge badge-verified" id="verifiedBadge" style="display:none;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                   </svg>
                   Verified
                 </span>
-                <span class="badge badge-member" id="memberSince">Member since Oct 2023</span>
+                <span class="badge badge-member" id="memberSince"></span>
               </div>
             </div>
           </div>
@@ -258,12 +258,12 @@
                 </div>
                 <div class="plan-info">
                   <span class="plan-label">Current Plan</span>
-                  <h3 class="plan-name" id="planName">Professional</h3>
+                  <h3 class="plan-name" id="planName">--</h3>
                 </div>
                 <div class="plan-price-stack">
                   <div class="plan-price">
-                    <span class="price-amount" id="planPrice">$49</span>
-                    <span class="price-period" id="planPeriod">/month</span>
+                    <span class="price-amount" id="planPrice">--</span>
+                    <span class="price-period" id="planPeriod"></span>
                   </div>
                   <div class="plan-renewal">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -326,7 +326,7 @@
               <div class="account-card usage-card fade-in stagger-3">
                 <div class="card-header">
                   <h3 class="card-title">Usage This Month</h3>
-                  <span class="card-period">Nov 1 - Nov 30</span>
+                  <span class="card-period">--</span>
                 </div>
                 <div class="usage-stats">
                 <div class="usage-item">
@@ -615,7 +615,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="ohio_certificate" id="upload-ohio_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
                           <label for="upload-ohio_certificate" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Click to upload or drag and drop</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -699,7 +699,7 @@
                       <div class="file-upload-area">
                         <input type="file" name="cert_upload" id="upload-cert_upload" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
                         <label for="upload-cert_upload" class="file-upload-label">
-                          <span class="upload-icon">⭱</span>
+                          <span class="upload-icon">^</span>
                           <span class="upload-text">Upload certification documents</span>
                           <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                         </label>
@@ -935,7 +935,7 @@
                       <div class="file-upload-area">
                         <input type="file" name="capability_statement" id="upload-capability_statement" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
                         <label for="upload-capability_statement" class="file-upload-label">
-                          <span class="upload-icon">⭱</span>
+                          <span class="upload-icon">^</span>
                           <span class="upload-text">Upload capability statement</span>
                           <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                         </label>
@@ -947,7 +947,7 @@
                       <div class="file-upload-area">
                         <input type="file" name="product_catalogs" id="upload-product_catalogs" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                         <label for="upload-product_catalogs" class="file-upload-label">
-                          <span class="upload-icon">⭱</span>
+                          <span class="upload-icon">^</span>
                           <span class="upload-text">Upload product catalogs</span>
                           <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                         </label>
@@ -1086,7 +1086,7 @@
                             <div class="file-upload-area">
                               <input type="file" name="sub1_certificate" id="upload-sub1_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                               <label for="upload-sub1_certificate" class="file-upload-label">
-                                <span class="upload-icon">�-�</span>
+                                <span class="upload-icon">^</span>
                                 <span class="upload-text">Upload compliance certificate</span>
                                 <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                               </label>
@@ -1150,7 +1150,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="insurance_certificate" id="upload-insurance_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
                           <label for="upload-insurance_certificate" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload certificate of insurance</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1163,7 +1163,7 @@
                       <div class="file-upload-area">
                         <input type="file" name="bonding_letter" id="upload-bonding_letter" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                         <label for="upload-bonding_letter" class="file-upload-label">
-                          <span class="upload-icon">⭱</span>
+                          <span class="upload-icon">^</span>
                           <span class="upload-text">Upload bonding letter</span>
                           <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                         </label>
@@ -1256,7 +1256,7 @@
                       <div class="file-upload-area">
                         <input type="file" name="price_list_upload" id="upload-price_list_upload" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
                         <label for="upload-price_list_upload" class="file-upload-label">
-                          <span class="upload-icon">⭱</span>
+                          <span class="upload-icon">^</span>
                           <span class="upload-text">Upload price list or catalog</span>
                           <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                         </label>
@@ -1283,7 +1283,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="w9_upload" id="upload-w9_upload" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-w9_upload" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload W-9</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1295,7 +1295,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="business_license" id="upload-business_license" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-business_license" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload business license</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1307,7 +1307,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="safety_sheets" id="upload-safety_sheets" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-safety_sheets" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload safety sheets</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1321,7 +1321,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="warranty_info" id="upload-warranty_info" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-warranty_info" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload warranty info</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1333,7 +1333,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="previous_contracts" id="upload-previous_contracts" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-previous_contracts" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload previous contracts</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1345,7 +1345,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="org_chart" id="upload-org_chart" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-org_chart" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload org chart</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1387,7 +1387,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="digital_signature" id="upload-digital_signature" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-digital_signature" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload digital signature</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1399,7 +1399,7 @@
                         <div class="file-upload-area">
                           <input type="file" name="signature_image" id="upload-signature_image" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                           <label for="upload-signature_image" class="file-upload-label">
-                            <span class="upload-icon">⭱</span>
+                            <span class="upload-icon">^</span>
                             <span class="upload-text">Upload signature image</span>
                             <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                           </label>
@@ -1425,31 +1425,30 @@
                 <div class="billing-plan-header">
                   <div class="billing-plan-badge">Current Plan</div>
                   <div class="billing-plan-info">
-                    <h2 id="billingPlanName">Professional</h2>
-                    <p id="billingPlanCopy">Perfect for growing teams</p>
+                    <h2 id="billingPlanName">--</h2>
+                    <p id="billingPlanCopy"></p>
                   </div>
                   <div class="billing-plan-price">
-                    <span class="price-big" id="billingPlanPrice">$49</span>
-                    <span class="price-period" id="billingPlanPeriod">/month</span>
+                    <span class="price-big" id="billingPlanPrice">--</span>
+                    <span class="price-period" id="billingPlanPeriod"></span>
                   </div>
                 </div>
                 <div class="billing-plan-body">
                   <div class="billing-stat">
-                    <span class="billing-stat-value" id="billingAnnualCost">$588</span>
+                    <span class="billing-stat-value" id="billingAnnualCost">--</span>
                     <span class="billing-stat-label">Annual cost</span>
                   </div>
                   <div class="billing-stat">
-                    <span class="billing-stat-value" id="billingNextBilling">Dec 15</span>
+                    <span class="billing-stat-value" id="billingNextBilling">--</span>
                     <span class="billing-stat-label">Next billing</span>
                   </div>
                   <div class="billing-stat">
-                    <span class="billing-stat-value" id="billingCycle">Monthly</span>
+                    <span class="billing-stat-value" id="billingCycle">--</span>
                     <span class="billing-stat-label">Billing cycle</span>
                   </div>
                 </div>
                 <div class="billing-plan-actions">
-                  <button class="btn-primary" id="billingUpgradeBtn">Upgrade Plan</button>
-                  <button class="btn-secondary" id="billingAnnualBtn">Switch to Annual (Save 20%)</button>
+                  <a class="btn-primary" id="billingUpgradeBtn" href="/billing">Compare Plans</a>
                 </div>
               </div>
             </div>
@@ -1494,11 +1493,11 @@
               </div>
               <div class="team-header-stats">
                 <div class="team-stat">
-                  <span class="team-stat-value" id="teamCount">3</span>
+                  <span class="team-stat-value" id="teamCount">--</span>
                   <span class="team-stat-label">Members</span>
                 </div>
                 <div class="team-stat">
-                  <span class="team-stat-value" id="teamAvailable">2</span>
+                  <span class="team-stat-value" id="teamAvailable">--</span>
                   <span class="team-stat-label">Available</span>
                 </div>
               </div>
@@ -1512,74 +1511,7 @@
             </div>
 
             <div class="team-grid fade-in stagger-1" id="teamGrid">
-              <div class="team-card owner-card">
-                <div class="team-card-header">
-                  <div class="team-card-avatar">JD</div>
-                  <div class="team-card-badge owner">Owner</div>
-                </div>
-                <div class="team-card-body">
-                  <h4>John Davidson</h4>
-                  <p>john.davidson@acmecontractors.com</p>
-                  <span class="team-card-status online">
-                    <span class="status-dot"></span>
-                    Online now
-                  </span>
-                </div>
-                <div class="team-card-footer">
-                  <span class="team-card-joined">Joined Oct 2023</span>
-                </div>
-              </div>
-
-              <div class="team-card">
-                <div class="team-card-header">
-                  <div class="team-card-avatar" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);">SK</div>
-                  <div class="team-card-badge admin">Admin</div>
-                </div>
-                <div class="team-card-body">
-                  <h4>Sarah Kim</h4>
-                  <p>sarah.kim@acmecontractors.com</p>
-                  <span class="team-card-status online">
-                    <span class="status-dot"></span>
-                    Online now
-                  </span>
-                </div>
-                <div class="team-card-footer">
-                  <span class="team-card-joined">Joined Nov 2023</span>
-                  <button class="team-card-menu">•••</button>
-                </div>
-              </div>
-
-              <div class="team-card">
-                <div class="team-card-header">
-                  <div class="team-card-avatar" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">MR</div>
-                  <div class="team-card-badge member">Member</div>
-                </div>
-                <div class="team-card-body">
-                  <h4>Mike Rodriguez</h4>
-                  <p>mike.rodriguez@acmecontractors.com</p>
-                  <span class="team-card-status offline">
-                    <span class="status-dot"></span>
-                    Offline
-                  </span>
-                </div>
-                <div class="team-card-footer">
-                  <span class="team-card-joined">Joined Jan 2024</span>
-                  <button class="team-card-menu">•••</button>
-                </div>
-              </div>
-
-              <div class="team-card add-card">
-                <div class="add-card-content">
-                  <div class="add-card-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                  </div>
-                  <h4>Add Team Member</h4>
-                  <p>2 seats remaining</p>
-                </div>
-              </div>
+              <div class="muted">Loading team...</div>
             </div>
 
             <div class="settings-section fade-in stagger-2">
@@ -1775,7 +1707,7 @@
                   </div>
                   <div class="session-info">
                     <span class="session-device">MacBook Pro - Chrome</span>
-                    <span class="session-location">Columbus, OH • Current session</span>
+                    <span class="session-location">Columbus, OH &bull; Current session</span>
                   </div>
                   <span class="session-current-badge">This device</span>
                 </div>
@@ -1788,7 +1720,7 @@
                   </div>
                   <div class="session-info">
                     <span class="session-device">iPhone 14 - Safari</span>
-                    <span class="session-location">Columbus, OH • Last active 2 hours ago</span>
+                    <span class="session-location">Columbus, OH &bull; Last active 2 hours ago</span>
                   </div>
                   <button class="btn-danger-ghost">Revoke</button>
                 </div>
@@ -1847,10 +1779,8 @@
       const tabContents = document.querySelectorAll('.tab-content');
       const goToTeamTab = () => {
         const tab = document.querySelector('.account-tab[data-tab="team"]');
-        const teamContent = document.getElementById('tab-team');
-        if (!tab || !teamContent) return;
+        if (!tab) return;
         tab.click();
-        setTimeout(() => teamContent.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       };
 
       tabs.forEach(tab => {
@@ -2236,7 +2166,7 @@
           const statusText = m.accepted ? 'Online now' : 'Pending invite';
           const joined = m.accepted_at ? `Joined ${new Date(m.accepted_at).toLocaleDateString()}` : `Invited ${new Date(m.invited_at || Date.now()).toLocaleDateString()}`;
           const removeBtn = role !== 'owner'
-            ? `<button class="team-card-menu" data-remove="${m.id}" data-email="${m.email || ''}">⋯</button>`
+            ? `<button class="team-card-menu" data-remove="${m.id}" data-email="${m.email || ''}">...</button>`
             : '';
           return `
             <div class="team-card ${role === 'owner' ? 'owner-card' : ''}">
@@ -2497,6 +2427,7 @@
         if (topAvatar) topAvatar.textContent = initials(name);
         const badge = document.getElementById('planBadge');
         const badgeLabel = document.getElementById('planBadgeLabel');
+        if (badge) badge.style.display = plan.label ? 'inline-flex' : 'none';
         if (badgeLabel) badgeLabel.textContent = plan.label || '';
         if (badge && !badgeLabel) badge.textContent = plan.label || '';
         const teamBadge = document.getElementById('teamBadge');
@@ -2542,7 +2473,7 @@
             const d = new Date(raw);
             planNextBillingEl.textContent = isNaN(d.getTime()) ? raw : d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
           } else {
-            planNextBillingEl.textContent = '—';
+            planNextBillingEl.textContent = '--';
           }
         }
         const tierKey = (user.tier_key || '').toLowerCase();
@@ -2926,7 +2857,7 @@
               <div class="file-upload-area">
                 <input type="file" name="sub${n}_certificate" id="upload-sub${n}_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
                 <label for="upload-sub${n}_certificate" class="file-upload-label">
-                  <span class="upload-icon">�-�</span>
+                  <span class="upload-icon">^</span>
                   <span class="upload-text">Upload compliance certificate</span>
                   <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
                 </label>
@@ -3009,10 +2940,10 @@
         const tier = (data?.tier || '').trim() || 'Professional';
         const invoices = data?.invoices || [];
         const latest = invoices[0] || null;
-        const price = latest ? formatMoney(latest.amount_paid ?? latest.amount_due, latest.currency) : '$—';
+        const price = latest ? formatMoney(latest.amount_paid ?? latest.amount_due, latest.currency) : '$--';
         const cycle = 'Monthly';
-        const annualCost = latest ? formatMoney(((latest.amount_paid ?? latest.amount_due) || 0) * 12, latest.currency) : '$—';
-        const nextBilling = data?.next_billing_at ? formatDate(data.next_billing_at) : '—';
+        const annualCost = latest ? formatMoney(((latest.amount_paid ?? latest.amount_due) || 0) * 12, latest.currency) : '$--';
+        const nextBilling = data?.next_billing_at ? formatDate(data.next_billing_at) : '--';
         const map = {
           starter: 'Starter',
           professional: 'Professional',
@@ -3026,6 +2957,7 @@
         const nextEl = document.getElementById('billingNextBilling');
         const cycleEl = document.getElementById('billingCycle');
         const topTier = document.getElementById('topTierLabel');
+        const planBadgeWrap = document.getElementById('planBadge');
         const planBadge = document.getElementById('planBadgeLabel');
         const planName = document.getElementById('planName');
         const planPrice = document.getElementById('planPrice');
@@ -3037,6 +2969,7 @@
         if (nextEl) nextEl.textContent = nextBilling;
         if (cycleEl) cycleEl.textContent = cycle;
         if (topTier) topTier.textContent = friendlyTier;
+        if (planBadgeWrap) planBadgeWrap.style.display = friendlyTier ? 'inline-flex' : 'none';
         if (planBadge) planBadge.textContent = friendlyTier;
         if (planName) planName.textContent = friendlyTier;
         if (planPrice) planPrice.textContent = price;
@@ -3060,7 +2993,7 @@
               </svg>
             </div>
             <div class="payment-card-info">
-              <span class="payment-card-number">•••• •••• •••• ${last4 || ''}</span>
+              <span class="payment-card-number">**** **** **** ${last4 || ''}</span>
               <span class="payment-card-expiry">${exp}</span>
             </div>
             <span class="payment-card-default">Default</span>

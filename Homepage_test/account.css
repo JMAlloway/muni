@@ -5,17 +5,29 @@
   max-width: 1400px;
 }
 
+:root {
+  --account-sticky-top: 8px;
+  --account-header-sticky-height: 220px;
+  --account-tabs-height: 62px;
+}
+
 /* ===== ACCOUNT HEADER ===== */
 .account-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 32px;
+  min-height: var(--account-header-sticky-height);
+  max-height: var(--account-header-sticky-height);
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   margin-bottom: 24px;
   box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: var(--account-sticky-top);
+  z-index: 8;
+  width: 100%;
 }
 
 .account-header-left {
@@ -272,6 +284,11 @@
   border-radius: var(--radius-lg);
   margin-bottom: 24px;
   overflow-x: auto;
+  position: sticky;
+  top: calc(var(--account-sticky-top) + var(--account-header-sticky-height));
+  z-index: 7;
+  min-height: var(--account-tabs-height);
+  width: 100%;
 }
 
 .account-tab {
@@ -313,10 +330,15 @@
 /* ===== TAB CONTENT ===== */
 .tab-content {
   display: none;
+  padding-top: 8px;
 }
 
 .tab-content.active {
   display: block;
+}
+
+.tab-content > :first-child {
+  margin-top: 0;
 }
 
 /* ===== ACCOUNT GRID ===== */

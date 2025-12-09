@@ -279,6 +279,86 @@ async def ensure_team_schema(engine) -> None:
         return
 
 
+async def ensure_knowledge_base_schema(engine) -> None:
+    """Create knowledge base + RFP response tables if missing (SQLite-friendly)."""
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_documents (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    team_id TEXT,
+                    filename TEXT NOT NULL,
+                    mime TEXT,
+                    size INTEGER,
+                    storage_key TEXT NOT NULL,
+                    doc_type TEXT NOT NULL,
+                    tags JSON,
+                    extracted_text TEXT,
+                    extraction_status TEXT DEFAULT 'pending',
+                    extraction_error TEXT,
+                    has_embeddings INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_kdocs_user ON knowledge_documents(user_id)")
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_kdocs_team ON knowledge_documents(team_id)")
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_kdocs_type ON knowledge_documents(doc_type)")
+
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS win_themes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    team_id TEXT,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    category TEXT,
+                    supporting_docs JSON,
+                    metrics JSON,
+                    times_used INTEGER DEFAULT 0,
+                    last_used_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_win_themes_user ON win_themes(user_id)")
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_win_themes_cat ON win_themes(category)")
+
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS rfp_responses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    team_id TEXT,
+                    opportunity_id TEXT NOT NULL,
+                    status TEXT DEFAULT 'draft',
+                    version INTEGER DEFAULT 1,
+                    selected_win_themes JSON,
+                    selected_knowledge_docs JSON,
+                    custom_instructions TEXT,
+                    sections JSON,
+                    compliance_score REAL,
+                    compliance_issues JSON,
+                    assigned_reviewers JSON,
+                    review_comments JSON,
+                    generated_at TIMESTAMP,
+                    submitted_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_rfp_responses_oppty ON rfp_responses(opportunity_id)")
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_rfp_responses_status ON rfp_responses(status)")
+    except Exception:
+        return
+
+
 async def ensure_user_tier_column(engine) -> None:
     """Ensure users.tier exists so billing/webhooks can persist plan."""
     try:
@@ -308,4 +388,22 @@ async def ensure_billing_schema(engine) -> None:
                 await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN next_billing_at TEXT")
     except Exception:
         # Non-SQLite or insufficient permissions; ignore quietly.
+        return
+
+
+async def ensure_opportunity_extraction_schema(engine) -> None:
+    """Ensure opportunities tables have json_blob for extracted metadata."""
+    try:
+        async with engine.begin() as conn:
+            for table in ("opportunities", "opportunity"):
+                try:
+                    res = await conn.exec_driver_sql(f"PRAGMA table_info('{table}')")
+                    cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
+                    if not cols:
+                        continue
+                    if "json_blob" not in cols:
+                        await conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN json_blob JSON")
+                except Exception:
+                    continue
+    except Exception:
         return

@@ -49,6 +49,15 @@ if CANONICAL_HOST:
 # -------------------------------------------------------------------
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
 
+# Dev convenience: serve the `Homepage_test` folder at /preview for live styling previews
+# This is non-invasive — files stay in-place and are served as static HTML/CSS/JS.
+try:
+    # Use a relative path so this works in local dev (working dir is repo root)
+    app.mount("/preview", StaticFiles(directory="Homepage_test", html=True), name="preview")
+except Exception:
+    # If the folder isn't present or mount fails in some envs, keep server booting.
+    pass
+
 # -------------------------------------------------------------------
 # Core imports (after app is defined)
 # -------------------------------------------------------------------
@@ -70,6 +79,8 @@ from app.core.db_migrations import (
     ensure_company_profile_schema,
     ensure_tracker_team_schema,
     ensure_opportunity_scope_columns,
+    ensure_opportunity_extraction_schema,
+    ensure_knowledge_base_schema,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -230,6 +241,12 @@ from app.api import (
     debug_cookies,
     dev_auth,
     welcome,
+    tracked_opps,
+    ai_tools,
+    knowledge_base,
+    rfp_responses,
+    rfp_extract,
+    opportunity_generate,
 )
 from app.api.bid_tracker import router as tracker_router
 from app.api.uploads import router as uploads_router
@@ -260,6 +277,12 @@ app.include_router(admin.router)
 app.include_router(debug_cookies.router)
 app.include_router(dev_auth.router)
 app.include_router(vendor_guides.router)
+app.include_router(ai_tools.router)
+app.include_router(knowledge_base.router)
+app.include_router(rfp_responses.router)
+app.include_router(rfp_extract.router)
+app.include_router(opportunity_generate.router)
+app.include_router(tracked_opps.router)
 
 # -------------------------------------------------------------------
 # Health check
@@ -289,6 +312,8 @@ async def on_startup():
         await ensure_billing_schema(engine)
         await ensure_company_profile_schema(engine)
         await ensure_tracker_team_schema(engine)
+        await ensure_opportunity_extraction_schema(engine)
+        await ensure_knowledge_base_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 

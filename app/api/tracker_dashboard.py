@@ -328,11 +328,11 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
             <div class="team-avatars">{''.join(avatars)}</div>
             <div class="team-details">
               <span class="team-label">Your Team</span>
-              <span><strong>Team</strong> • {count} member{'s' if count != 1 else ''}</span>
+              <span><strong>Team workspace</strong> · {count} member{'s' if count != 1 else ''}</span>
             </div>
           </div>
           <a class="shared-dashboard-btn" href="/account/team">
-            <span>👥</span>
+            <span>⇱</span>
             Team Dashboard
           </a>
         </div>
@@ -563,21 +563,17 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
     """
 
     body_template = """
-    <link rel="stylesheet" href="/static/css/vendor.css">
-    <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
-    <div class="page dashboard-page">
-      __TEAM_BAR__
-      __STATS__
-      <div class="grid-3">
-        <div>
-          __TIMELINE__
-          __TRACKED__
-        </div>
-        <div>
-          __DONUT__
-          __ACTIVITY__
-        </div>
+    __TEAM_BAR__
+    __STATS__
+    <div class="grid-3">
+      <div>
+        __TIMELINE__
+        __TRACKED__
+      </div>
+      <div>
+        __DONUT__
+        __ACTIVITY__
       </div>
     </div>
     __THREAD__
@@ -695,6 +691,11 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
       })();
     </script>
     <script src="/static/js/tracker_dashboard.js"></script>
+    <script>
+      (function(){
+        if (document && document.body) document.body.classList.add('tracker-dashboard-page');
+      }());
+    </script>
     """
 
     body = (

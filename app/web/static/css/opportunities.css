@@ -675,6 +675,60 @@
   color: var(--text-tertiary);
 }
 
+/* Success toast when tracking */
+.success-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.25s ease forwards;
+  z-index: 1200;
+}
+
+.success-checkmark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px 28px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: popIn 0.25s ease forwards;
+  z-index: 1210;
+}
+
+.check-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.check-circle {
+  stroke: #22c55e;
+  stroke-width: 3;
+}
+
+.check-check {
+  stroke: #22c55e;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.success-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #126a45;
+}
+
+@keyframes popIn {
+  from { transform: translate(-50%, -50%) scale(0.9); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
 @media (max-width: 1200px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);

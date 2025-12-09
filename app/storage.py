@@ -52,6 +52,28 @@ def store_bytes(user_id: int, opportunity_id: int, data: bytes, original_name: s
             f.write(data)
         return key, size, mime
 
+def store_knowledge_bytes(user_id: str, team_id: Optional[str], data: bytes, original_name: str, content_type: Optional[str]) -> Tuple[str, int, str]:
+    """
+    Store reusable knowledge-base documents under a dedicated prefix (S3) or folder (local).
+    Returns: (storage_key, size, mime)
+    """
+    fname = _safe_filename(original_name)
+    mime = content_type or mimetypes.guess_type(fname)[0] or "application/octet-stream"
+    size = len(data)
+    owner = team_id or user_id
+
+    if USE_S3:
+        key = f"knowledge/{owner}/{uuid.uuid4()}_{fname}"
+        _s3.put_object(Bucket=BUCKET, Key=key, Body=data, ContentType=mime)
+        return key, size, mime
+
+    base_dir = os.path.join(LOCAL_DIR, "knowledge", str(owner))
+    os.makedirs(base_dir, exist_ok=True)
+    key = os.path.join(base_dir, f"{uuid.uuid4()}_{fname}")
+    with open(key, "wb") as f:
+        f.write(data)
+    return key, size, mime
+
 def create_presigned_get(storage_key: str, expires: int = 900) -> str:
     if USE_S3:
         return _s3.generate_presigned_url(
@@ -62,6 +84,24 @@ def create_presigned_get(storage_key: str, expires: int = 900) -> str:
     else:
         # Local mode: serve via FastAPI streaming route
         return f"/uploads/local/{storage_key}"
+
+
+def read_storage_bytes(storage_key: str) -> bytes:
+    """
+    Fetch raw bytes from storage_key (S3 or local). Best-effort; raises on failures.
+    """
+    if USE_S3:
+        obj = _s3.get_object(Bucket=BUCKET, Key=storage_key)
+        return obj["Body"].read()
+
+    # Local disk fallback: ensure we don't leave uploads/ root
+    base = os.path.abspath(LOCAL_DIR)
+    abspath = os.path.abspath(storage_key)
+    if not abspath.startswith(base):
+        # Most knowledge keys will already be an absolute path under LOCAL_DIR
+        abspath = os.path.abspath(os.path.join(base, storage_key))
+    with open(abspath, "rb") as f:
+        return f.read()
 
 
 def store_profile_file(user_id: int, field: str, data: bytes, original_name: str, content_type: Optional[str]) -> str:

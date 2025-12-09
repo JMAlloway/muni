@@ -20,7 +20,6 @@ async def documents_page(request: Request):
     """
     user_email = get_current_user_email(request)
     body = """
-<link rel="stylesheet" href="/static/css/base.css">
 <link rel="stylesheet" href="/static/css/dashboard.css">
 <link rel="stylesheet" href="/static/css/documents.css">
 
