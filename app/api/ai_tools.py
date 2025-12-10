@@ -5,7 +5,7 @@ from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
 
 router = APIRouter(tags=["ai-tools"])
-STATIC_VER = "20251210.1"
+STATIC_VER = "20251210.2"
 
 
 @router.get("/ai-tools", response_class=HTMLResponse)
@@ -58,6 +58,20 @@ async def ai_tools_page(request: Request):
             <span class="select-arrow">&#9662;</span>
           </div>
         </div>
+
+        <div id="existingDocsSection" class="form-group hidden">
+          <label class="form-label">Select Document Source</label>
+          <div class="doc-source-tabs">
+            <button type="button" class="doc-source-tab active" data-source="existing">&#128196; Use Existing Document</button>
+            <button type="button" class="doc-source-tab" data-source="upload">&#128228; Upload New Document</button>
+          </div>
+          <div id="existingDocsContainer" class="existing-docs-container">
+            <div id="existingDocsList" class="existing-docs-list">
+              <p class="loading-docs">Loading documents...</p>
+            </div>
+          </div>
+        </div>
+
         <div id="uploadArea" class="upload-area">
           <div class="upload-icon">&#128196;</div>
           <p class="upload-text">Drop your RFP here or click to browse</p>

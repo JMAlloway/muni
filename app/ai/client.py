@@ -137,11 +137,16 @@ def get_llm_client():
         print("[AI client] AI disabled via settings.AI_ENABLED")
         return None
 
+    # Check both env var AND settings object for provider
     provider = os.getenv("AI_PROVIDER", "").lower().strip()
+    if not provider:
+        provider = (getattr(settings, "ai_provider", "") or "").lower().strip()
+
+    # Check both env var AND settings object for OpenAI API key
+    api_key = os.getenv("OPENAI_API_KEY") or getattr(settings, "openai_api_key", None)
 
     # if someone explicitly wants OpenAI, honor it
     if provider == "openai":
-        api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             print("[AI client] OPENAI selected but no key -> rule-based")
             return None
@@ -149,9 +154,15 @@ def get_llm_client():
         print(f"[AI client] Using OpenAI model={model}")
         return OpenAIChatClient(api_key=api_key, model=model)
 
+    # Auto-detect: if we have an OpenAI key but no explicit provider, use OpenAI
+    if api_key and not provider:
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        print(f"[AI client] Auto-detected OpenAI key, using model={model}")
+        return OpenAIChatClient(api_key=api_key, model=model)
+
     # otherwise: default to local Ollama
-    base = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-    model = os.getenv("OLLAMA_MODEL", "gemma3:4b")  # we saw this in /api/tags
+    base = os.getenv("OLLAMA_BASE_URL", "") or getattr(settings, "ollama_base_url", "http://127.0.0.1:11434")
+    model = os.getenv("OLLAMA_MODEL", "") or getattr(settings, "ollama_model", "gemma3:4b")
 
     print(f"[AI client] Using local Ollama (generate) at {base} model={model}")
     return OllamaGenerateClient(base, model)

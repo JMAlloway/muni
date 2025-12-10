@@ -9,6 +9,10 @@
     progressText: document.getElementById("progressText"),
     progressPercent: document.getElementById("progressPercent"),
     genOpportunity: document.getElementById("genOpportunity"),
+    existingDocsSection: document.getElementById("existingDocsSection"),
+    existingDocsList: document.getElementById("existingDocsList"),
+    existingDocsContainer: document.getElementById("existingDocsContainer"),
+    docSourceTabs: document.querySelectorAll(".doc-source-tab"),
     uploadArea: document.getElementById("uploadArea"),
     rfpUploadInput: document.getElementById("rfpUploadInput"),
     uploadedFile: document.getElementById("uploadedFile"),
@@ -68,6 +72,8 @@
     documents: { cover: "", responses: "" },
     currentDoc: "cover",
     sessionId: null,
+    existingDocs: [],
+    docSource: "existing", // "existing" or "upload"
   };
 
   let saveTimer = null;
@@ -187,6 +193,123 @@
       }
     } catch (err) {
       showMessage("Could not load tracked opportunities. Try refreshing.", "error");
+    }
+  }
+
+  async function fetchExistingDocuments(opportunityId) {
+    if (!opportunityId) {
+      state.existingDocs = [];
+      renderExistingDocs();
+      return;
+    }
+    if (els.existingDocsList) {
+      els.existingDocsList.innerHTML = `<p class="loading-docs">Loading documents...</p>`;
+    }
+    try {
+      const res = await fetch(`/uploads/list/${encodeURIComponent(opportunityId)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        state.existingDocs = [];
+        renderExistingDocs();
+        return;
+      }
+      const data = await res.json();
+      state.existingDocs = Array.isArray(data) ? data : [];
+      renderExistingDocs();
+    } catch (err) {
+      state.existingDocs = [];
+      renderExistingDocs();
+    }
+  }
+
+  function renderExistingDocs() {
+    if (!els.existingDocsSection || !els.existingDocsList) return;
+
+    // Show/hide the section based on whether we have an opportunity selected
+    if (!state.opportunityId) {
+      els.existingDocsSection.classList.add("hidden");
+      if (els.uploadArea) els.uploadArea.style.display = "block";
+      return;
+    }
+
+    // Always show the section when opportunity is selected
+    els.existingDocsSection.classList.remove("hidden");
+
+    // Update visibility based on doc source
+    updateDocSourceView();
+
+    // Render the list of existing documents
+    if (!state.existingDocs || state.existingDocs.length === 0) {
+      els.existingDocsList.innerHTML = `
+        <p class="no-docs-message">No documents uploaded yet for this opportunity.</p>
+        <p class="no-docs-hint">Use the "Upload New Document" tab to add an RFP document.</p>
+      `;
+      // Auto-switch to upload tab if no docs
+      setDocSource("upload");
+      return;
+    }
+
+    els.existingDocsList.innerHTML = "";
+    state.existingDocs.forEach((doc) => {
+      const div = document.createElement("div");
+      div.className = "existing-doc-item" + (state.upload?.id === doc.id ? " selected" : "");
+      div.dataset.docId = doc.id;
+      const size = formatBytes(doc.size);
+      const dateStr = doc.created_at ? new Date(doc.created_at).toLocaleDateString() : "";
+      div.innerHTML = `
+        <div class="doc-icon">&#128196;</div>
+        <div class="doc-info">
+          <span class="doc-name">${doc.filename || "Unnamed file"}</span>
+          <span class="doc-meta">${size}${dateStr ? " • " + dateStr : ""}</span>
+        </div>
+        <div class="doc-select-indicator">&#10003;</div>
+      `;
+      div.addEventListener("click", () => selectExistingDoc(doc));
+      els.existingDocsList.appendChild(div);
+    });
+  }
+
+  function selectExistingDoc(doc) {
+    state.upload = {
+      id: doc.id,
+      filename: doc.filename,
+      size: doc.size,
+      mime: doc.mime,
+      storage_key: doc.storage_key,
+    };
+    state.extracted = null;
+    if (els.extractResults) {
+      els.extractResults.classList.add("hidden");
+    }
+    renderExistingDocs();
+    renderUpload(state.upload);
+    handleStepAvailability();
+    showMessage(`Selected: ${doc.filename}`, "success");
+    scheduleSave();
+  }
+
+  function setDocSource(source) {
+    state.docSource = source;
+    els.docSourceTabs.forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.source === source);
+    });
+    updateDocSourceView();
+  }
+
+  function updateDocSourceView() {
+    const showExisting = state.docSource === "existing";
+    if (els.existingDocsContainer) {
+      els.existingDocsContainer.style.display = showExisting ? "block" : "none";
+    }
+    if (els.uploadArea) {
+      // Show upload area when in upload mode AND no file is selected yet
+      const showUpload = !showExisting && !state.upload;
+      els.uploadArea.style.display = showUpload ? "block" : "none";
+    }
+    if (els.uploadedFile && state.upload) {
+      // Always show uploaded file indicator if we have a file selected
+      els.uploadedFile.classList.remove("hidden");
     }
   }
 
@@ -646,12 +769,24 @@
         state.opportunityId = select.value;
         state.opportunityLabel = select.options[select.selectedIndex]?.text || "";
         state.extracted = null;
+        state.upload = null;
+        state.existingDocs = [];
         if (els.extractResults) els.extractResults.classList.add("hidden");
+        if (els.uploadedFile) els.uploadedFile.classList.add("hidden");
+        if (els.uploadArea) els.uploadArea.style.display = "block";
         handleStepAvailability();
         fetchOpportunityExtraction();
+        fetchExistingDocuments(state.opportunityId);
         scheduleSave();
       });
     }
+
+    // Document source tab handlers
+    els.docSourceTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        setDocSource(tab.dataset.source);
+      });
+    });
 
     if (els.uploadArea && els.rfpUploadInput) {
       els.uploadArea.addEventListener("click", () => els.rfpUploadInput?.click());
