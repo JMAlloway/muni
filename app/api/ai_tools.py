@@ -5,308 +5,276 @@ from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
 
 router = APIRouter(tags=["ai-tools"])
-STATIC_VER = "20251209.2"
+STATIC_VER = "20251210.1"
 
 
 @router.get("/ai-tools", response_class=HTMLResponse)
 async def ai_tools_page(request: Request):
     user_email = get_current_user_email(request)
     body = f"""
-<link rel="stylesheet" href="/static/css/dashboard.css?v={STATIC_VER}">
-<link rel="stylesheet" href="/static/css/ai_tools.css?v={STATIC_VER}">
+<link rel="stylesheet" href="/static/css/ai-studio.css?v={STATIC_VER}">
 
-<main class="page ai-tools-page">
-  <div id="sessionPicker" class="session-picker" style="display:none;"></div>
-  <div id="saveIndicator" class="save-indicator">Saved</div>
-  <div class="success-modal" id="successModal">
-    <div class="success-content">
-      <div class="success-icon">✓</div>
-      <h3>All sections ready!</h3>
-      <p>Your responses look complete. Time to review and export.</p>
-      <button class="primary-btn" type="button" id="successClose">Close</button>
-    </div>
-  </div>
-  <div class="preview-panel" id="previewPanel">
-    <div class="preview-header">
-      <h3>Document Preview</h3>
-      <button class="close-preview" id="closePreview" type="button">×</button>
-    </div>
-    <div class="preview-tabs">
-      <button class="preview-tab active" data-tab="cover" type="button">Cover Letter</button>
-      <button class="preview-tab" data-tab="soq" type="button">SOQ</button>
-      <button class="preview-tab" data-tab="full" type="button">Full Package</button>
-    </div>
-    <div class="preview-content" id="previewContent"></div>
-    <div class="preview-footer">
-      <button class="ghost-btn" type="button" id="previewEdit">Edit</button>
-      <button class="primary-btn" type="button" id="previewExport">Export PDF</button>
-    </div>
-  </div>
-  <section class="wizard-progress">
-    <div class="progress-track">
-      <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
-    </div>
-    <div class="progress-steps" id="progressSteps">
-      <div class="step completed" data-step="1">
-        <div class="step-icon">✓</div>
-        <div class="step-label">Upload</div>
-      </div>
-      <div class="step completed" data-step="2">
-        <div class="step-icon">✓</div>
-        <div class="step-label">Extract</div>
-      </div>
-      <div class="step active" data-step="3">
-        <div class="step-icon">3</div>
-        <div class="step-label">Answer</div>
-        <div class="step-detail" id="progressDetail">0 of 0</div>
-      </div>
-      <div class="step" data-step="4">
-        <div class="step-icon">4</div>
-        <div class="step-label">Review</div>
-      </div>
-      <div class="step" data-step="5">
-        <div class="step-icon">5</div>
-        <div class="step-label">Export</div>
-      </div>
-    </div>
-  </section>
-  <header class="ai-header">
-    <div>
-      <p class="eyebrow">AI Studio</p>
-      <h1>RFP Assistant</h1>
-      <p class="lede">Start by generating the summary and checklist from your tracked solicitation, then create documents and answers.</p>
-    </div>
-    <div class="header-actions">
-      <span class="pill success">OpenAI</span>
-    </div>
-  </header>
-
-  <section class="card">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Snapshot</p>
-        <h2>RFP summary &amp; requirements</h2>
-      </div>
-      <button id="regenSummary" class="ghost-btn" type="button">Generate summary/checklist</button>
-    </div>
-    <div class="field" style="margin-bottom:12px;">
-      <label>Opportunity</label>
-      <select id="genOpportunity" required>
-        <option value="">Select a tracked solicitation</option>
-      </select>
-      <p class="hint">We'll pull your uploaded RFP instructions for this opportunity.</p>
-      <button id="refreshUploads" class="ghost-btn" type="button" style="margin-top:6px;">Load uploads</button>
-    </div>
-    <div class="card inset">
-      <div class="section-heading">
+<main class="ai-tools-page">
+  <div class="wizard-container">
+    <div class="wizard-header">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div class="wizard-icon">AI</div>
         <div>
-          <p class="eyebrow">Step 1</p>
-          <h3>Upload RFP</h3>
-          <p class="hint">Drop the RFP file for this opportunity. Extraction runs automatically.</p>
-        </div>
-        <div class="right-actions">
-          <input type="file" id="rfpUploadInput" style="display:none;" />
-          <button id="rfpUploadBtn" class="primary-btn" type="button">Upload RFP</button>
+          <h1 class="wizard-title">AI Proposal Studio</h1>
+          <p class="wizard-subtitle">Upload, extract, draft, and export without leaving this flow.</p>
         </div>
       </div>
-      <p class="hint">Latest upload is used to extract summary, questions, and instructions.</p>
-    </div>
-    <div class="card inset">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">RFP instructions</p>
-          <h3>Select uploaded instruction docs</h3>
-        </div>
-      </div>
-      <div id="uploadsList" class="kb-list"></div>
-    </div>
-    <div id="summaryCard" class="summary-card empty" style="margin-top:12px;">Select an opportunity to load extracted summary.</div>
-    <div class="grid two-col">
-      <div>
-        <h4>Checklist</h4>
-        <ul id="checklist" class="simple-list"></ul>
-      </div>
-      <div>
-        <h4>Submission instructions</h4>
-        <div id="instructionsBlock" class="instructions-block"></div>
+      <div class="wizard-actions">
+        <button class="btn-secondary" type="button" id="resumeLatest">Load last session</button>
+        <button class="btn-secondary" type="button" id="manualSave">Save now</button>
       </div>
     </div>
-  </section>
 
-  <section class="card">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Auto-generated docs</p>
-        <h2>Cover letter, SOQ, reminders</h2>
-      </div>
-      <button id="generateDocs" class="primary-btn" type="button">Generate documents</button>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%;"></div>
     </div>
-    <div id="docsContainer" class="docs-container empty">Generate to see documents.</div>
-  </section>
+    <div class="progress-label">
+      <span id="progressText">Step 1 of 4</span>
+      <span id="progressPercent">0% complete</span>
+    </div>
 
-  <section class="card">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Preview &amp; edit</p>
-        <h2>Fine-tune before export</h2>
-      </div>
-      <div class="right-actions">
-        <button id="exportWord" class="primary-btn" type="button">Export Word</button>
-        <button id="exportPdf" class="ghost-btn" type="button">Export PDF</button>
-      </div>
-    </div>
-    <div class="grid two-col">
-      <div class="field">
-        <label>Cover letter</label>
-        <textarea id="coverEdit" rows="12" style="width:100%;"></textarea>
-      </div>
-      <div class="field">
-        <label>Statement of Qualifications (editable)</label>
-        <textarea id="soqEdit" rows="12" style="width:100%;"></textarea>
-      </div>
-    </div>
-  </section>
+    <div id="statusMessage" class="state-card hidden"></div>
 
-  <section class="card">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Draft answers</p>
-        <h2>Per-question content</h2>
-      </div>
-      <div class="right-actions">
-        <div id="presenceBar" class="pill" style="display:none;">Live: <span id="presenceList">0</span></div>
-        <button id="resultsClear" class="ghost-btn" type="button">Clear</button>
-      </div>
-    </div>
-    <div class="split-panel">
-      <aside class="question-sidebar">
-        <div class="sidebar-header">
-          <h3>Questions</h3>
-          <span class="badge" id="questionBadge">0/0</span>
+    <div id="step1" class="wizard-step active">
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <div class="step-info">
+          <h2>Select Opportunity &amp; Upload RFP</h2>
+          <p>Choose a tracked solicitation and upload the RFP document</p>
         </div>
-        <div class="question-list" id="questionList"></div>
-        <button class="add-question-btn" id="addQuestionBtn" type="button">
-          <span class="icon">+</span>
-          Add Question
+      </div>
+      <div class="step-content">
+        <div class="form-group">
+          <label class="form-label" for="genOpportunity">Opportunity</label>
+          <div class="select-wrapper">
+            <select id="genOpportunity" class="form-select">
+              <option value="">Select a tracked solicitation...</option>
+            </select>
+            <span class="select-arrow">&#9662;</span>
+          </div>
+        </div>
+        <div id="uploadArea" class="upload-area">
+          <div class="upload-icon">&#128196;</div>
+          <p class="upload-text">Drop your RFP here or click to browse</p>
+          <p class="upload-hint">PDF, DOCX, or TXT up to 25MB</p>
+          <input type="file" id="rfpUploadInput" hidden accept=".pdf,.docx,.doc,.txt" />
+        </div>
+        <div id="uploadedFile" class="uploaded-file hidden">
+          <div class="file-icon">&#128196;</div>
+          <div class="file-details">
+            <span id="fileName" class="file-name"></span>
+            <span id="fileSize" class="file-size"></span>
+          </div>
+          <button id="removeFile" class="file-remove" type="button" title="Remove file">&times;</button>
+        </div>
+      </div>
+      <div class="step-actions">
+        <button id="step1Next" class="btn-primary" type="button" disabled>
+          Continue to Extraction &rarr;
         </button>
-      </aside>
-      <main class="editor-panel">
-        <div class="editor-header">
-          <div class="question-nav">
-            <button class="nav-btn" id="prevQuestion" type="button">←</button>
-            <span class="question-number" id="questionNumber">Question 0 of 0</span>
-            <button class="nav-btn" id="nextQuestion" type="button">→</button>
-          </div>
-          <div class="editor-actions">
-            <button class="action-btn" id="regenerateBtn" type="button">
-              <span class="icon">↻</span> Regenerate
-            </button>
-            <button class="action-btn success" id="approveBtn" type="button">
-              <span class="icon">✓</span> Approve
-            </button>
-          </div>
-        </div>
-        <div class="question-display">
-          <h2 id="currentQuestion">Select a question</h2>
-          <div class="question-meta" id="questionMeta"></div>
-        </div>
-        <div class="answer-editor">
-          <div class="editor-toolbar">
-            <button class="toolbar-btn" title="Bold" type="button"><b>B</b></button>
-            <button class="toolbar-btn" title="Italic" type="button"><i>I</i></button>
-            <button class="toolbar-btn" title="Bullet list" type="button">•</button>
-            <span class="toolbar-divider"></span>
-            <button class="toolbar-btn" title="Insert from library" type="button">📚</button>
-            <button class="toolbar-btn" title="AI suggestions" type="button">✨</button>
-          </div>
-          <div class="rich-editor" contenteditable="true" id="answerEditor"></div>
-          <div class="editor-footer">
-            <div class="word-count">
-              <span class="count" id="wordCount">0</span>
-              <span>/</span>
-              <span id="wordLimit">0</span>
-              <span>words</span>
-              <span class="compliance-badge success" id="complianceBadge">Draft</span>
-            </div>
-            <div class="confidence-score">
-              <span class="label">AI Confidence:</span>
-              <div class="confidence-bar">
-                <div class="confidence-fill" id="confidenceFill" style="width: 0%;"></div>
-              </div>
-              <span class="value" id="confidenceValue">0%</span>
-            </div>
-          </div>
-        </div>
-        <div class="ai-suggestions" id="suggestions" style="display:none;">
-          <div class="suggestion-header">
-            <span class="icon">💡</span>
-            <span>AI Suggestions</span>
-          </div>
-          <div class="suggestion-item">
-            <p id="suggestionText">Add specific metrics or references to boost compliance.</p>
-            <button class="apply-btn" id="applySuggestion" type="button">Apply</button>
-          </div>
-        </div>
-      </main>
-    </div>
-    <div class="card inset">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Step 3</p>
-          <h3>Auto-detect questions</h3>
-          <p class="hint">Detect questions from the uploaded RFP. You can edit or add more.</p>
-        </div>
-        <button id="detectQuestions" class="ghost-btn" type="button">Detect questions</button>
       </div>
     </div>
-    <form id="genForm" class="stack">
-      <div class="grid two-col">
-        <div class="field">
-          <label>Custom instructions</label>
-          <input id="genInstructions" type="text" placeholder="Emphasize local presence and 24/7 response">
+
+    <div id="step2" class="wizard-step">
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <div class="step-info">
+          <h2>Extract RFP Information</h2>
+          <p>AI will analyze your document and extract key details</p>
         </div>
       </div>
-      <div class="card inset">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Sections</p>
-            <h3>Add RFP questions</h3>
-          </div>
-          <button id="addSection" class="ghost-btn" type="button">Add section</button>
+      <div class="step-content">
+        <div class="extract-prompt">
+          <p>We'll extract the following from your RFP:</p>
+          <ul class="extract-list">
+            <li>&#10003; Summary &amp; scope of work</li>
+            <li>&#10003; Submission requirements</li>
+            <li>&#10003; Required documents checklist</li>
+            <li>&#10003; Key dates &amp; deadlines</li>
+            <li>&#10003; Evaluation criteria</li>
+            <li>&#10003; Contact information</li>
+          </ul>
         </div>
-        <div id="sectionsList" class="sections-list"></div>
-        <div class="grid three-col" id="newSectionForm">
-          <input id="secQuestion" type="text" placeholder="Question text">
-          <input id="secMaxWords" type="number" min="0" placeholder="Max words (optional)">
-          <label class="checkbox">
-            <input id="secRequired" type="checkbox" checked>
-            <span>Required</span>
+        <button id="extractBtn" class="btn-extract" type="button" disabled>
+          &#10024; Extract RFP Details
+        </button>
+        <div id="extractStatus" class="state-card hidden"></div>
+        <div id="extractResults" class="extract-results hidden">
+          <div class="result-columns">
+            <div class="result-section">
+              <h3>Summary</h3>
+              <p id="summaryText"></p>
+            </div>
+            <div class="result-section">
+              <h3>Checklist</h3>
+              <ul id="checklistItems"></ul>
+            </div>
+          </div>
+          <div class="result-section">
+            <h3>Key Dates</h3>
+            <div id="keyDates"></div>
+          </div>
+        </div>
+      </div>
+      <div class="step-actions">
+        <button id="step2Back" class="btn-secondary" type="button">&larr; Back</button>
+        <button id="step2Next" class="btn-primary" type="button" disabled>
+          Continue to Generate &rarr;
+        </button>
+      </div>
+    </div>
+
+    <div id="step3" class="wizard-step">
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <div class="step-info">
+          <h2>Generate &amp; Edit Response</h2>
+          <p>AI will draft your cover letter and responses</p>
+        </div>
+      </div>
+      <div class="step-content">
+        <div class="generate-options">
+          <label class="generate-option selected">
+            <input type="checkbox" checked>
+            <div class="option-content">
+              &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
+            </div>
+          </label>
+          <label class="generate-option selected">
+            <input type="checkbox" checked>
+            <div class="option-content">
+              &#128203; <div><strong>Statement of Qualifications</strong><span>Company capabilities &amp; experience</span></div>
+            </div>
           </label>
         </div>
-      </div>
-      <button class="primary-btn" type="submit">Generate with OpenAI</button>
-    </form>
-    <div id="results" class="results"></div>
-    <div class="card inset">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Comments</p>
-          <h3>Inline review</h3>
-          <p class="hint">Comments sync live for all collaborators.</p>
+        <div class="custom-instructions form-group">
+          <label class="form-label">Custom Instructions (optional)</label>
+          <input id="customInstructions" class="form-input" placeholder="e.g., Emphasize our local presence and 24/7 support">
+        </div>
+        <button id="generateBtn" class="btn-generate" type="button" disabled>
+          &#10024; Generate with AI
+        </button>
+        <div id="generateError" class="state-card error hidden"></div>
+
+        <div id="documentEditor" class="document-editor hidden">
+          <div class="editor-tabs">
+            <button class="editor-tab active" type="button" data-doc="cover">&#128221; Cover Letter</button>
+            <button class="editor-tab" type="button" data-doc="responses">&#128203; Responses</button>
+            <div class="editor-tab-actions">
+              <button class="tab-action" type="button" title="Fullscreen">&#9939;</button>
+            </div>
+          </div>
+          <div class="editor-toolbar">
+            <div class="toolbar-group">
+              <button class="toolbar-btn" type="button" data-format="bold"><b>B</b></button>
+              <button class="toolbar-btn" type="button" data-format="italic"><i>I</i></button>
+              <button class="toolbar-btn" type="button" data-format="underline"><u>U</u></button>
+            </div>
+            <span class="toolbar-divider"></span>
+            <div class="toolbar-group">
+              <button class="toolbar-btn" type="button" data-format="h1">H1</button>
+              <button class="toolbar-btn" type="button" data-format="h2">H2</button>
+              <button class="toolbar-btn" type="button" data-format="h3">H3</button>
+            </div>
+            <span class="toolbar-divider"></span>
+            <div class="toolbar-group">
+              <button class="toolbar-btn" type="button" data-format="ul">&bull;</button>
+              <button class="toolbar-btn" type="button" data-format="ol">1.</button>
+            </div>
+            <div class="toolbar-spacer"></div>
+            <div class="badge success">Autosave ready</div>
+          </div>
+          <div class="editor-split">
+            <div class="editor-pane">
+              <div class="pane-header">EDIT</div>
+              <div id="editableContent" class="editable-content" contenteditable="true"></div>
+            </div>
+            <div class="preview-pane">
+              <div class="pane-header">PREVIEW</div>
+              <div class="document-preview">
+                <div class="preview-page">
+                  <div id="previewContent" class="preview-content"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="editor-footer">
+            <div class="doc-status-bar">
+              <span class="status-dot"></span>
+              <span id="wordCount">0 words</span>
+            </div>
+            <div class="ai-actions">
+              <button id="improveBtn" class="ai-action-btn" type="button">&#10024; Improve</button>
+              <button id="shortenBtn" class="ai-action-btn" type="button">&#128201; Shorten</button>
+              <button id="expandBtn" class="ai-action-btn" type="button">&#128200; Expand</button>
+              <button class="ai-action-btn" type="button" id="manualSaveInline">Save</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div id="commentsList" class="comments-list"></div>
-      <div class="grid two-col">
-        <input id="commentText" type="text" placeholder="Add a comment about a section...">
-        <button id="commentSend" class="ghost-btn" type="button">Send</button>
+      <div class="step-actions">
+        <button class="btn-secondary" type="button" id="step3Back">&larr; Back</button>
+        <button class="btn-primary" type="button" id="step3Next" disabled>
+          Continue to Review &rarr;
+        </button>
       </div>
     </div>
-  </section>
+
+    <div id="step4" class="wizard-step">
+      <div class="step-header">
+        <div class="step-number">4</div>
+        <div class="step-info">
+          <h2>Review &amp; Export</h2>
+          <p>Final review before downloading your response package</p>
+        </div>
+      </div>
+      <div class="step-content">
+        <div class="review-summary">
+          <div class="review-item">
+            <span>&#10003;</span>
+            <div><strong>Opportunity</strong><span id="reviewOpportunity">&mdash;</span></div>
+          </div>
+          <div class="review-item">
+            <span>&#10003;</span>
+            <div><strong>Cover Letter</strong><span>Generated and edited</span></div>
+          </div>
+          <div class="review-item">
+            <span>&#10003;</span>
+            <div><strong>Statement of Qualifications</strong><span>Generated and edited</span></div>
+          </div>
+        </div>
+        <div class="export-section">
+          <h3>Download Your Package</h3>
+          <p>Choose your preferred format</p>
+          <div class="export-buttons">
+            <button id="exportWord" class="btn-export" type="button">
+              &#128196; <div><strong>Word Document</strong><span>.docx format</span></div>
+            </button>
+            <button id="exportPdf" class="btn-export" type="button">
+              &#128213; <div><strong>PDF Document</strong><span>.pdf format</span></div>
+            </button>
+          </div>
+        </div>
+        <div id="completionMessage" class="completion-message hidden">
+          <div class="completion-icon">&#10003;</div>
+          <h3>Response Package Complete!</h3>
+          <p>Your documents are ready for submission.</p>
+          <button id="startNew" class="btn-primary">Start New Response</button>
+        </div>
+      </div>
+      <div class="step-actions">
+        <button class="btn-secondary" type="button" id="step4Back">&larr; Back to Edit</button>
+      </div>
+    </div>
+  </div>
+  <div id="saveIndicator" class="save-indicator hidden">Saved</div>
 </main>
 
-<script>
-  window.AI_TOOLS_CONFIG = {{ "user_email": "{user_email or ''}" }};
-</script>
-<script src="/static/js/ai_tools.js?v={STATIC_VER}"></script>
+<script src="/static/js/ai-studio.js?v={STATIC_VER}"></script>
     """
     return HTMLResponse(page_shell(body, title="AI Studio", user_email=user_email))
