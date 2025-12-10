@@ -79,6 +79,29 @@ async def ai_tools_page(request: Request):
   <section class="card">
     <div class="section-heading">
       <div>
+        <p class="eyebrow">Preview &amp; edit</p>
+        <h2>Fine-tune before export</h2>
+      </div>
+      <div class="right-actions">
+        <button id="exportWord" class="primary-btn" type="button">Export Word</button>
+        <button id="exportPdf" class="ghost-btn" type="button">Export PDF</button>
+      </div>
+    </div>
+    <div class="grid two-col">
+      <div class="field">
+        <label>Cover letter</label>
+        <textarea id="coverEdit" rows="12" style="width:100%;"></textarea>
+      </div>
+      <div class="field">
+        <label>Statement of Qualifications (editable)</label>
+        <textarea id="soqEdit" rows="12" style="width:100%;"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
         <p class="eyebrow">Draft answers</p>
         <h2>Per-question content</h2>
       </div>

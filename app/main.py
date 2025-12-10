@@ -247,6 +247,7 @@ from app.api import (
     rfp_responses,
     rfp_extract,
     opportunity_generate,
+    opportunity_export,
 )
 from app.api.bid_tracker import router as tracker_router
 from app.api.uploads import router as uploads_router
@@ -282,6 +283,7 @@ app.include_router(knowledge_base.router)
 app.include_router(rfp_responses.router)
 app.include_router(rfp_extract.router)
 app.include_router(opportunity_generate.router)
+app.include_router(opportunity_export.router)
 app.include_router(tracked_opps.router)
 
 # -------------------------------------------------------------------

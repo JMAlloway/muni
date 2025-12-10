@@ -33,6 +33,10 @@
   const generateDocsBtn = document.getElementById("generateDocs");
   const docsContainer = document.getElementById("docsContainer");
   const regenSummaryBtn = document.getElementById("regenSummary");
+  const coverEdit = document.getElementById("coverEdit");
+  const soqEdit = document.getElementById("soqEdit");
+  const exportWordBtn = document.getElementById("exportWord");
+  const exportPdfBtn = document.getElementById("exportPdf");
   const overlay = document.createElement("div");
   overlay.className = "loading-overlay";
   overlay.innerHTML = `<div class="spinner"></div><div class="loading-text">Working...</div>`;
@@ -46,6 +50,8 @@
     sections: [],
     loading: false,
     extracted: null,
+    coverDraft: "",
+    soqDraft: "",
   };
 
   function setLoading(flag) {
@@ -432,6 +438,113 @@ ${toText(soq.appendices)}
         }
       });
     });
+
+    state.coverDraft = toText(cover);
+    state.soqDraft = toText(`
+COVER PAGE
+${toText(soq.cover_page)}
+
+COMPANY OVERVIEW
+${toText(soq.company_overview)}
+
+LEGAL STRUCTURE
+${toText(soq.legal_structure)}
+
+BUSINESS CERTIFICATIONS
+${toText(soq.business_certifications)}
+
+PROGRAMS SERVED
+${toText(soq.programs_served)}
+
+CRIMINAL HISTORY POLICY
+${toText(soq.criminal_history_policy)}
+
+RECORDKEEPING CONTROLS
+${toText(soq.recordkeeping_controls)}
+
+PROJECT MANAGER
+${toText(soq.project_manager)}
+
+KEY PERSONNEL
+${toText(soq.key_personnel)}
+
+ORGANIZATIONAL CAPACITY
+${toText(soq.organizational_capacity)}
+
+RELEVANT PROJECTS
+${toText(soq.relevant_projects)}
+
+LOW INCOME PROGRAMS
+${toText(soq.low_income_programs)}
+
+TIMELINES
+${toText(soq.timelines)}
+
+CONTRACTOR LICENSES
+${toText(soq.contractor_licenses)}
+
+TRAININGS COMPLETED
+${toText(soq.trainings_completed)}
+
+CERTIFICATIONS
+${toText(soq.certifications)}
+
+TRAINING PLAN
+${toText(soq.training_plan)}
+
+INSURANCE
+${toText(soq.insurance)}
+
+COMPLIANCE STATEMENTS
+${toText(soq.compliance_statements)}
+
+APPENDICES
+${toText(soq.appendices)}
+`);
+
+    renderEditableDocs();
+  }
+
+  function renderEditableDocs() {
+    if (coverEdit) coverEdit.value = state.coverDraft || "";
+    if (soqEdit) soqEdit.value = state.soqDraft || "";
+  }
+
+  async function exportDocs(format) {
+    if (!genOpportunity || !genOpportunity.value) {
+      alert("Select an opportunity first.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/opportunities/${encodeURIComponent(genOpportunity.value)}/export?format=${format}`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCSRF(),
+        },
+        body: JSON.stringify({
+          cover_letter: coverEdit ? coverEdit.value : state.coverDraft,
+          soq_body: soqEdit ? soqEdit.value : state.soqDraft,
+          title: state.extracted?.title || "",
+          agency: state.extracted?.agency || "",
+        }),
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = format === "pdf" ? "pdf" : "docx";
+      a.download = `soq.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function fetchUploads() {
