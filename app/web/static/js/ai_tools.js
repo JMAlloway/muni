@@ -7,19 +7,13 @@
     }
   };
 
-  const kbListEl = document.getElementById("kbList");
-  const refreshBtn = document.getElementById("refreshDocs");
-  const uploadForm = document.getElementById("kbUploadForm");
-  const kbDocType = document.getElementById("kbDocType");
-  const kbTags = document.getElementById("kbTags");
-  const kbFiles = document.getElementById("kbFiles");
-  const selectAllDocsBtn = document.getElementById("selectAllDocs");
-  const clearDocsBtn = document.getElementById("clearDocs");
   const genForm = document.getElementById("genForm");
   const genOpportunity = document.getElementById("genOpportunity");
   const genInstructions = document.getElementById("genInstructions");
   const uploadsList = document.getElementById("uploadsList");
   const refreshUploads = document.getElementById("refreshUploads");
+  const rfpUploadBtn = document.getElementById("rfpUploadBtn");
+  const rfpUploadInput = document.getElementById("rfpUploadInput");
   const addSectionBtn = document.getElementById("addSection");
   const sectionsList = document.getElementById("sectionsList");
   const secQuestion = document.getElementById("secQuestion");
@@ -37,14 +31,19 @@
   const soqEdit = document.getElementById("soqEdit");
   const exportWordBtn = document.getElementById("exportWord");
   const exportPdfBtn = document.getElementById("exportPdf");
+  const detectQuestionsBtn = document.getElementById("detectQuestions");
+  const presenceBar = document.getElementById("presenceBar");
+  const presenceList = document.getElementById("presenceList");
+  const commentsList = document.getElementById("commentsList");
+  const commentText = document.getElementById("commentText");
+  const commentSend = document.getElementById("commentSend");
+
   const overlay = document.createElement("div");
   overlay.className = "loading-overlay";
   overlay.innerHTML = `<div class="spinner"></div><div class="loading-text">Working...</div>`;
   document.body.appendChild(overlay);
 
   const state = {
-    docs: [],
-    selectedDocs: new Set(),
     uploads: [],
     selectedUploads: new Set(),
     sections: [],
@@ -52,6 +51,11 @@
     extracted: null,
     coverDraft: "",
     soqDraft: "",
+    responseId: null,
+    ws: null,
+    presence: [],
+    comments: [],
+    latestSections: [],
   };
 
   function setLoading(flag) {
@@ -65,65 +69,20 @@
     }
   }
 
-  async function fetchDocs() {
-    try {
-      const res = await fetch("/api/knowledge/list", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load docs");
-      const data = await res.json();
-      state.docs = Array.isArray(data) ? data : [];
-      renderDocs();
-    } catch (err) {
-      console.error(err);
-      kbListEl.innerHTML = `<div class="empty">Unable to load documents</div>`;
-    }
-  }
-
-  function renderDocs() {
-    if (!kbListEl) return;
-    if (!state.docs.length) {
-      kbListEl.innerHTML = `<div class="empty">No knowledge documents yet.</div>`;
-      return;
-    }
-    kbListEl.innerHTML = "";
-    state.docs.forEach((doc) => {
-      const card = document.createElement("div");
-      card.className = "kb-item";
-      const checked = state.selectedDocs.has(doc.id) ? "checked" : "";
-      card.innerHTML = `
-        <label class="checkbox">
-          <input type="checkbox" data-id="${doc.id}" ${checked}>
-          <span></span>
-        </label>
-        <div class="meta">
-          <div class="title">${doc.filename || "Untitled"}</div>
-          <div class="tags">${(doc.tags || []).map((t) => `<span class="tag">${t}</span>`).join("")}</div>
-          <div class="status pill ${doc.extraction_status || ""}">${doc.extraction_status || "pending"}</div>
-        </div>
-        <div class="actions">
-          <button class="ghost-btn" data-action="preview" data-id="${doc.id}">Preview</button>
-          <button class="ghost-btn" data-action="extract" data-id="${doc.id}">Extract</button>
-          <button class="ghost-btn danger" data-action="delete" data-id="${doc.id}">Delete</button>
-        </div>
-      `;
-      kbListEl.appendChild(card);
-    });
-  }
-
   async function fetchTracked() {
-    const sel = genOpportunity;
-    if (!sel) return;
+    if (!genOpportunity) return;
     try {
       const res = await fetch("/api/tracked/my", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load tracked");
       const data = await res.json();
-      sel.innerHTML = `<option value="">Select a tracked solicitation</option>`;
+      genOpportunity.innerHTML = `<option value="">Select a tracked solicitation</option>`;
       (Array.isArray(data) ? data : []).forEach((row) => {
         const opt = document.createElement("option");
         opt.value = row.id;
         const due = row.due_date ? ` | due ${row.due_date}` : "";
         const agency = row.agency_name ? ` | ${row.agency_name}` : "";
         opt.textContent = `${row.title || row.id}${agency}${due}`;
-        sel.appendChild(opt);
+        genOpportunity.appendChild(opt);
       });
     } catch (err) {
       console.error(err);
@@ -131,25 +90,23 @@
   }
 
   async function fetchExtraction() {
-    const sel = genOpportunity;
-    if (!sel || !sel.value) {
+    if (!genOpportunity || !genOpportunity.value) {
       state.extracted = null;
       renderSummary();
       return;
     }
     try {
-      const res = await fetch(`/api/opportunities/${encodeURIComponent(sel.value)}/extracted`, {
+      const res = await fetch(`/api/opportunities/${encodeURIComponent(genOpportunity.value)}/extracted`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed extraction fetch");
       const data = await res.json();
       state.extracted = data;
-      renderSummary();
     } catch (err) {
       console.error(err);
       state.extracted = null;
-      renderSummary();
     }
+    renderSummary();
   }
 
   function renderSummary() {
@@ -245,7 +202,6 @@
     }
     setLoading(true);
     try {
-      // Re-extract from selected uploads (first one sufficient for now)
       const uploadIds = Array.from(state.selectedUploads);
       for (const uid of uploadIds) {
         await fetch(`/api/rfp-extract/${uid}`, {
@@ -256,7 +212,6 @@
       }
       await fetchExtraction();
 
-      // Generate docs to populate checklist/instructions in UI
       const res = await fetch(`/api/opportunities/${encodeURIComponent(genOpportunity.value)}/generate`, {
         method: "POST",
         credentials: "include",
@@ -289,11 +244,10 @@
 
   function renderDocs(docs) {
     if (!docsContainer) return;
-    docsContainer.classList.remove("empty");
-    const cover = docs.cover_letter || "";
-    const soq = docs.soq || {};
-    const checklist = docs.submission_checklist || docs.checklist || [];
-    const events = docs.calendar_events || [];
+    const cover = docs?.cover_letter || "";
+    const soq = docs?.soq || {};
+    const checklist = docs?.submission_checklist || docs?.checklist || [];
+    const events = docs?.calendar_events || [];
 
     const toText = (val) => {
       if (Array.isArray(val)) {
@@ -320,6 +274,7 @@
       URL.revokeObjectURL(url);
     }
 
+    docsContainer.classList.remove("empty");
     docsContainer.innerHTML = `
       <article class="result">
         <div class="result-head">
@@ -560,13 +515,70 @@ ${toText(soq.appendices)}
       const data = await res.json();
       const rows = Array.isArray(data) ? data : [];
       state.uploads = rows;
-      state.selectedUploads = new Set(
-        Array.from(state.selectedUploads).filter((id) => rows.some((r) => r.id === id))
-      );
+      if (!state.selectedUploads.size && rows.length) {
+        state.selectedUploads = new Set([rows[0].id]);
+      } else {
+        state.selectedUploads = new Set(Array.from(state.selectedUploads).filter((id) => rows.some((r) => r.id === id)));
+      }
       renderUploads(rows);
     } catch (err) {
       console.error(err);
       renderUploads([]);
+    }
+  }
+
+  async function uploadRfp(files) {
+    const oid = genOpportunity && genOpportunity.value;
+    if (!oid) {
+      alert("Select an opportunity first.");
+      return;
+    }
+    if (!files || !files.length) return;
+    const fd = new FormData();
+    fd.append("opportunity_id", oid);
+    Array.from(files).forEach((f) => fd.append("files", f, f.name));
+    setLoading(true);
+    try {
+      const res = await fetch("/uploads/add", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRF-Token": getCSRF() },
+        body: fd,
+      });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+      await fetchUploads();
+    } catch (err) {
+      alert("Upload failed: " + err);
+    } finally {
+      setLoading(false);
+      if (rfpUploadInput) rfpUploadInput.value = "";
+    }
+  }
+
+  async function detectQuestions() {
+    if (!genOpportunity || !genOpportunity.value) {
+      alert("Select an opportunity first.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/opportunities/${encodeURIComponent(genOpportunity.value)}/detect-questions`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to detect questions");
+      const data = await res.json();
+      const qs = (data.questions || []).map((q, idx) => ({
+        id: q.id || `q-${Date.now()}-${idx}`,
+        question: q.text || q.question || "",
+        max_words: q.word_limit || q.page_limit || null,
+        required: true,
+      }));
+      state.sections = qs;
+      renderSections();
+    } catch (err) {
+      alert("Detect failed: " + err);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -595,120 +607,6 @@ ${toText(soq.appendices)}
     });
   }
 
-  if (kbListEl) {
-    kbListEl.addEventListener("change", (e) => {
-      const id = parseInt(e.target.getAttribute("data-id") || "", 10);
-      if (!id) return;
-      if (e.target.checked) state.selectedDocs.add(id);
-      else state.selectedDocs.delete(id);
-    });
-    kbListEl.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button");
-      if (!btn) return;
-      const action = btn.getAttribute("data-action");
-      const id = parseInt(btn.getAttribute("data-id") || "", 10);
-      if (!id) return;
-      if (action === "preview") {
-        try {
-          const res = await fetch(`/api/knowledge/${id}/preview`, { credentials: "include" });
-          if (!res.ok) throw new Error("Failed preview");
-          const data = await res.json();
-          alert((data.extraction_status || "pending") + ":\n\n" + (data.extracted_text || "No text"));
-        } catch (err) {
-          alert("Preview failed");
-        }
-      }
-      if (action === "extract") {
-        try {
-          const res = await fetch(`/api/knowledge/${id}/extract`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "X-CSRF-Token": getCSRF() },
-          });
-          const data = await res.json();
-          alert(`Extraction: ${data.extraction_status || "pending"}`);
-          fetchDocs();
-        } catch (_) {
-          alert("Extraction failed");
-        }
-      }
-      if (action === "delete") {
-        if (!confirm("Delete this document?")) return;
-        try {
-          const res = await fetch(`/api/knowledge/${id}`, {
-            method: "DELETE",
-            credentials: "include",
-            headers: { "X-CSRF-Token": getCSRF() },
-          });
-          if (!res.ok) throw new Error("delete");
-          state.selectedDocs.delete(id);
-          await fetchDocs();
-        } catch (err) {
-          alert("Delete failed");
-        }
-      }
-    });
-  }
-
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", fetchDocs);
-  }
-  fetchTracked();
-  if (refreshUploads) {
-    refreshUploads.addEventListener("click", fetchUploads);
-  }
-  if (selectAllDocsBtn) {
-    selectAllDocsBtn.addEventListener("click", () => {
-      state.docs.forEach((d) => state.selectedDocs.add(d.id));
-      renderDocs();
-    });
-  }
-  if (clearDocsBtn) {
-    clearDocsBtn.addEventListener("click", () => {
-      state.selectedDocs.clear();
-      renderDocs();
-    });
-  }
-  if (uploadsList) {
-    uploadsList.addEventListener("change", (e) => {
-      const id = parseInt(e.target.getAttribute("data-upload-id") || "", 10);
-      if (!id) return;
-      if (e.target.checked) state.selectedUploads.add(id);
-      else state.selectedUploads.delete(id);
-    });
-  }
-
-  if (uploadForm) {
-    uploadForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const files = kbFiles && kbFiles.files ? Array.from(kbFiles.files) : [];
-      if (!files.length) {
-        alert("Select at least one file.");
-        return;
-      }
-      const fd = new FormData();
-      fd.append("doc_type", kbDocType.value || "other");
-      fd.append("tags", kbTags.value || "[]");
-      files.forEach((f) => fd.append("files", f, f.name));
-      setLoading(true);
-      try {
-        const res = await fetch("/api/knowledge/upload", {
-          method: "POST",
-          credentials: "include",
-          headers: { "X-CSRF-Token": getCSRF() },
-          body: fd,
-        });
-        if (!res.ok) throw new Error("upload failed");
-        kbFiles.value = "";
-        await fetchDocs();
-      } catch (err) {
-        alert("Upload failed");
-      } finally {
-        setLoading(false);
-      }
-    });
-  }
-
   function renderSections() {
     if (!sectionsList) return;
     sectionsList.innerHTML = "";
@@ -734,6 +632,201 @@ ${toText(soq.appendices)}
     });
   }
 
+  function renderResults(data) {
+    if (!resultsEl) return;
+    const sections = data.sections || [];
+    state.responseId = data.response_id || state.responseId;
+    state.latestSections = sections.map((s) => ({ ...s }));
+    if (state.responseId) {
+      connectCollab(state.responseId);
+    }
+    if (!sections.length) {
+      resultsEl.innerHTML = `<div class="empty">No results yet.</div>`;
+      return;
+    }
+    resultsEl.innerHTML = "";
+    sections.forEach((s) => {
+      const card = document.createElement("article");
+      card.className = "result";
+      card.innerHTML = `
+        <div class="result-head">
+          <div>
+            <p class="eyebrow">${s.id || ""}</p>
+            <h4>${s.question || ""}</h4>
+          </div>
+          <div class="meta">
+            <span class="pill">${(s.confidence || 0).toFixed(2)} conf</span>
+            <span class="pill">${s.word_count || 0} words</span>
+          </div>
+        </div>
+        <div class="result-body">
+          <textarea data-section-id="${s.id || ""}" class="result-edit" rows="6" style="width:100%;">${s.answer || ""}</textarea>
+        </div>
+        <div class="result-foot">
+          <div class="hint">Sources: ${(s.sources || []).join(", ") || "None"}</div>
+        </div>
+      `;
+      const ta = card.querySelector("textarea");
+      if (ta) {
+        ta.addEventListener("input", (e) => handleLocalEdit(s.id, e.target.value));
+      }
+      resultsEl.appendChild(card);
+    });
+  }
+
+  function handleLocalEdit(sectionId, content) {
+    state.latestSections = (state.latestSections || []).map((s) =>
+      s.id === sectionId ? { ...s, answer: content } : s
+    );
+    if (state.ws && state.ws.readyState === WebSocket.OPEN && state.responseId) {
+      state.ws.send(
+        JSON.stringify({
+          type: "edit",
+          section_id: sectionId,
+          content,
+          cursor: null,
+        })
+      );
+    }
+  }
+
+  function applyRemoteEdit(sectionId, content, userEmail) {
+    state.latestSections = (state.latestSections || []).map((s) =>
+      s.id === sectionId ? { ...s, answer: content } : s
+    );
+    const ta = resultsEl?.querySelector(`textarea[data-section-id="${sectionId}"]`);
+    if (ta && ta !== document.activeElement) {
+      ta.value = content || "";
+      const note = document.createElement("div");
+      note.className = "hint";
+      note.textContent = `Updated by ${userEmail}`;
+      ta.parentElement?.appendChild(note);
+      setTimeout(() => note.remove(), 2000);
+    }
+  }
+
+  function renderPresence() {
+    if (!presenceBar || !presenceList) return;
+    if (!state.presence || !state.presence.length) {
+      presenceBar.style.display = "none";
+      return;
+    }
+    presenceBar.style.display = "inline-flex";
+    presenceList.textContent = state.presence.join(", ");
+  }
+
+  function renderComments() {
+    if (!commentsList) return;
+    const list = state.comments || [];
+    if (!list.length) {
+      commentsList.innerHTML = `<div class="empty">No comments yet.</div>`;
+      return;
+    }
+    commentsList.innerHTML = "";
+    list.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "comment-row";
+      row.innerHTML = `<strong>${c.user || "User"}:</strong> ${c.content || ""} ${c.section_id ? `(Section ${c.section_id})` : ""}`;
+      commentsList.appendChild(row);
+    });
+  }
+
+  function connectCollab(responseId) {
+    if (!responseId || typeof WebSocket === "undefined") return;
+    if (state.ws) {
+      try {
+        state.ws.close();
+      } catch (_) {}
+    }
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${window.location.host}/ws/response/${responseId}`);
+    state.ws = ws;
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === "presence") {
+          state.presence = msg.users || [];
+          renderPresence();
+        } else if (msg.type === "edit") {
+          applyRemoteEdit(msg.section_id, msg.content, msg.user);
+        } else if (msg.type === "comment") {
+          state.comments = [...(state.comments || []), msg];
+          renderComments();
+        } else if (msg.type === "init") {
+          state.comments = msg.comments || [];
+          state.presence = msg.presence || [];
+          renderPresence();
+          renderComments();
+        }
+      } catch (err) {
+        console.error("WS message error", err);
+      }
+    };
+    ws.onclose = () => {
+      state.ws = null;
+    };
+  }
+
+  if (resultsClear) {
+    resultsClear.addEventListener("click", () => {
+      resultsEl.innerHTML = `<div class="empty">Cleared.</div>`;
+    });
+  }
+  if (commentSend) {
+    commentSend.addEventListener("click", () => {
+      const text = (commentText?.value || "").trim();
+      if (!text || !state.ws || state.ws.readyState !== WebSocket.OPEN) {
+        if (!text) alert("Enter a comment first.");
+        return;
+      }
+      state.ws.send(
+        JSON.stringify({
+          type: "comment",
+          content: text,
+          section_id: null,
+          created_at: new Date().toISOString(),
+        })
+      );
+      commentText.value = "";
+    });
+  }
+
+  if (genOpportunity) {
+    genOpportunity.addEventListener("change", () => {
+      fetchExtraction();
+      fetchUploads();
+    });
+  }
+  if (uploadsList) {
+    uploadsList.addEventListener("change", (e) => {
+      const id = parseInt(e.target.getAttribute("data-upload-id") || "", 10);
+      if (!id) return;
+      if (e.target.checked) state.selectedUploads.add(id);
+      else state.selectedUploads.delete(id);
+    });
+  }
+  if (refreshUploads) {
+    refreshUploads.addEventListener("click", fetchUploads);
+  }
+  if (rfpUploadBtn && rfpUploadInput) {
+    rfpUploadBtn.addEventListener("click", () => rfpUploadInput.click());
+    rfpUploadInput.addEventListener("change", () => uploadRfp(rfpUploadInput.files));
+  }
+  if (detectQuestionsBtn) {
+    detectQuestionsBtn.addEventListener("click", detectQuestions);
+  }
+  if (generateDocsBtn) {
+    generateDocsBtn.addEventListener("click", generateDocs);
+  }
+  if (regenSummaryBtn) {
+    regenSummaryBtn.addEventListener("click", regenerateSummary);
+  }
+  if (exportWordBtn) {
+    exportWordBtn.addEventListener("click", () => exportDocs("docx"));
+  }
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener("click", () => exportDocs("pdf"));
+  }
   if (addSectionBtn) {
     addSectionBtn.addEventListener("click", () => {
       const q = (secQuestion.value || "").trim();
@@ -766,7 +859,7 @@ ${toText(soq.appendices)}
       const payload = {
         opportunity_id: genOpportunity.value || "",
         win_theme_ids: [],
-        knowledge_doc_ids: Array.from(state.selectedDocs),
+        knowledge_doc_ids: [],
         instruction_upload_ids: Array.from(state.selectedUploads),
         custom_instructions: genInstructions.value || "",
         sections: state.sections.map((s) => ({
@@ -801,58 +894,8 @@ ${toText(soq.appendices)}
     });
   }
 
-  function renderResults(data) {
-    if (!resultsEl) return;
-    const sections = data.sections || [];
-    if (!sections.length) {
-      resultsEl.innerHTML = `<div class="empty">No results yet.</div>`;
-      return;
-    }
-    resultsEl.innerHTML = "";
-    sections.forEach((s) => {
-      const card = document.createElement("article");
-      card.className = "result";
-      card.innerHTML = `
-        <div class="result-head">
-          <div>
-            <p class="eyebrow">${s.id || ""}</p>
-            <h4>${s.question || ""}</h4>
-          </div>
-          <div class="meta">
-            <span class="pill">${(s.confidence || 0).toFixed(2)} conf</span>
-            <span class="pill">${s.word_count || 0} words</span>
-          </div>
-        </div>
-        <div class="result-body">${(s.answer || "").replace(/\\n/g, "<br>")}</div>
-        <div class="result-foot">
-          <div class="hint">Sources: ${(s.sources || []).join(", ") || "None"}</div>
-        </div>
-      `;
-      resultsEl.appendChild(card);
-    });
-  }
-
-  if (resultsClear) {
-    resultsClear.addEventListener("click", () => {
-      resultsEl.innerHTML = `<div class="empty">Cleared.</div>`;
-    });
-  }
-
-  if (genOpportunity) {
-    genOpportunity.addEventListener("change", () => {
-      fetchExtraction();
-      fetchUploads();
-    });
-  }
-  if (generateDocsBtn) {
-    generateDocsBtn.addEventListener("click", generateDocs);
-  }
-  if (regenSummaryBtn) {
-    regenSummaryBtn.addEventListener("click", regenerateSummary);
-  }
-
   // Initial load
-  fetchDocs();
+  fetchTracked();
   renderSections();
   fetchExtraction();
-})(); 
+})();

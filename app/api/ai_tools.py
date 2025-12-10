@@ -46,6 +46,20 @@ async def ai_tools_page(request: Request):
     <div class="card inset">
       <div class="section-heading">
         <div>
+          <p class="eyebrow">Step 1</p>
+          <h3>Upload RFP</h3>
+          <p class="hint">Drop the RFP file for this opportunity. Extraction runs automatically.</p>
+        </div>
+        <div class="right-actions">
+          <input type="file" id="rfpUploadInput" style="display:none;" />
+          <button id="rfpUploadBtn" class="primary-btn" type="button">Upload RFP</button>
+        </div>
+      </div>
+      <p class="hint">Latest upload is used to extract summary, questions, and instructions.</p>
+    </div>
+    <div class="card inset">
+      <div class="section-heading">
+        <div>
           <p class="eyebrow">RFP instructions</p>
           <h3>Select uploaded instruction docs</h3>
         </div>
@@ -105,7 +119,20 @@ async def ai_tools_page(request: Request):
         <p class="eyebrow">Draft answers</p>
         <h2>Per-question content</h2>
       </div>
-      <button id="resultsClear" class="ghost-btn" type="button">Clear</button>
+      <div class="right-actions">
+        <div id="presenceBar" class="pill" style="display:none;">Live: <span id="presenceList">0</span></div>
+        <button id="resultsClear" class="ghost-btn" type="button">Clear</button>
+      </div>
+    </div>
+    <div class="card inset">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Step 3</p>
+          <h3>Auto-detect questions</h3>
+          <p class="hint">Detect questions from the uploaded RFP. You can edit or add more.</p>
+        </div>
+        <button id="detectQuestions" class="ghost-btn" type="button">Detect questions</button>
+      </div>
     </div>
     <form id="genForm" class="stack">
       <div class="grid two-col">
@@ -135,6 +162,20 @@ async def ai_tools_page(request: Request):
       <button class="primary-btn" type="submit">Generate with OpenAI</button>
     </form>
     <div id="results" class="results"></div>
+    <div class="card inset">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Comments</p>
+          <h3>Inline review</h3>
+          <p class="hint">Comments sync live for all collaborators.</p>
+        </div>
+      </div>
+      <div id="commentsList" class="comments-list"></div>
+      <div class="grid two-col">
+        <input id="commentText" type="text" placeholder="Add a comment about a section...">
+        <button id="commentSend" class="ghost-btn" type="button">Send</button>
+      </div>
+    </div>
   </section>
 </main>
 

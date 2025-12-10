@@ -81,6 +81,7 @@ from app.core.db_migrations import (
     ensure_opportunity_scope_columns,
     ensure_opportunity_extraction_schema,
     ensure_knowledge_base_schema,
+    ensure_response_library_schema,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -248,6 +249,9 @@ from app.api import (
     rfp_extract,
     opportunity_generate,
     opportunity_export,
+    opportunity_questions,
+    response_library_api,
+    collaboration,
 )
 from app.api.bid_tracker import router as tracker_router
 from app.api.uploads import router as uploads_router
@@ -284,6 +288,9 @@ app.include_router(rfp_responses.router)
 app.include_router(rfp_extract.router)
 app.include_router(opportunity_generate.router)
 app.include_router(opportunity_export.router)
+app.include_router(opportunity_questions.router)
+app.include_router(response_library_api.router)
+app.include_router(collaboration.router)
 app.include_router(tracked_opps.router)
 
 # -------------------------------------------------------------------
@@ -316,6 +323,7 @@ async def on_startup():
         await ensure_tracker_team_schema(engine)
         await ensure_opportunity_extraction_schema(engine)
         await ensure_knowledge_base_schema(engine)
+        await ensure_response_library_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 

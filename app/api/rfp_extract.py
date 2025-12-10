@@ -1,31 +1,16 @@
 import json
+import datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.auth.session import get_current_user_email
 from app.core.db_core import engine
 from app.services.document_processor import DocumentProcessor
 from app.services.rfp_extractor import RfpExtractor
 from app.storage import read_storage_bytes
+from app.api.auth_helpers import require_user_with_team, ensure_user_can_access_opportunity
 
 router = APIRouter(prefix="/api/rfp-extract", tags=["rfp-extract"])
-
-
-async def _require_user(request: Request):
-    email = get_current_user_email(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    async with engine.begin() as conn:
-        res = await conn.exec_driver_sql(
-            "SELECT id, email, team_id FROM users WHERE email = :e LIMIT 1",
-            {"e": email},
-        )
-        row = res.first()
-    if not row:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    m = row._mapping
-    return {"id": m["id"], "email": m["email"], "team_id": m.get("team_id")}
 
 
 async def _update_opportunity(opportunity_id: Any, extracted: Dict[str, Any]) -> None:
@@ -54,7 +39,7 @@ async def _update_opportunity(opportunity_id: Any, extracted: Dict[str, Any]) ->
 
 
 @router.post("/{upload_id}")
-async def extract_from_upload(upload_id: int, user=Depends(_require_user)):
+async def extract_from_upload(upload_id: int, user=Depends(require_user_with_team)):
     """
     Given an existing user_upload ID, extract structured RFP JSON and persist to the opportunity.
     """
@@ -72,6 +57,7 @@ async def extract_from_upload(upload_id: int, user=Depends(_require_user)):
         raise HTTPException(status_code=404, detail="Upload not found")
 
     rec = row._mapping
+    await ensure_user_can_access_opportunity(user, rec["opportunity_id"])
     data = read_storage_bytes(rec["storage_key"])
     if not data:
         raise HTTPException(status_code=400, detail="File is empty")
@@ -81,12 +67,19 @@ async def extract_from_upload(upload_id: int, user=Depends(_require_user)):
     text = extraction.get("text") or ""
 
     extractor = RfpExtractor()
-    extracted_json = extractor.extract_json(text)
+    extracted_all = extractor.extract_all(text)
+    ts = datetime.datetime.utcnow().isoformat()
+    # Wrap with versioning info
+    payload = {
+        "version": ts,
+        "discovery": extracted_all.get("discovery") or {},
+        "extracted": extracted_all.get("extracted") or {},
+    }
 
-    await _update_opportunity(rec["opportunity_id"], extracted_json)
+    await _update_opportunity(rec["opportunity_id"], payload)
 
     return {
         "ok": True,
         "opportunity_id": rec["opportunity_id"],
-        "extracted": extracted_json,
+        "extracted": payload,
     }

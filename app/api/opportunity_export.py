@@ -5,15 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.auth.session import get_current_user_email
+from app.api.auth_helpers import require_user_with_team, ensure_user_can_access_opportunity
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-export"])
-
-
-async def _require_user(request: Request):
-    email = get_current_user_email(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return {"email": email}
 
 
 def _build_docx(payload: Dict[str, Any]) -> bytes:
@@ -90,8 +84,9 @@ async def export_documents(
     opportunity_id: str,
     payload: Dict[str, Any],
     format: str = Query("docx", regex="^(docx|pdf)$"),
-    user=Depends(_require_user),
+    user=Depends(require_user_with_team),
 ):
+    await ensure_user_can_access_opportunity(user, opportunity_id)
     if not payload:
         raise HTTPException(status_code=400, detail="Missing payload")
     if format == "docx":

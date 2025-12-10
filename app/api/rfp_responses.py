@@ -4,15 +4,19 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+import logging
 from app.auth.session import get_current_user_email
 from app.core.db_core import engine
+from app.api.auth_helpers import ensure_user_can_access_opportunity
 from app.services.document_processor import DocumentProcessor
 from app.services.response_validator import run_basic_checks
 from app.services.rfp_generator import generate_section_answer
 from app.services.company_profile_template import merge_company_profile_defaults
+from app.services.response_library import ResponseLibrary
 from app.storage import read_storage_bytes
 
 router = APIRouter(prefix="/api/rfp-responses", tags=["rfp-responses"])
+resp_lib = ResponseLibrary()
 
 
 async def _require_user(request: Request):
@@ -42,7 +46,8 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
             if row and row[0]:
                 data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
                 return merge_company_profile_defaults(data)
-    except Exception:
+    except Exception as exc:
+        logging.warning("Failed to load company profile: %s", exc)
         pass
     return merge_company_profile_defaults({})
 
@@ -160,6 +165,7 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
         raise HTTPException(status_code=400, detail="opportunity_id is required")
     if not sections:
         raise HTTPException(status_code=400, detail="sections are required")
+    await ensure_user_can_access_opportunity(user, opportunity_id)
 
     win_theme_ids = payload.get("win_theme_ids") or []
     knowledge_doc_ids = payload.get("knowledge_doc_ids") or []
@@ -200,6 +206,15 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
                 "compliance": compliance,
             }
         )
+        try:
+            await resp_lib.store_response(
+                user,
+                question=section.get("question") or "",
+                answer=generated["answer"],
+                metadata={"opportunity_id": opportunity_id, "section_id": section.get("id")},
+            )
+        except Exception:
+            pass
 
     avg_score = 0.0
     scored = [r["compliance"]["score"] for r in results if r.get("compliance")]
@@ -275,6 +290,7 @@ async def get_rfp_response(response_id: int, user=Depends(_require_user)):
     data["selected_knowledge_docs"] = json.loads(data["selected_knowledge_docs"]) if data.get("selected_knowledge_docs") else []
     data["sections"] = json.loads(data["sections"]) if data.get("sections") else []
     data["compliance_issues"] = json.loads(data["compliance_issues"]) if data.get("compliance_issues") else []
+    data["review_comments"] = json.loads(data["review_comments"]) if data.get("review_comments") else []
     return data
 
 

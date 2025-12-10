@@ -1,5 +1,7 @@
 import json
 import datetime
+import logging
+import re
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,25 +12,12 @@ from app.services.document_processor import DocumentProcessor
 from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
 from app.storage import read_storage_bytes
+from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team
+from app.services.response_library import ResponseLibrary
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-generate"])
 
-
-async def _require_user(request: Request):
-    email = get_current_user_email(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    async with engine.begin() as conn:
-        res = await conn.exec_driver_sql(
-            "SELECT id, email, team_id FROM users WHERE email = :e LIMIT 1",
-            {"e": email},
-        )
-        row = res.first()
-    if not row:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    m = row._mapping
-    return {"id": m["id"], "email": m["email"], "team_id": m.get("team_id")}
-
+response_lib = ResponseLibrary()
 
 async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
     try:
@@ -41,8 +30,8 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
             if row and row[0]:
                 data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
                 return merge_company_profile_defaults(data)
-    except Exception:
-        pass
+    except Exception as exc:
+        logging.warning("Failed to load company profile: %s", exc)
     return merge_company_profile_defaults({})
 
 
@@ -69,8 +58,16 @@ def _contact_from_extracted(extracted: Dict[str, Any]) -> Dict[str, str]:
     return contact
 
 
+def _sanitize_text(val: str, max_chars: int = 8000) -> str:
+    if not val:
+        return ""
+    # Strip control chars and trim length
+    cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", val)
+    return cleaned[:max_chars]
+
+
 def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instructions_text: str = "") -> list[dict]:
-    instr = instructions_text or extracted.get("submission_instructions") or ""
+    instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
     return [
@@ -193,7 +190,8 @@ async def _load_instruction_text(user_id: Any, upload_ids: list[int]) -> str:
 
 
 @router.post("/{opportunity_id}/generate")
-async def generate_submission_docs(opportunity_id: str, payload: dict | None = None, user=Depends(_require_user)):
+async def generate_submission_docs(opportunity_id: str, payload: dict | None = None, user=Depends(require_user_with_team)):
+    await ensure_user_can_access_opportunity(user, opportunity_id)
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
             "SELECT json_blob FROM opportunities WHERE id = :oid LIMIT 1",
@@ -204,7 +202,11 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
         raise HTTPException(status_code=404, detail="No extracted JSON found for this opportunity")
 
     try:
-        extracted = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        blob = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        if isinstance(blob, dict) and "extracted" in blob:
+            extracted = blob.get("extracted") or {}
+        else:
+            extracted = blob
     except Exception:
         extracted = {}
 
@@ -226,11 +228,27 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"LLM error: {exc}")
 
+    # store generated answers in response library for reuse (question/answer pairs)
+    try:
+        if data and isinstance(data, dict):
+            # we only store the cover letter for now
+            cover = data.get("cover_letter") or ""
+            if cover:
+                await response_lib.store_response(
+                    user,
+                    question="Cover letter",
+                    answer=cover,
+                    metadata={"opportunity_id": opportunity_id, "type": "cover_letter"},
+                )
+    except Exception:
+        pass
+
     return {"opportunity_id": opportunity_id, "documents": data}
 
 
 @router.get("/{opportunity_id}/extracted")
-async def get_extracted_json(opportunity_id: str, user=Depends(_require_user)):
+async def get_extracted_json(opportunity_id: str, user=Depends(require_user_with_team)):
+    await ensure_user_can_access_opportunity(user, opportunity_id)
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
             """

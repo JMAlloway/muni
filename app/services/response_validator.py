@@ -1,20 +1,27 @@
 from typing import Any, Dict, List
 
+from app.services.compliance_checker import ComplianceChecker
+
 
 def run_basic_checks(answer: str, question: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Lightweight compliance checks: length and required flag coverage.
+    Multi-dimensional compliance checks: length, required elements, prohibited terms, references, and completeness.
+    Returns score plus failing issues for quick surfacing in the UI.
     """
-    issues: List[Dict[str, str]] = []
-    wc = len((answer or "").split())
-    max_words = question.get("max_words") or 0
-
-    if max_words and wc > max_words:
-        issues.append({"type": "length", "detail": f"Answer exceeds max_words ({wc} > {max_words})"})
-    if question.get("required") and wc < 20:
-        issues.append({"type": "completeness", "detail": "Answer may be too short for a required question"})
-
-    # Simple score: start at 0.9 and subtract per issue
-    score = 0.9 - 0.15 * len(issues)
-    score = max(0.1, min(score, 1.0))
-    return {"score": round(score, 2), "issues": issues}
+    checker = ComplianceChecker()
+    requirements: Dict[str, Any] = {
+        "word_limit": question.get("max_words") or question.get("word_limit"),
+        "page_limit": question.get("page_limit"),
+        "must_include": question.get("must_include") or question.get("required_elements") or [],
+        "prohibited": question.get("prohibited") or [],
+        "company_name": question.get("company_name"),
+        "rfp_number": question.get("rfp_number") or question.get("opportunity_id"),
+        "sub_questions": question.get("sub_questions") or [],
+    }
+    result = checker.check_all(answer or "", requirements)
+    failing = [
+        {"type": c.name, "detail": c.detail}
+        for c in result.checks
+        if not c.passed
+    ]
+    return {"score": result.score, "issues": failing, "checks": [c.__dict__ for c in result.checks]}

@@ -355,6 +355,17 @@ async def ensure_knowledge_base_schema(engine) -> None:
             )
             await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_rfp_responses_oppty ON rfp_responses(opportunity_id)")
             await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_rfp_responses_status ON rfp_responses(status)")
+
+            # Add missing columns for existing deployments (SQLite-friendly)
+            try:
+                res_cols = await conn.exec_driver_sql("PRAGMA table_info('rfp_responses')")
+                cols: Set[str] = {row._mapping["name"] for row in res_cols.fetchall()}
+                if "review_comments" not in cols:
+                    await conn.exec_driver_sql("ALTER TABLE rfp_responses ADD COLUMN review_comments JSON")
+                if "assigned_reviewers" not in cols:
+                    await conn.exec_driver_sql("ALTER TABLE rfp_responses ADD COLUMN assigned_reviewers JSON")
+            except Exception:
+                pass
     except Exception:
         return
 
@@ -405,5 +416,37 @@ async def ensure_opportunity_extraction_schema(engine) -> None:
                         await conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN json_blob JSON")
                 except Exception:
                     continue
+    except Exception:
+        return
+
+
+async def ensure_response_library_schema(engine) -> None:
+    """Ensure response_library table exists for answer reuse."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='response_library'"
+            )
+            if not res.fetchone():
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE response_library (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        team_id TEXT,
+                        question TEXT NOT NULL,
+                        answer TEXT NOT NULL,
+                        metadata JSON,
+                        embedding TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_response_library_user ON response_library(user_id)"
+                )
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_response_library_team ON response_library(team_id)"
+                )
     except Exception:
         return
