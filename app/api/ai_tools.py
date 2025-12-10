@@ -18,6 +18,58 @@ async def ai_tools_page(request: Request):
 <main class="page ai-tools-page">
   <div id="sessionPicker" class="session-picker" style="display:none;"></div>
   <div id="saveIndicator" class="save-indicator">Saved</div>
+  <div class="success-modal" id="successModal">
+    <div class="success-content">
+      <div class="success-icon">✓</div>
+      <h3>All sections ready!</h3>
+      <p>Your responses look complete. Time to review and export.</p>
+      <button class="primary-btn" type="button" id="successClose">Close</button>
+    </div>
+  </div>
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-header">
+      <h3>Document Preview</h3>
+      <button class="close-preview" id="closePreview" type="button">×</button>
+    </div>
+    <div class="preview-tabs">
+      <button class="preview-tab active" data-tab="cover" type="button">Cover Letter</button>
+      <button class="preview-tab" data-tab="soq" type="button">SOQ</button>
+      <button class="preview-tab" data-tab="full" type="button">Full Package</button>
+    </div>
+    <div class="preview-content" id="previewContent"></div>
+    <div class="preview-footer">
+      <button class="ghost-btn" type="button" id="previewEdit">Edit</button>
+      <button class="primary-btn" type="button" id="previewExport">Export PDF</button>
+    </div>
+  </div>
+  <section class="wizard-progress">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+    </div>
+    <div class="progress-steps" id="progressSteps">
+      <div class="step completed" data-step="1">
+        <div class="step-icon">✓</div>
+        <div class="step-label">Upload</div>
+      </div>
+      <div class="step completed" data-step="2">
+        <div class="step-icon">✓</div>
+        <div class="step-label">Extract</div>
+      </div>
+      <div class="step active" data-step="3">
+        <div class="step-icon">3</div>
+        <div class="step-label">Answer</div>
+        <div class="step-detail" id="progressDetail">0 of 0</div>
+      </div>
+      <div class="step" data-step="4">
+        <div class="step-icon">4</div>
+        <div class="step-label">Review</div>
+      </div>
+      <div class="step" data-step="5">
+        <div class="step-icon">5</div>
+        <div class="step-label">Export</div>
+      </div>
+    </div>
+  </section>
   <header class="ai-header">
     <div>
       <p class="eyebrow">AI Studio</p>
@@ -125,6 +177,77 @@ async def ai_tools_page(request: Request):
         <div id="presenceBar" class="pill" style="display:none;">Live: <span id="presenceList">0</span></div>
         <button id="resultsClear" class="ghost-btn" type="button">Clear</button>
       </div>
+    </div>
+    <div class="split-panel">
+      <aside class="question-sidebar">
+        <div class="sidebar-header">
+          <h3>Questions</h3>
+          <span class="badge" id="questionBadge">0/0</span>
+        </div>
+        <div class="question-list" id="questionList"></div>
+        <button class="add-question-btn" id="addQuestionBtn" type="button">
+          <span class="icon">+</span>
+          Add Question
+        </button>
+      </aside>
+      <main class="editor-panel">
+        <div class="editor-header">
+          <div class="question-nav">
+            <button class="nav-btn" id="prevQuestion" type="button">←</button>
+            <span class="question-number" id="questionNumber">Question 0 of 0</span>
+            <button class="nav-btn" id="nextQuestion" type="button">→</button>
+          </div>
+          <div class="editor-actions">
+            <button class="action-btn" id="regenerateBtn" type="button">
+              <span class="icon">↻</span> Regenerate
+            </button>
+            <button class="action-btn success" id="approveBtn" type="button">
+              <span class="icon">✓</span> Approve
+            </button>
+          </div>
+        </div>
+        <div class="question-display">
+          <h2 id="currentQuestion">Select a question</h2>
+          <div class="question-meta" id="questionMeta"></div>
+        </div>
+        <div class="answer-editor">
+          <div class="editor-toolbar">
+            <button class="toolbar-btn" title="Bold" type="button"><b>B</b></button>
+            <button class="toolbar-btn" title="Italic" type="button"><i>I</i></button>
+            <button class="toolbar-btn" title="Bullet list" type="button">•</button>
+            <span class="toolbar-divider"></span>
+            <button class="toolbar-btn" title="Insert from library" type="button">📚</button>
+            <button class="toolbar-btn" title="AI suggestions" type="button">✨</button>
+          </div>
+          <div class="rich-editor" contenteditable="true" id="answerEditor"></div>
+          <div class="editor-footer">
+            <div class="word-count">
+              <span class="count" id="wordCount">0</span>
+              <span>/</span>
+              <span id="wordLimit">0</span>
+              <span>words</span>
+              <span class="compliance-badge success" id="complianceBadge">Draft</span>
+            </div>
+            <div class="confidence-score">
+              <span class="label">AI Confidence:</span>
+              <div class="confidence-bar">
+                <div class="confidence-fill" id="confidenceFill" style="width: 0%;"></div>
+              </div>
+              <span class="value" id="confidenceValue">0%</span>
+            </div>
+          </div>
+        </div>
+        <div class="ai-suggestions" id="suggestions" style="display:none;">
+          <div class="suggestion-header">
+            <span class="icon">💡</span>
+            <span>AI Suggestions</span>
+          </div>
+          <div class="suggestion-item">
+            <p id="suggestionText">Add specific metrics or references to boost compliance.</p>
+            <button class="apply-btn" id="applySuggestion" type="button">Apply</button>
+          </div>
+        </div>
+      </main>
     </div>
     <div class="card inset">
       <div class="section-heading">

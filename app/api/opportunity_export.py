@@ -100,7 +100,12 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf.set_font("Helvetica", "", 11)
     pdf.multi_cell(0, 6, _ascii_safe(str(soq)))
 
-    return pdf.output(dest="S").encode("latin-1", errors="replace")
+    output = pdf.output(dest="S")
+    if isinstance(output, (bytes, bytearray)):
+        return bytes(output)
+    if isinstance(output, str):
+        return output.encode("latin-1", errors="replace")
+    return b""
 
 
 @router.post("/{opportunity_id}/export")

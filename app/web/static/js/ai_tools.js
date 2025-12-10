@@ -41,6 +41,24 @@
     "commentSend",
     "sessionPicker",
     "saveIndicator",
+    "progressFill",
+    "progressSteps",
+    "progressDetail",
+    "questionList",
+    "addQuestionBtn",
+    "prevQuestion",
+    "nextQuestion",
+    "questionNumber",
+    "currentQuestion",
+    "questionMeta",
+    "answerEditor",
+    "wordCount",
+    "wordLimit",
+    "complianceBadge",
+    "confidenceFill",
+    "confidenceValue",
+    "regenerateBtn",
+    "approveBtn",
   ];
   ids.forEach((id) => (elements[id] = document.getElementById(id)));
 
@@ -77,6 +95,29 @@
     commentSend,
     sessionPicker,
     saveIndicator,
+    progressFill,
+    progressSteps,
+    progressDetail,
+    questionList,
+    addQuestionBtn,
+    prevQuestion,
+    nextQuestion,
+    questionNumber,
+    currentQuestion,
+    questionMeta,
+    answerEditor,
+    wordCount,
+    wordLimit,
+    complianceBadge,
+    confidenceFill,
+    confidenceValue,
+    regenerateBtn,
+    approveBtn,
+    previewPanel,
+    previewContent,
+    closePreview,
+    previewExport,
+    previewEdit,
   } = elements;
 
   const overlay = document.createElement("div");
@@ -97,12 +138,14 @@
     presence: [],
     comments: [],
     latestSections: [],
+    activeSectionIndex: 0,
   };
   let wsLoaded = false;
   const pendingRequests = new Map();
   let currentSessionId = null;
   const AUTOSAVE_INTERVAL = 30000;
   let autosaveTimer = null;
+  let typingLock = false;
 
   function setComponentLoading(elementId, loading) {
     const el = elements[elementId];
@@ -242,6 +285,7 @@
         instructionsBlock.innerHTML = `<p>${instr}</p>`;
       }
     }
+    updateProgress();
   }
 
   async function generateDocs() {
@@ -266,6 +310,9 @@
       }
       const data = await res.json();
       renderDocs(data.documents || {});
+      if (previewPanel && previewContent) {
+        previewContent.innerHTML = `<pre>${JSON.stringify(data.documents || {}, null, 2)}</pre>`;
+      }
     } catch (err) {
       alert("Generation failed: " + err);
     } finally {
@@ -540,6 +587,10 @@ ${toText(soq.appendices)}
 `);
 
     renderEditableDocs();
+    if (previewPanel && previewContent) {
+      // default to cover letter
+      previewContent.innerHTML = `<h4>Cover Letter</h4><p>${(cover || "").replace(/\n/g, "<br>")}</p>`;
+    }
   }
 
   function renderEditableDocs() {
@@ -722,11 +773,33 @@ ${toText(soq.appendices)}
     };
   }
 
-  function createSectionCard(s) {
-    const card = document.createElement("article");
-    card.className = "result";
-    const debouncedEdit = debounce((id, val) => handleLocalEdit(id, val), 300);
-    card.innerHTML = `
+  function typewriterEffect(el, text, speed = 15) {
+    if (!el || !text) return;
+    typingLock = true;
+    el.classList.add("ai-typing");
+    let out = "";
+    const setter = "value" in el ? (val) => (el.value = val) : (val) => (el.textContent = val);
+    setter("");
+    let i = 0;
+    const step = () => {
+      if (i < text.length) {
+        out += text.charAt(i);
+        setter(out);
+        i += 1;
+        setTimeout(step, speed);
+      } else {
+        el.classList.remove("ai-typing");
+        typingLock = false;
+      }
+    };
+    step();
+  }
+
+function createSectionCard(s) {
+  const card = document.createElement("article");
+  card.className = "result";
+  const debouncedEdit = debounce((id, val) => handleLocalEdit(id, val), 300);
+  card.innerHTML = `
       <div class="result-head">
         <div>
           <p class="eyebrow">${s.id || ""}</p>
@@ -738,18 +811,25 @@ ${toText(soq.appendices)}
         </div>
       </div>
       <div class="result-body">
-        <textarea data-section-id="${s.id || ""}" class="result-edit" rows="6" style="width:100%;">${s.answer || ""}</textarea>
-      </div>
-      <div class="result-foot">
-        <div class="hint">Sources: ${(s.sources || []).join(", ") || "None"}</div>
-      </div>
-    `;
-    const ta = card.querySelector("textarea");
-    if (ta) {
-      ta.addEventListener("input", (e) => debouncedEdit(s.id, e.target.value));
+      <textarea data-section-id="${s.id || ""}" class="result-edit" rows="6" style="width:100%;">${s.answer || ""}</textarea>
+    </div>
+    <div class="result-foot">
+      <div class="hint">Sources: ${(s.sources || []).join(", ") || "None"}</div>
+    </div>
+  `;
+  const ta = card.querySelector("textarea");
+  if (ta) {
+    const answerText = s.answer || "";
+    if (answerText) {
+      ta.value = "";
+      typewriterEffect(ta, answerText, 12);
+    } else {
+      ta.value = "";
     }
-    return card;
+    ta.addEventListener("input", (e) => debouncedEdit(s.id, e.target.value));
   }
+  return card;
+}
 
   function renderResultsVirtual(sections) {
     const container = resultsEl;
@@ -807,6 +887,7 @@ ${toText(soq.appendices)}
     const sections = data.sections || [];
     state.responseId = data.response_id || state.responseId;
     state.latestSections = sections.map((s) => ({ ...s }));
+    state.activeSectionIndex = 0;
     if (state.responseId && !wsLoaded) {
       ensureCollabLoaded();
       connectCollab(state.responseId);
@@ -824,6 +905,9 @@ ${toText(soq.appendices)}
       const card = createSectionCard(s);
       resultsEl.appendChild(card);
     });
+    updateProgress();
+    renderQuestionSidebar();
+    renderActiveEditor();
   }
 
   const debouncedSync = debounce(async (sectionId, content) => {
@@ -847,6 +931,7 @@ ${toText(soq.appendices)}
   }, 1000);
 
   function handleLocalEdit(sectionId, content) {
+    if (typingLock) return;
     state.latestSections = (state.latestSections || []).map((s) =>
       s.id === sectionId ? { ...s, answer: content, _dirty: true } : s
     );
@@ -870,6 +955,31 @@ ${toText(soq.appendices)}
     }
     debouncedSync(sectionId, content);
     markDirty();
+    renderQuestionSidebar();
+  }
+
+  function updateProgress() {
+    const total = state.latestSections.length || state.sections.length || 0;
+    const completed = (state.latestSections || []).filter(
+      (s) => s.answer && s.answer.split(/\s+/).filter(Boolean).length > 20
+    ).length;
+    const percent = total ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+    if (progressFill) progressFill.style.width = `${percent || 10}%`;
+    if (progressDetail) progressDetail.textContent = `${completed} of ${total}`;
+    if (progressSteps) {
+      progressSteps.querySelectorAll(".step").forEach((step) => {
+        const idx = parseInt(step.getAttribute("data-step") || "0", 10);
+        if (idx < 3) {
+          step.classList.add("completed");
+        } else if (idx === 3) {
+          step.classList.add("active");
+        }
+      });
+    }
+    if (total > 0 && completed === total && !state.successShown) {
+      celebrateSuccess();
+      state.successShown = true;
+    }
   }
 
   function applyRemoteEdit(sectionId, content, userEmail) {
@@ -911,6 +1021,125 @@ ${toText(soq.appendices)}
       row.innerHTML = `<strong>${c.user || "User"}:</strong> ${c.content || ""} ${c.section_id ? `(Section ${c.section_id})` : ""}`;
       commentsList.appendChild(row);
     });
+  }
+
+  function renderQuestionSidebar() {
+    if (!questionList) return;
+    const sections = state.latestSections || [];
+    const total = sections.length;
+    const completed = sections.filter((s) => (s.answer || "").trim().split(/\s+/).filter(Boolean).length > 20).length;
+    if (questionBadge) {
+      questionBadge.textContent = `${completed}/${total} Complete`;
+    }
+    questionList.innerHTML = "";
+    sections.forEach((s, idx) => {
+      const item = document.createElement("div");
+      item.className = "question-item" + (idx === state.activeSectionIndex ? " active" : "");
+      item.setAttribute("draggable", "true");
+      const isDone = (s.answer || "").trim().length > 0;
+      item.innerHTML = `
+        <div class="status-icon">${isDone ? "✓" : idx + 1}</div>
+        <div class="question-preview">${s.question || "Question"}</div>
+      `;
+      item.addEventListener("click", () => {
+        state.activeSectionIndex = idx;
+        renderActiveEditor();
+        renderQuestionSidebar();
+      });
+      questionList.appendChild(item);
+    });
+    initDragAndDrop();
+  }
+
+  function updateSectionOrder() {
+    if (!questionList) return;
+    const items = Array.from(questionList.querySelectorAll(".question-item"));
+    const newOrder = [];
+    items.forEach((item) => {
+      const preview = item.querySelector(".question-preview")?.textContent || "";
+      const status = item.querySelector(".status-icon")?.textContent || "";
+      const match = state.latestSections.find((s) => (s.question || "") === preview || String(status) === String(s.id));
+      if (match) newOrder.push(match);
+    });
+    if (newOrder.length === state.latestSections.length) {
+      state.latestSections = newOrder;
+      state.sections = newOrder;
+      renderResults({ sections: state.latestSections, response_id: state.responseId });
+    }
+  }
+
+  function initDragAndDrop() {
+    if (!questionList) return;
+    let draggedItem = null;
+
+    questionList.addEventListener("dragstart", (e) => {
+      draggedItem = e.target.closest(".question-item");
+      if (draggedItem) {
+        draggedItem.classList.add("dragging");
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      }
+    });
+
+    questionList.addEventListener("dragend", () => {
+      if (draggedItem) {
+        draggedItem.classList.remove("dragging");
+        draggedItem = null;
+        updateSectionOrder();
+      }
+    });
+
+    questionList.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(questionList, e.clientY);
+      if (draggedItem) {
+        if (!afterElement) {
+          questionList.appendChild(draggedItem);
+        } else {
+          questionList.insertBefore(draggedItem, afterElement);
+        }
+      }
+    });
+  }
+
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll(".question-item:not(.dragging)")];
+    return draggableElements.reduce(
+      (closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      },
+      { offset: Number.NEGATIVE_INFINITY }
+    ).element;
+  }
+
+  function renderActiveEditor() {
+    const sections = state.latestSections || [];
+    if (!sections.length) return;
+    const idx = Math.min(state.activeSectionIndex, sections.length - 1);
+    state.activeSectionIndex = idx;
+    const section = sections[idx];
+    if (questionNumber) questionNumber.textContent = `Question ${idx + 1} of ${sections.length}`;
+    if (currentQuestion) currentQuestion.textContent = section.question || "Question";
+    if (questionMeta) {
+      const meta = [];
+      if (section.max_words) meta.push(`📝 Max ${section.max_words} words`);
+      if (section.required) meta.push("⚡ Required");
+      questionMeta.innerHTML = meta.map((m) => `<span class="meta-item">${m}</span>`).join("");
+    }
+    if (answerEditor) {
+      answerEditor.innerText = section.answer || "";
+    }
+    const wc = (section.answer || "").split(/\s+/).filter(Boolean).length;
+    if (wordCount) wordCount.textContent = wc;
+    if (wordLimit) wordLimit.textContent = section.max_words || "∞";
+    if (complianceBadge) complianceBadge.textContent = section.required ? "Required" : "Draft";
+    if (confidenceFill) confidenceFill.style.width = `${Math.min(100, Math.round((section.confidence || 0) * 100))}%`;
+    if (confidenceValue) confidenceValue.textContent = `${Math.round((section.confidence || 0) * 100)}%`;
   }
 
   function connectCollab(responseId) {
@@ -972,6 +1201,60 @@ ${toText(soq.appendices)}
       );
       commentText.value = "";
     });
+  }
+
+  if (closePreview && previewPanel) {
+    closePreview.addEventListener("click", () => previewPanel.classList.remove("open"));
+  }
+  if (previewExport) {
+    previewExport.addEventListener("click", () => {
+      exportDocs("pdf");
+    });
+  }
+  if (previewEdit) {
+    previewEdit.addEventListener("click", () => {
+      previewPanel.classList.remove("open");
+    });
+  }
+  if (successClose && successModal) {
+    successClose.addEventListener("click", () => successModal.classList.remove("show"));
+  }
+
+  if (answerEditor) {
+    answerEditor.addEventListener("input", () => {
+      const sections = state.latestSections || [];
+      if (!sections.length) return;
+      const idx = state.activeSectionIndex || 0;
+      const section = sections[idx];
+      const text = answerEditor.innerText || "";
+      handleLocalEdit(section.id, text);
+      const wc = text.split(/\s+/).filter(Boolean).length;
+      if (wordCount) wordCount.textContent = wc;
+    });
+  }
+  if (prevQuestion) {
+    prevQuestion.addEventListener("click", () => {
+      if (state.activeSectionIndex > 0) {
+        state.activeSectionIndex -= 1;
+        renderActiveEditor();
+        renderQuestionSidebar();
+      }
+    });
+  }
+  if (nextQuestion) {
+    nextQuestion.addEventListener("click", () => {
+      if (state.activeSectionIndex < (state.latestSections.length - 1)) {
+        state.activeSectionIndex += 1;
+        renderActiveEditor();
+        renderQuestionSidebar();
+      }
+    });
+  }
+  if (regenerateBtn) {
+    regenerateBtn.addEventListener("click", () => alert("Regenerate coming soon"));
+  }
+  if (approveBtn) {
+    approveBtn.addEventListener("click", () => alert("Approved"));
   }
 
   if (genOpportunity) {
@@ -1291,6 +1574,25 @@ ${toText(soq.appendices)}
     window._dirtySaveTimeout = setTimeout(() => saveSession(), 5000);
   }
 
+  function celebrateSuccess() {
+    // Simple confetti
+    const confetti = document.createElement("div");
+    confetti.className = "confetti";
+    for (let i = 0; i < 80; i++) {
+      const piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      piece.style.left = `${Math.random() * 100}%`;
+      piece.style.background = ["#0f8b5a", "#10b981", "#f59e0b", "#3b82f6"][i % 4];
+      piece.style.animationDelay = `${Math.random()}s`;
+      confetti.appendChild(piece);
+    }
+    document.body.appendChild(confetti);
+    setTimeout(() => confetti.remove(), 3200);
+    if (successModal) {
+      successModal.classList.add("show");
+    }
+  }
+
   window.addEventListener("beforeunload", () => {
     if (state.sections.length || state.coverDraft || state.soqDraft) {
       const payload = new Blob(
@@ -1327,6 +1629,9 @@ ${toText(soq.appendices)}
       await fetchUploads();
     }
     startAutosave();
+    if (previewPanel) {
+      previewPanel.classList.add("open");
+    }
   }
 
   // Initial load with session support
