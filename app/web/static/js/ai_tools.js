@@ -754,7 +754,18 @@ ${toText(soq.appendices)}
   function renderResultsVirtual(sections) {
     const container = resultsEl;
     if (!container) return;
-    const itemHeight = 220;
+    // Measure a sample card to better estimate height for virtualization
+    let itemHeight = 220;
+    if (sections.length) {
+      const sample = createSectionCard(sections[0]);
+      sample.style.visibility = "hidden";
+      sample.style.position = "absolute";
+      sample.style.top = "-9999px";
+      document.body.appendChild(sample);
+      const measured = sample.offsetHeight || 0;
+      if (measured > 0) itemHeight = measured;
+      document.body.removeChild(sample);
+    }
     const viewport = container.clientHeight || Math.floor(window.innerHeight * 0.6) || 600;
     const visibleCount = Math.ceil(viewport / itemHeight) + 2;
 
@@ -858,6 +869,7 @@ ${toText(soq.appendices)}
       );
     }
     debouncedSync(sectionId, content);
+    markDirty();
   }
 
   function applyRemoteEdit(sectionId, content, userEmail) {
@@ -1281,22 +1293,19 @@ ${toText(soq.appendices)}
 
   window.addEventListener("beforeunload", () => {
     if (state.sections.length || state.coverDraft || state.soqDraft) {
-      navigator.sendBeacon(
-        "/api/ai-sessions/save",
-        JSON.stringify({
-          session_id: currentSessionId,
-          opportunity_id: genOpportunity?.value,
-          state: getSessionState(),
-        })
+      const payload = new Blob(
+        [
+          JSON.stringify({
+            session_id: currentSessionId,
+            opportunity_id: genOpportunity?.value,
+            state: getSessionState(),
+          }),
+        ],
+        { type: "application/json" }
       );
+      navigator.sendBeacon("/api/ai-sessions/save", payload);
     }
   });
-
-  const originalHandleLocalEdit = handleLocalEdit;
-  handleLocalEdit = function (sectionId, content) {
-    originalHandleLocalEdit(sectionId, content);
-    markDirty();
-  };
 
   if (coverEdit) {
     coverEdit.addEventListener("input", () => markDirty());

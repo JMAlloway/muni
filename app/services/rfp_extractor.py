@@ -4,6 +4,7 @@ import textwrap
 from typing import Any, Dict, List
 
 from app.ai.client import get_llm_client
+from app.services.extraction_cache import ExtractionCache
 
 # Tunable constants
 MAX_WORDS_PER_CHUNK = 3500  # heuristic for token limits
@@ -169,6 +170,7 @@ class RfpExtractor:
 
     def __init__(self):
         self.llm = get_llm_client()
+        self.cache = ExtractionCache()
 
     def discover(self, text: str) -> Dict[str, Any]:
         cleaned = _clean_text(text)
@@ -242,3 +244,26 @@ class RfpExtractor:
         discovery = self.discover(text)
         extracted = self.extract_json(text)
         return {"discovery": discovery, "extracted": extracted}
+
+    async def extract_json_cached(self, text: str) -> Dict[str, Any]:
+        """
+        Async helper that checks cache before running extract_json.
+        """
+        cached = await self.cache.get(text)
+        if cached:
+            return cached
+        result = self.extract_json(text)
+        await self.cache.set(text, result)
+        return result
+
+    async def extract_all_cached(self, text: str) -> Dict[str, Any]:
+        """
+        Async helper wrapping extract_all with caching on extracted payload.
+        """
+        cached = await self.cache.get(text)
+        if cached and isinstance(cached, dict) and cached.get("extracted"):
+            # cache may store just extracted; normalize shape
+            return {"discovery": cached.get("discovery") or {}, "extracted": cached.get("extracted") or cached}
+        result = self.extract_all(text)
+        await self.cache.set(text, result)
+        return result
