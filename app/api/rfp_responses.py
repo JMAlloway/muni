@@ -10,7 +10,7 @@ from app.core.db_core import engine
 from app.api.auth_helpers import ensure_user_can_access_opportunity
 from app.services.document_processor import DocumentProcessor
 from app.services.response_validator import run_basic_checks
-from app.services.rfp_generator import generate_section_answer
+from app.services.rfp_generator import generate_section_answer, generate_batch_answers
 from app.services.company_profile_template import merge_company_profile_defaults
 from app.services.response_library import ResponseLibrary
 from app.storage import read_storage_bytes
@@ -177,32 +177,32 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
     knowledge_docs = await _get_knowledge_docs(user, knowledge_doc_ids)
     instruction_docs = await _get_instruction_docs(user, instruction_upload_ids)
 
+    ctx = {
+        "company_profile": company_profile,
+        "win_themes": win_themes,
+        "knowledge_docs": knowledge_docs,
+        "custom_instructions": custom_instructions,
+        "instruction_docs": instruction_docs,
+    }
+
     results = []
     issues = []
-    for section in sections:
-        generated = generate_section_answer(
-            section,
-            {
-                "company_profile": company_profile,
-                "win_themes": win_themes,
-                "knowledge_docs": knowledge_docs,
-                "custom_instructions": custom_instructions,
-                "instruction_docs": instruction_docs,
-            },
-        )
-        compliance = run_basic_checks(generated["answer"], section)
+    batch_generated = generate_batch_answers(sections, ctx, batch_size=4)
+    for generated in batch_generated:
+        section = next((s for s in sections if str(s.get("id")) == str(generated.get("id"))), generated)
+        compliance = run_basic_checks(generated.get("answer", ""), section)
         issues.extend(compliance.get("issues") or [])
         results.append(
             {
-                "id": section.get("id"),
+                "id": generated.get("id"),
                 "question": section.get("question"),
                 "max_words": section.get("max_words"),
                 "required": section.get("required"),
-                "answer": generated["answer"],
-                "sources": generated["sources"],
-                "win_themes_used": generated["win_themes_used"],
-                "confidence": generated["confidence"],
-                "word_count": generated["word_count"],
+                "answer": generated.get("answer"),
+                "sources": generated.get("sources"),
+                "win_themes_used": generated.get("win_themes_used"),
+                "confidence": generated.get("confidence"),
+                "word_count": generated.get("word_count"),
                 "compliance": compliance,
             }
         )
@@ -210,7 +210,7 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
             await resp_lib.store_response(
                 user,
                 question=section.get("question") or "",
-                answer=generated["answer"],
+                answer=generated.get("answer", ""),
                 metadata={"opportunity_id": opportunity_id, "section_id": section.get("id")},
             )
         except Exception:

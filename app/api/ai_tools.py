@@ -16,6 +16,8 @@ async def ai_tools_page(request: Request):
 <link rel="stylesheet" href="/static/css/ai_tools.css?v={STATIC_VER}">
 
 <main class="page ai-tools-page">
+  <div id="sessionPicker" class="session-picker" style="display:none;"></div>
+  <div id="saveIndicator" class="save-indicator">Saved</div>
   <header class="ai-header">
     <div>
       <p class="eyebrow">AI Studio</p>

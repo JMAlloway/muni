@@ -10,6 +10,30 @@ from app.api.auth_helpers import require_user_with_team, ensure_user_can_access_
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-export"])
 
 
+def _ascii_safe(text: str) -> str:
+    """
+    FPDF built-in fonts are latin-1 only; normalize/strip smart quotes and unicode chars.
+    """
+    if not text:
+        return ""
+    replacements = {
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+        "–": "-",
+        "—": "-",
+        "•": "-",
+        "…": "...",
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    try:
+        return text.encode("latin-1", "ignore").decode("latin-1")
+    except Exception:
+        return text
+
+
 def _build_docx(payload: Dict[str, Any]) -> bytes:
     try:
         from docx import Document  # type: ignore
@@ -61,20 +85,20 @@ def _build_pdf(payload: Dict[str, Any]) -> bytes:
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, title, ln=1)
+    pdf.cell(0, 10, _ascii_safe(title), ln=1)
     if agency:
         pdf.set_font("Helvetica", "", 11)
-        pdf.multi_cell(0, 8, agency)
+        pdf.multi_cell(0, 8, _ascii_safe(agency))
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 10, "Cover Letter", ln=1)
     pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 6, str(cover))
+    pdf.multi_cell(0, 6, _ascii_safe(str(cover)))
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 10, "Statement of Qualifications", ln=1)
     pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 6, str(soq))
+    pdf.multi_cell(0, 6, _ascii_safe(str(soq)))
 
     return pdf.output(dest="S").encode("latin-1", errors="replace")
 

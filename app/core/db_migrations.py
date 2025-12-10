@@ -370,6 +370,24 @@ async def ensure_knowledge_base_schema(engine) -> None:
         return
 
 
+async def ensure_extraction_cache_schema(engine) -> None:
+    """Create extraction_cache table for LLM extraction caching."""
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS extraction_cache (
+                    hash TEXT PRIMARY KEY,
+                    result JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS idx_extraction_cache_date ON extraction_cache(created_at)")
+    except Exception:
+        return
+
+
 async def ensure_user_tier_column(engine) -> None:
     """Ensure users.tier exists so billing/webhooks can persist plan."""
     try:
@@ -448,5 +466,35 @@ async def ensure_response_library_schema(engine) -> None:
                 await conn.exec_driver_sql(
                     "CREATE INDEX IF NOT EXISTS idx_response_library_team ON response_library(team_id)"
                 )
+    except Exception:
+        return
+
+
+async def ensure_ai_sessions_schema(engine) -> None:
+    """Session persistence for AI Studio."""
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS ai_studio_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    team_id INTEGER,
+                    opportunity_id TEXT,
+                    name TEXT,
+                    state_json TEXT NOT NULL DEFAULT '{}',
+                    sections_total INTEGER DEFAULT 0,
+                    sections_completed INTEGER DEFAULT 0,
+                    has_cover_letter INTEGER DEFAULT 0,
+                    has_soq INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS idx_ai_sessions_user ON ai_studio_sessions(user_id, last_accessed_at DESC)"
+            )
     except Exception:
         return

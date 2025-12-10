@@ -7,36 +7,77 @@
     }
   };
 
-  const genForm = document.getElementById("genForm");
-  const genOpportunity = document.getElementById("genOpportunity");
-  const genInstructions = document.getElementById("genInstructions");
-  const uploadsList = document.getElementById("uploadsList");
-  const refreshUploads = document.getElementById("refreshUploads");
-  const rfpUploadBtn = document.getElementById("rfpUploadBtn");
-  const rfpUploadInput = document.getElementById("rfpUploadInput");
-  const addSectionBtn = document.getElementById("addSection");
-  const sectionsList = document.getElementById("sectionsList");
-  const secQuestion = document.getElementById("secQuestion");
-  const secMaxWords = document.getElementById("secMaxWords");
-  const secRequired = document.getElementById("secRequired");
-  const resultsEl = document.getElementById("results");
-  const resultsClear = document.getElementById("resultsClear");
-  const summaryCard = document.getElementById("summaryCard");
-  const checklistEl = document.getElementById("checklist");
-  const instructionsBlock = document.getElementById("instructionsBlock");
-  const generateDocsBtn = document.getElementById("generateDocs");
-  const docsContainer = document.getElementById("docsContainer");
-  const regenSummaryBtn = document.getElementById("regenSummary");
-  const coverEdit = document.getElementById("coverEdit");
-  const soqEdit = document.getElementById("soqEdit");
-  const exportWordBtn = document.getElementById("exportWord");
-  const exportPdfBtn = document.getElementById("exportPdf");
-  const detectQuestionsBtn = document.getElementById("detectQuestions");
-  const presenceBar = document.getElementById("presenceBar");
-  const presenceList = document.getElementById("presenceList");
-  const commentsList = document.getElementById("commentsList");
-  const commentText = document.getElementById("commentText");
-  const commentSend = document.getElementById("commentSend");
+  const elements = {};
+  const ids = [
+    "genForm",
+    "genOpportunity",
+    "genInstructions",
+    "uploadsList",
+    "refreshUploads",
+    "rfpUploadBtn",
+    "rfpUploadInput",
+    "addSection",
+    "sectionsList",
+    "secQuestion",
+    "secMaxWords",
+    "secRequired",
+    "results",
+    "resultsClear",
+    "summaryCard",
+    "checklist",
+    "instructionsBlock",
+    "generateDocs",
+    "docsContainer",
+    "regenSummary",
+    "coverEdit",
+    "soqEdit",
+    "exportWord",
+    "exportPdf",
+    "detectQuestions",
+    "presenceBar",
+    "presenceList",
+    "commentsList",
+    "commentText",
+    "commentSend",
+    "sessionPicker",
+    "saveIndicator",
+  ];
+  ids.forEach((id) => (elements[id] = document.getElementById(id)));
+
+  const {
+    genForm,
+    genOpportunity,
+    genInstructions,
+    uploadsList,
+    refreshUploads,
+    rfpUploadBtn,
+    rfpUploadInput,
+    addSection: addSectionBtn,
+    sectionsList,
+    secQuestion,
+    secMaxWords,
+    secRequired,
+    results: resultsEl,
+    resultsClear,
+    summaryCard,
+    checklist: checklistEl,
+    instructionsBlock,
+    generateDocs: generateDocsBtn,
+    docsContainer,
+    regenSummary: regenSummaryBtn,
+    coverEdit,
+    soqEdit,
+    exportWord: exportWordBtn,
+    exportPdf: exportPdfBtn,
+    detectQuestions: detectQuestionsBtn,
+    presenceBar,
+    presenceList,
+    commentsList,
+    commentText,
+    commentSend,
+    sessionPicker,
+    saveIndicator,
+  } = elements;
 
   const overlay = document.createElement("div");
   overlay.className = "loading-overlay";
@@ -57,6 +98,46 @@
     comments: [],
     latestSections: [],
   };
+  let wsLoaded = false;
+  const pendingRequests = new Map();
+  let currentSessionId = null;
+  const AUTOSAVE_INTERVAL = 30000;
+  let autosaveTimer = null;
+
+  function setComponentLoading(elementId, loading) {
+    const el = elements[elementId];
+    if (!el) return;
+    if (loading) {
+      el.classList.add("loading");
+      if (!el.querySelector(".inline-spinner")) {
+        el.insertAdjacentHTML("beforeend", '<div class="inline-spinner"></div>');
+      }
+    } else {
+      el.classList.remove("loading");
+      const sp = el.querySelector(".inline-spinner");
+      if (sp) sp.remove();
+    }
+  }
+
+  async function fetchWithDedup(url, options = {}) {
+    const key = `${options.method || "GET"}:${url}`;
+    if (pendingRequests.has(key)) {
+      return pendingRequests.get(key);
+    }
+    const p = fetch(url, { credentials: "include", ...options })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .finally(() => pendingRequests.delete(key));
+    pendingRequests.set(key, p);
+    return p;
+  }
+
+  function ensureCollabLoaded() {
+    if (wsLoaded) return;
+    wsLoaded = true;
+  }
 
   function setLoading(flag) {
     state.loading = flag;
@@ -95,18 +176,19 @@
       renderSummary();
       return;
     }
+    setComponentLoading("summaryCard", true);
     try {
-      const res = await fetch(`/api/opportunities/${encodeURIComponent(genOpportunity.value)}/extracted`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed extraction fetch");
-      const data = await res.json();
+      const data = await fetchWithDedup(
+        `/api/opportunities/${encodeURIComponent(genOpportunity.value)}/extracted`
+      );
       state.extracted = data;
     } catch (err) {
       console.error(err);
       state.extracted = null;
+    } finally {
+      setComponentLoading("summaryCard", false);
+      renderSummary();
     }
-    renderSummary();
   }
 
   function renderSummary() {
@@ -167,7 +249,7 @@
       alert("Select an opportunity first.");
       return;
     }
-    setLoading(true);
+    setComponentLoading("docsContainer", true);
     try {
       const res = await fetch(`/api/opportunities/${encodeURIComponent(genOpportunity.value)}/generate`, {
         method: "POST",
@@ -187,7 +269,7 @@
     } catch (err) {
       alert("Generation failed: " + err);
     } finally {
-      setLoading(false);
+      setComponentLoading("docsContainer", false);
     }
   }
 
@@ -200,7 +282,7 @@
       alert("Select at least one uploaded RFP file to extract.");
       return;
     }
-    setLoading(true);
+    setComponentLoading("summaryCard", true);
     try {
       const uploadIds = Array.from(state.selectedUploads);
       for (const uid of uploadIds) {
@@ -238,7 +320,7 @@
     } catch (err) {
       alert("Generation failed: " + err);
     } finally {
-      setLoading(false);
+      setComponentLoading("summaryCard", false);
     }
   }
 
@@ -632,52 +714,139 @@ ${toText(soq.appendices)}
     });
   }
 
+  function debounce(fn, ms) {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  function createSectionCard(s) {
+    const card = document.createElement("article");
+    card.className = "result";
+    const debouncedEdit = debounce((id, val) => handleLocalEdit(id, val), 300);
+    card.innerHTML = `
+      <div class="result-head">
+        <div>
+          <p class="eyebrow">${s.id || ""}</p>
+          <h4>${s.question || ""}</h4>
+        </div>
+        <div class="meta">
+          <span class="pill">${(s.confidence || 0).toFixed(2)} conf</span>
+          <span class="pill">${s.word_count || 0} words</span>
+        </div>
+      </div>
+      <div class="result-body">
+        <textarea data-section-id="${s.id || ""}" class="result-edit" rows="6" style="width:100%;">${s.answer || ""}</textarea>
+      </div>
+      <div class="result-foot">
+        <div class="hint">Sources: ${(s.sources || []).join(", ") || "None"}</div>
+      </div>
+    `;
+    const ta = card.querySelector("textarea");
+    if (ta) {
+      ta.addEventListener("input", (e) => debouncedEdit(s.id, e.target.value));
+    }
+    return card;
+  }
+
+  function renderResultsVirtual(sections) {
+    const container = resultsEl;
+    if (!container) return;
+    const itemHeight = 220;
+    const viewport = container.clientHeight || Math.floor(window.innerHeight * 0.6) || 600;
+    const visibleCount = Math.ceil(viewport / itemHeight) + 2;
+
+    container.innerHTML = "";
+    container.style.position = "relative";
+    container.style.maxHeight = "70vh";
+    container.style.overflowY = "auto";
+
+    const list = document.createElement("div");
+    list.style.position = "relative";
+    list.style.height = `${sections.length * itemHeight}px`;
+    container.appendChild(list);
+
+    let scrollTop = 0;
+    function renderVisible() {
+      const startIdx = Math.floor(scrollTop / itemHeight);
+      const endIdx = Math.min(startIdx + visibleCount, sections.length);
+      list.innerHTML = "";
+      for (let i = startIdx; i < endIdx; i++) {
+        const card = createSectionCard(sections[i]);
+        card.style.position = "absolute";
+        card.style.top = `${i * itemHeight}px`;
+        card.style.left = "0";
+        card.style.right = "0";
+        list.appendChild(card);
+      }
+    }
+
+    container.addEventListener("scroll", (e) => {
+      scrollTop = e.target.scrollTop;
+      requestAnimationFrame(renderVisible);
+    });
+
+    renderVisible();
+  }
+
   function renderResults(data) {
     if (!resultsEl) return;
     const sections = data.sections || [];
     state.responseId = data.response_id || state.responseId;
     state.latestSections = sections.map((s) => ({ ...s }));
-    if (state.responseId) {
+    if (state.responseId && !wsLoaded) {
+      ensureCollabLoaded();
       connectCollab(state.responseId);
     }
     if (!sections.length) {
       resultsEl.innerHTML = `<div class="empty">No results yet.</div>`;
       return;
     }
+    if (sections.length > 30) {
+      renderResultsVirtual(sections);
+      return;
+    }
     resultsEl.innerHTML = "";
     sections.forEach((s) => {
-      const card = document.createElement("article");
-      card.className = "result";
-      card.innerHTML = `
-        <div class="result-head">
-          <div>
-            <p class="eyebrow">${s.id || ""}</p>
-            <h4>${s.question || ""}</h4>
-          </div>
-          <div class="meta">
-            <span class="pill">${(s.confidence || 0).toFixed(2)} conf</span>
-            <span class="pill">${s.word_count || 0} words</span>
-          </div>
-        </div>
-        <div class="result-body">
-          <textarea data-section-id="${s.id || ""}" class="result-edit" rows="6" style="width:100%;">${s.answer || ""}</textarea>
-        </div>
-        <div class="result-foot">
-          <div class="hint">Sources: ${(s.sources || []).join(", ") || "None"}</div>
-        </div>
-      `;
-      const ta = card.querySelector("textarea");
-      if (ta) {
-        ta.addEventListener("input", (e) => handleLocalEdit(s.id, e.target.value));
-      }
+      const card = createSectionCard(s);
       resultsEl.appendChild(card);
     });
   }
 
+  const debouncedSync = debounce(async (sectionId, content) => {
+    if (!state.responseId) return;
+    try {
+      await fetch(`/api/rfp-responses/${state.responseId}/sections/${sectionId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCSRF(),
+        },
+        body: JSON.stringify({ answer: content }),
+      });
+      state.latestSections = (state.latestSections || []).map((s) =>
+        s.id === sectionId ? { ...s, _dirty: false } : s
+      );
+    } catch (err) {
+      console.error("Sync failed:", err);
+    }
+  }, 1000);
+
   function handleLocalEdit(sectionId, content) {
     state.latestSections = (state.latestSections || []).map((s) =>
-      s.id === sectionId ? { ...s, answer: content } : s
+      s.id === sectionId ? { ...s, answer: content, _dirty: true } : s
     );
+    // Update local word count immediately
+    const wc = (content || "").split(/\s+/).filter(Boolean).length;
+    const wcEl = resultsEl
+      ?.querySelector(`textarea[data-section-id="${sectionId}"]`)
+      ?.closest(".result")
+      ?.querySelector(".pill:nth-child(2), .pill:last-child");
+    if (wcEl) wcEl.textContent = `${wc} words`;
+
     if (state.ws && state.ws.readyState === WebSocket.OPEN && state.responseId) {
       state.ws.send(
         JSON.stringify({
@@ -688,6 +857,7 @@ ${toText(soq.appendices)}
         })
       );
     }
+    debouncedSync(sectionId, content);
   }
 
   function applyRemoteEdit(sectionId, content, userEmail) {
@@ -732,6 +902,7 @@ ${toText(soq.appendices)}
   }
 
   function connectCollab(responseId) {
+    ensureCollabLoaded();
     if (!responseId || typeof WebSocket === "undefined") return;
     if (state.ws) {
       try {
@@ -894,8 +1065,261 @@ ${toText(soq.appendices)}
     });
   }
 
-  // Initial load
-  fetchTracked();
-  renderSections();
-  fetchExtraction();
+  // Session persistence helpers
+  function getSessionState() {
+    return {
+      opportunityId: genOpportunity?.value || null,
+      selectedUploads: Array.from(state.selectedUploads),
+      sections: state.sections,
+      latestSections: state.latestSections,
+      coverDraft: state.coverDraft,
+      soqDraft: state.soqDraft,
+      responseId: state.responseId,
+      extracted: state.extracted,
+      comments: state.comments,
+    };
+  }
+
+  function restoreSessionState(sessionState) {
+    if (!sessionState) return;
+    if (sessionState.opportunityId && genOpportunity) {
+      genOpportunity.value = sessionState.opportunityId;
+    }
+    state.selectedUploads = new Set(sessionState.selectedUploads || []);
+    state.sections = sessionState.sections || [];
+    state.latestSections = sessionState.latestSections || [];
+    state.coverDraft = sessionState.coverDraft || "";
+    state.soqDraft = sessionState.soqDraft || "";
+    state.responseId = sessionState.responseId || null;
+    state.extracted = sessionState.extracted || null;
+    state.comments = sessionState.comments || [];
+
+    renderSummary();
+    renderSections();
+    renderUploads(state.uploads);
+    renderEditableDocs();
+    if (state.latestSections.length) {
+      renderResults({ sections: state.latestSections, response_id: state.responseId });
+    }
+    if (state.responseId) {
+      connectCollab(state.responseId);
+    }
+  }
+
+  async function saveSession(name = null) {
+    const sessionState = getSessionState();
+    if (!sessionState.opportunityId && !state.sections.length) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/ai-sessions/save", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCSRF(),
+        },
+        body: JSON.stringify({
+          session_id: currentSessionId,
+          opportunity_id: sessionState.opportunityId,
+          name: name,
+          state: sessionState,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      currentSessionId = data.session_id;
+      showSaveIndicator("Saved");
+    } catch (err) {
+      console.error("Session save error:", err);
+      showSaveIndicator("Save failed", true);
+    }
+  }
+
+  async function loadSession(sessionId) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/ai-sessions/${sessionId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Load failed");
+      const data = await res.json();
+      currentSessionId = data.id;
+      await fetchTracked();
+      restoreSessionState(data.state);
+      if (data.state?.opportunityId) {
+        await Promise.all([fetchExtraction(), fetchUploads()]);
+      }
+      hideSessionPicker();
+    } catch (err) {
+      alert("Failed to load session: " + err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchRecentSessions() {
+    try {
+      const res = await fetch("/api/ai-sessions/recent", { credentials: "include" });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      return [];
+    }
+  }
+
+  async function renderSessionPicker() {
+    const picker = sessionPicker;
+    if (!picker) return;
+    const sessions = await fetchRecentSessions();
+    if (!sessions.length) {
+      picker.innerHTML = `
+        <div class="session-picker-empty">
+          <p>No previous sessions found.</p>
+          <button class="primary-btn" id="startNewSession">Start New Session</button>
+        </div>
+      `;
+      picker.style.display = "block";
+      document.getElementById("startNewSession")?.addEventListener("click", hideSessionPicker);
+      return;
+    }
+    picker.innerHTML = `
+      <div class="session-picker-header">
+        <h3>Recent Sessions</h3>
+        <button class="ghost-btn" id="startNewSession">+ New Session</button>
+      </div>
+      <div class="session-list">
+        ${sessions
+          .map(
+            (s) => `
+          <div class="session-card" data-session-id="${s.id}">
+            <div class="session-info">
+              <div class="session-title">${s.opportunity_title || s.name || "Untitled Session"}</div>
+              <div class="session-meta">
+                ${s.agency_name ? `<span>${s.agency_name}</span>` : ""}
+                <span>${s.sections_completed || 0}/${s.sections_total || 0} sections</span>
+                ${s.has_cover_letter ? '<span class="pill success">Cover Letter</span>' : ""}
+                ${s.has_soq ? '<span class="pill success">SOQ</span>' : ""}
+              </div>
+              <div class="session-time">${formatTimeAgo(s.last_accessed_at)}</div>
+            </div>
+            <div class="session-actions">
+              <button class="ghost-btn load-session">Resume</button>
+              <button class="ghost-btn danger delete-session">Delete</button>
+            </div>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    `;
+    picker.style.display = "block";
+    document.getElementById("startNewSession")?.addEventListener("click", hideSessionPicker);
+    picker.querySelectorAll(".load-session").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const card = e.target.closest(".session-card");
+        const sessionId = parseInt(card?.dataset.sessionId || "", 10);
+        if (sessionId) loadSession(sessionId);
+      });
+    });
+    picker.querySelectorAll(".delete-session").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const card = e.target.closest(".session-card");
+        const sessionId = parseInt(card?.dataset.sessionId || "", 10);
+        if (!sessionId || !confirm("Delete this session?")) return;
+        await fetch(`/api/ai-sessions/${sessionId}`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "X-CSRF-Token": getCSRF() },
+        });
+        card.remove();
+      });
+    });
+  }
+
+  function hideSessionPicker() {
+    if (sessionPicker) sessionPicker.style.display = "none";
+  }
+
+  function showSaveIndicator(text, isError = false) {
+    if (!saveIndicator) return;
+    saveIndicator.textContent = text;
+    saveIndicator.classList.toggle("error", isError);
+    saveIndicator.classList.add("visible");
+    setTimeout(() => saveIndicator.classList.remove("visible"), 2000);
+  }
+
+  function formatTimeAgo(dateStr) {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  }
+
+  function startAutosave() {
+    if (autosaveTimer) clearInterval(autosaveTimer);
+    autosaveTimer = setInterval(() => {
+      if (state.sections.length || state.coverDraft || state.soqDraft) {
+        saveSession();
+      }
+    }, AUTOSAVE_INTERVAL);
+  }
+
+  function markDirty() {
+    clearTimeout(window._dirtySaveTimeout);
+    window._dirtySaveTimeout = setTimeout(() => saveSession(), 5000);
+  }
+
+  window.addEventListener("beforeunload", () => {
+    if (state.sections.length || state.coverDraft || state.soqDraft) {
+      navigator.sendBeacon(
+        "/api/ai-sessions/save",
+        JSON.stringify({
+          session_id: currentSessionId,
+          opportunity_id: genOpportunity?.value,
+          state: getSessionState(),
+        })
+      );
+    }
+  });
+
+  const originalHandleLocalEdit = handleLocalEdit;
+  handleLocalEdit = function (sectionId, content) {
+    originalHandleLocalEdit(sectionId, content);
+    markDirty();
+  };
+
+  if (coverEdit) {
+    coverEdit.addEventListener("input", () => markDirty());
+  }
+  if (soqEdit) {
+    soqEdit.addEventListener("input", () => markDirty());
+  }
+
+  async function initSessions() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionIdParam = urlParams.get("session");
+    await fetchTracked();
+    renderSections();
+    if (sessionIdParam) {
+      await loadSession(parseInt(sessionIdParam, 10));
+    } else {
+      await renderSessionPicker();
+      await fetchExtraction();
+      await fetchUploads();
+    }
+    startAutosave();
+  }
+
+  // Initial load with session support
+  initSessions();
 })();

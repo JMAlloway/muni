@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.core.db_core import engine
 from app.services.document_processor import DocumentProcessor
 from app.services.rfp_extractor import RfpExtractor
+from app.services.extraction_cache import ExtractionCache
 from app.storage import read_storage_bytes
 from app.api.auth_helpers import require_user_with_team, ensure_user_can_access_opportunity
 
 router = APIRouter(prefix="/api/rfp-extract", tags=["rfp-extract"])
+cache = ExtractionCache()
 
 
 async def _update_opportunity(opportunity_id: Any, extracted: Dict[str, Any]) -> None:
@@ -67,7 +69,12 @@ async def extract_from_upload(upload_id: int, user=Depends(require_user_with_tea
     text = extraction.get("text") or ""
 
     extractor = RfpExtractor()
-    extracted_all = extractor.extract_all(text)
+    cached = await cache.get(text)
+    if cached:
+        extracted_all = cached
+    else:
+        extracted_all = extractor.extract_all(text)
+        await cache.set(text, extracted_all)
     ts = datetime.datetime.utcnow().isoformat()
     # Wrap with versioning info
     payload = {

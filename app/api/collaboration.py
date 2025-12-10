@@ -1,6 +1,8 @@
-from typing import Dict, Set, Any, List
+from typing import Dict, Set, Any, List, Optional
 
 import json
+import datetime as dt
+import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
@@ -93,7 +95,7 @@ async def _user_can_access_response(user: Dict[str, Any], response_id: int) -> D
     return None
 
 
-async def _load_comments(response_id: int) -> List[Dict[str, Any]]:
+async def _load_review_comments(response_id: int) -> List[Dict[str, Any]]:
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
             "SELECT review_comments FROM rfp_responses WHERE id = :id LIMIT 1", {"id": response_id}
@@ -108,14 +110,83 @@ async def _load_comments(response_id: int) -> List[Dict[str, Any]]:
         return []
 
 
-async def _save_comment(response_id: int, comment: Dict[str, Any]) -> None:
-    existing = await _load_comments(response_id)
+async def _load_comments(response_record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Return combined comments: review_comments (RFQ responses) + team bid notes for this opportunity.
+    """
+    response_id = response_record["id"]
+    base_comments: List[Dict[str, Any]] = await _load_review_comments(response_id)
+
+    team_comments: List[Dict[str, Any]] = []
+    opp_id = response_record.get("opportunity_id")
+    team_id = response_record.get("team_id")
+    if opp_id and team_id:
+        try:
+            async with engine.begin() as conn:
+                note_res = await conn.exec_driver_sql(
+                    """
+                    SELECT bn.body, bn.author_user_id, bn.created_at, u.email AS author_email
+                    FROM bid_notes bn
+                    LEFT JOIN users u ON u.id = bn.author_user_id
+                    WHERE bn.team_id = :team AND bn.opportunity_id = :oid
+                    ORDER BY bn.created_at ASC
+                    LIMIT 100
+                    """,
+                    {"team": team_id, "oid": opp_id},
+                )
+                team_comments = [
+                    {
+                        "type": "comment",
+                        "section_id": None,
+                        "content": note._mapping["body"],
+                        "user": note._mapping.get("author_email") or str(note._mapping.get("author_user_id") or ""),
+                        "created_at": str(note._mapping.get("created_at") or ""),
+                        "source": "team_thread",
+                    }
+                    for note in note_res.fetchall()
+                ]
+        except Exception:
+            team_comments = []
+
+    return team_comments + base_comments
+
+
+async def _save_comment(response_record: Dict[str, Any], comment: Dict[str, Any], user: Dict[str, Any]) -> None:
+    response_id = response_record["id"]
+    existing = await _load_review_comments(response_id)
     existing.append(comment)
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
             "UPDATE rfp_responses SET review_comments = :c, updated_at = CURRENT_TIMESTAMP WHERE id = :id",
             {"c": json.dumps(existing), "id": response_id},
         )
+
+    # Also mirror into team bid notes for sidebar/thread if team/opportunity available
+    opp_id = response_record.get("opportunity_id")
+    team_id = response_record.get("team_id")
+    if opp_id and team_id:
+        body = comment.get("content") or ""
+        section = comment.get("section_id")
+        prefix = f"[Section {section}] " if section else ""
+        try:
+            async with engine.begin() as conn:
+                await conn.exec_driver_sql(
+                    """
+                    INSERT INTO bid_notes (id, team_id, opportunity_id, author_user_id, body, mentions, created_at)
+                    VALUES (:id, :team, :oid, :author, :body, :mentions, :created_at)
+                    """,
+                    {
+                        "id": str(uuid.uuid4()),
+                        "team": team_id,
+                        "oid": opp_id,
+                        "author": user.get("id"),
+                        "body": prefix + body,
+                        "mentions": json.dumps([]),
+                        "created_at": dt.datetime.utcnow(),
+                    },
+                )
+        except Exception:
+            pass
 
 
 @router.websocket("/ws/response/{response_id}")
@@ -135,7 +206,7 @@ async def response_editor(websocket: WebSocket, response_id: int):
         await websocket.send_json(
             {
                 "type": "init",
-                "comments": await _load_comments(response_id),
+                "comments": await _load_comments(response_record),
                 "presence": list(manager.presence.get(response_id, [])),
             }
         )
@@ -164,7 +235,7 @@ async def response_editor(websocket: WebSocket, response_id: int):
                     "user": user["email"],
                     "created_at": data.get("created_at"),
                 }
-                await _save_comment(response_id, payload)
+                await _save_comment(response_record, payload, user)
                 await manager.broadcast(response_id, payload)
             elif msg_type == "presence":
                 await manager.broadcast(

@@ -1,8 +1,27 @@
 # app/ai/client.py
 import os
+import time
 import requests
 
 from app.core.settings import settings
+
+
+def retry_with_backoff(fn, max_retries: int = 3, base_delay: float = 1.0):
+    """
+    Retry the callable with exponential backoff for transient failures.
+    """
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as exc:
+            if attempt == max_retries - 1:
+                raise
+            delay = base_delay * (2 ** attempt)
+            try:
+                print(f"[AI client] Retry {attempt + 1}/{max_retries} after {delay}s: {exc}")
+            except Exception:
+                pass
+            time.sleep(delay)
 
 
 class OllamaGenerateClient:
@@ -37,13 +56,16 @@ class OllamaGenerateClient:
             },
         }
 
-        resp = requests.post(
-            f"{self.base_url}/api/generate",
-            json=payload,
-            timeout=60,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        def _call():
+            resp = requests.post(
+                f"{self.base_url}/api/generate",
+                json=payload,
+                timeout=60,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        data = retry_with_backoff(_call)
         # /api/generate returns {"response": "...", ...}
         return data.get("response", "").strip()
 
@@ -62,16 +84,47 @@ class OpenAIChatClient:
 
     def chat(self, messages, temperature=0, format=None):
         try:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                response_format={"type": "json_object"} if format == "json" else None,
-            )
+            def _call():
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    response_format={"type": "json_object"} if format == "json" else None,
+                )
+            resp = retry_with_backoff(_call)
             content = resp.choices[0].message.content if resp.choices else ""
             return (content or "").strip()
         except Exception as exc:
             print(f"[AI client] OpenAI chat error: {exc}")
+            return ""
+
+    def chat_stream(self, messages, temperature=0, on_chunk=None):
+        """
+        Stream a chat completion and optionally invoke a callback per chunk.
+        Returns the full aggregated response text.
+        """
+        try:
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                stream=True,
+            )
+            full = ""
+            for chunk in stream:
+                try:
+                    delta = chunk.choices[0].delta.content or ""
+                except Exception:
+                    delta = ""
+                full += delta
+                if on_chunk and delta:
+                    try:
+                        on_chunk(delta)
+                    except Exception:
+                        pass
+            return full.strip()
+        except Exception as exc:
+            print(f"[AI client] OpenAI chat stream error: {exc}")
             return ""
 
 

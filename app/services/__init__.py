@@ -19,6 +19,7 @@ from .rfp_extractor import RfpExtractor
 from .company_profile_template import merge_company_profile_defaults, default_company_profile
 from .question_extractor import extract_response_items
 from .compliance_checker import ComplianceChecker
+from .extraction_cache import ExtractionCache
 
 __all__ = [
     "ensure_default_preferences",
@@ -38,4 +39,5 @@ __all__ = [
     "default_company_profile",
     "extract_response_items",
     "ComplianceChecker",
+    "ExtractionCache",
 ]

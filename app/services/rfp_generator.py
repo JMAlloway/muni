@@ -166,3 +166,107 @@ def generate_section_answer(question: Dict[str, Any], context: Dict[str, Any]) -
         "confidence": _calculate_confidence(answer, question),
         "word_count": len(answer.split()),
     }
+
+
+def _build_batch_prompt(questions: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
+    company_profile = context.get("company_profile") or {}
+    win_themes = _format_win_themes(context.get("win_themes") or [])
+    instruction_docs = _format_instructions(context.get("instruction_docs") or [])
+    knowledge_docs = _format_documents(context.get("knowledge_docs") or [])
+    instructions = context.get("custom_instructions") or "None"
+    q_list = "\n".join(
+        [
+            f"{idx+1}. ID {q.get('id')}: {q.get('question') or q.get('text') or ''} (max {q.get('max_words', 'N/A')} words)"
+            for idx, q in enumerate(questions)
+        ]
+    )
+    return textwrap.dedent(
+        f"""
+        You are an expert RFP response writer. Answer each question independently.
+
+        Company Information (JSON):
+        {json.dumps(company_profile, ensure_ascii=False, indent=2)}
+
+        Win Themes to Highlight:
+        {win_themes}
+
+        RFP Instructions / Requirements (from uploaded RFP docs):
+        {instruction_docs}
+
+        Supporting Evidence from Past Projects:
+        {knowledge_docs}
+
+        Custom Instructions:
+        {instructions}
+
+        Questions:
+        {q_list}
+
+        Return JSON array in the same order:
+        [{{"question_id": "...", "answer": "...", "word_count": N}}]
+        """
+    ).strip()
+
+
+def generate_batch_answers(
+    questions: List[Dict[str, Any]],
+    context: Dict[str, Any],
+    batch_size: int = 4,
+) -> List[Dict[str, Any]]:
+    """
+    Generate answers for multiple questions in fewer LLM calls. Falls back to per-question on errors.
+    """
+    llm = get_llm_client()
+    if not llm:
+        # Fall back to single generation for each question
+        return [generate_section_answer(q, context) for q in questions]
+
+    results: List[Dict[str, Any]] = []
+    for i in range(0, len(questions), batch_size):
+        batch = questions[i : i + batch_size]
+        # For batch, we still score docs per question to keep relevance
+        enriched_batch = []
+        for q in batch:
+            q_text = q.get("question") or q.get("text") or ""
+            combined_docs = [{**d, "kind": "instruction"} for d in (context.get("instruction_docs") or [])] + (
+                context.get("knowledge_docs") or []
+            )
+            selected_docs = _score_docs(q_text, combined_docs, limit=6)
+            enriched_batch.append({**q, "_docs": selected_docs})
+
+        prompt = _build_batch_prompt(enriched_batch, {**context, "knowledge_docs": []})
+        try:
+            resp = llm.chat(
+                [
+                    {"role": "system", "content": "Answer each question. Return JSON array."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.6,
+            )
+            parsed = json.loads(resp)
+            if not isinstance(parsed, list):
+                raise ValueError("Batch response not a list")
+        except Exception:
+            # On failure, fall back to individual generation for this batch
+            for qb in enriched_batch:
+                results.append(generate_section_answer({k: v for k, v in qb.items() if not k.startswith("_")}, context))
+            continue
+
+        for idx, item in enumerate(parsed):
+            q_orig = enriched_batch[idx] if idx < len(enriched_batch) else batch[idx]
+            answer_text = item.get("answer") if isinstance(item, dict) else ""
+            question_id = item.get("question_id") if isinstance(item, dict) else q_orig.get("id")
+            wc = len((answer_text or "").split())
+            selected_docs = q_orig.get("_docs") or []
+            results.append(
+                {
+                    "id": question_id or q_orig.get("id"),
+                    "question": q_orig.get("question") or q_orig.get("text"),
+                    "answer": answer_text or "",
+                    "sources": [d.get("id") for d in selected_docs if d.get("id") is not None],
+                    "win_themes_used": [wt.get("id") for wt in (context.get("win_themes") or []) if wt.get("id")],
+                    "confidence": _calculate_confidence(answer_text or "", q_orig),
+                    "word_count": item.get("word_count") or wc,
+                }
+            )
+    return results

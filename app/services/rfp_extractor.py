@@ -77,6 +77,28 @@ Return strict JSON with these keys:
 - If unknown, use "" or [].
 """.strip()
 
+COMBINED_PROMPT = """
+Analyze this RFP and return JSON with two keys:
+{
+  "discovery": {
+    "document_type": "RFQ|RFP|IFB|SOW|other",
+    "sections": [{"title": "", "page": null, "has_questions": false}],
+    "response_items": [{"id": "", "text": "", "type": "narrative|table|form|attachment", "word_limit": null, "page_limit": null, "points": null}],
+    "deadlines": [{"event": "", "date": "", "time": "", "timezone": ""}],
+    "submission": {"method": "email|portal|mail", "copies": null, "format": "", "address": ""},
+    "evaluation_weights": [{"criterion": "", "weight": null}]
+  },
+  "extracted": {
+    "title": "", "agency": "", "summary": "", "scope_of_work": "",
+    "contractor_requirements": [], "training_requirements": [], "insurance_limits": "",
+    "required_documents": [], "submission_instructions": "", "deadlines": [], "contacts": [],
+    "evaluation_criteria": [], "required_forms": [], "compliance_terms": [], "red_flags": []
+  }
+}
+- arrays must be lists of strings (or objects if obvious like contacts).
+- If unknown, use "" or [].
+""".strip()
+
 
 def _build_discovery_prompt(text: str) -> List[Dict[str, str]]:
     return [
@@ -94,6 +116,16 @@ def _build_extraction_prompt(text: str) -> List[Dict[str, str]]:
         {
             "role": "user",
             "content": f"{EXTRACTION_SCHEMA_PROMPT}\n\nSource text:\n\"\"\"\n{text[:MAX_PROMPT_CHARS]}\n\"\"\"\n",
+        },
+    ]
+
+
+def _build_combined_prompt(text: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": "You are an expert RFP analyst. Return discovery + extracted JSON in one response."},
+        {
+            "role": "user",
+            "content": f"{COMBINED_PROMPT}\n\nSource text:\n\"\"\"\n{text[:MAX_PROMPT_CHARS]}\n\"\"\"\n",
         },
     ]
 
@@ -175,10 +207,38 @@ class RfpExtractor:
 
         return _merge_json(results)
 
+    def _extract_combined(self, text: str) -> Dict[str, Any]:
+        """
+        Single LLM call returning both discovery + extracted blocks.
+        """
+        cleaned = _clean_text(text)
+        if not cleaned or not self.llm:
+            return {"discovery": {}, "extracted": _merge_json([])}
+        try:
+            resp = self.llm.chat(_build_combined_prompt(cleaned), temperature=0)
+            parsed = json.loads(resp)
+            if isinstance(parsed, dict):
+                return {
+                    "discovery": parsed.get("discovery") or {},
+                    "extracted": parsed.get("extracted") or _merge_json([]),
+                }
+        except Exception:
+            pass
+        # Fallback to empty discovery + merged extraction to avoid crash
+        return {"discovery": {}, "extracted": _merge_json([])}
+
     def extract_all(self, text: str) -> Dict[str, Any]:
+        cleaned = _clean_text(text)
+        word_count = len(cleaned.split())
+
+        # Single call for small/medium docs
+        if word_count and word_count <= MAX_WORDS_PER_CHUNK:
+            combined = self._extract_combined(cleaned)
+            # If combined failed, fall back to legacy
+            if combined.get("discovery") or combined.get("extracted"):
+                return combined
+
+        # Legacy multi-call for larger docs or fallback
         discovery = self.discover(text)
         extracted = self.extract_json(text)
-        return {
-            "discovery": discovery,
-            "extracted": extracted,
-        }
+        return {"discovery": discovery, "extracted": extracted}
