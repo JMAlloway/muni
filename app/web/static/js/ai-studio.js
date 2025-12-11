@@ -50,6 +50,7 @@
     existingDocsList: document.getElementById("existingDocsList"),
     existingDocPane: document.getElementById("existingDocPane"),
     uploadDocPane: document.getElementById("uploadDocPane"),
+    generateOptions: document.getElementById("generateOptions"),
     editorTabs: document.querySelectorAll(".editor-tab"),
     toolbarBtns: document.querySelectorAll(".toolbar-btn"),
     optionCards: document.querySelectorAll(".generate-option"),
@@ -600,7 +601,73 @@
       }
     }
     handleStepAvailability();
+
+    // Populate Step 3 generate options with narrative sections
+    renderGenerateOptions(extracted);
+
     return hasContent;
+  }
+
+  function renderGenerateOptions(extracted) {
+    if (!els.generateOptions) return;
+
+    const narratives = extracted.narrative_sections || [];
+
+    if (!narratives.length) {
+      els.generateOptions.innerHTML = `
+        <div class="generate-option selected">
+          <input type="checkbox" checked>
+          <div class="option-content">
+            &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
+          </div>
+        </div>
+        <div class="generate-option selected">
+          <input type="checkbox" checked>
+          <div class="option-content">
+            &#128203; <div><strong>Project Response</strong><span>Based on RFP requirements</span></div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Always include Cover Letter first
+    let html = `
+      <div class="generate-option selected">
+        <input type="checkbox" checked>
+        <div class="option-content">
+          &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
+        </div>
+      </div>
+    `;
+
+    // Add each narrative section from extraction
+    narratives.forEach((section, index) => {
+      const name = typeof section === "string" ? section : section.name || "Section";
+      const requirements = typeof section === "object" ? (section.requirements || "") : "";
+      const shortReq = requirements.length > 60 ? requirements.substring(0, 57) + "..." : requirements;
+      const icon = index % 2 === 0 ? "&#128203;" : "&#128196;";
+
+      html += `
+        <div class="generate-option selected" data-section="${name}">
+          <input type="checkbox" checked>
+          <div class="option-content">
+            ${icon} <div><strong>${name}</strong><span>${shortReq || "Required narrative section"}</span></div>
+          </div>
+        </div>
+      `;
+    });
+
+    els.generateOptions.innerHTML = html;
+
+    // Re-bind click handlers for the new option cards
+    els.generateOptions.querySelectorAll(".generate-option").forEach((card) => {
+      card.addEventListener("click", () => {
+        card.classList.toggle("selected");
+        const input = card.querySelector("input");
+        if (input) input.checked = card.classList.contains("selected");
+      });
+    });
   }
 
   async function augmentExtractionFromGeneration() {

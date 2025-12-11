@@ -751,6 +751,13 @@
   margin-bottom: 16px;
 }
 
+.ai-tools-page .generate-options .loading-placeholder {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
 .ai-tools-page .generate-option {
   display: flex;
   align-items: center;
