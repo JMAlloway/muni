@@ -115,8 +115,11 @@ async def extract_from_upload(upload_id: int, user=Depends(require_user_with_tea
             extracted_all = None
     if extracted_all is None:
         extracted_all = extractor.extract_all(text)
-        await cache.set(text, extracted_all)
-        logger.info("rfp_extract cache_store upload_id=%s", upload_id)
+        if _has_useful_content(extracted_all):
+            await cache.set(text, extracted_all)
+            logger.info("rfp_extract cache_store upload_id=%s", upload_id)
+        else:
+            logger.warning("rfp_extract empty_extraction upload_id=%s", upload_id)
     ts = datetime.datetime.utcnow().isoformat()
     # Wrap with versioning info
     payload = {
@@ -124,6 +127,9 @@ async def extract_from_upload(upload_id: int, user=Depends(require_user_with_tea
         "discovery": extracted_all.get("discovery") or {},
         "extracted": extracted_all.get("extracted") or {},
     }
+    warning = None
+    if not _has_useful_content(payload):
+        warning = "Extraction returned no summary/checklist/dates. Try rerunning or upload a clearer document."
 
     await _update_opportunity(rec["opportunity_id"], payload)
     logger.info(
@@ -138,4 +144,5 @@ async def extract_from_upload(upload_id: int, user=Depends(require_user_with_tea
         "ok": True,
         "opportunity_id": rec["opportunity_id"],
         "extracted": payload,
+        "warning": warning,
     }

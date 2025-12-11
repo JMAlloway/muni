@@ -451,6 +451,9 @@
         }
         hasContent = await augmentExtractionFromGeneration();
       }
+      if (data.warning) {
+        showMessage(data.warning, "error");
+      }
       handleStepAvailability();
       showMessage("Extraction complete.", "success");
       scheduleSave();
@@ -595,9 +598,13 @@
         key_dates: docs.calendar_events || [],
       };
       const existing = state.extracted?.extracted || state.extracted || {};
+      const currentExtracted = state.extracted?.extracted?.extracted || state.extracted?.extracted || existing;
       state.extracted = {
         ...(state.extracted || {}),
-        extracted: { ...(state.extracted?.extracted || existing), ...augmented },
+        extracted: {
+          ...(state.extracted?.extracted || {}),
+          extracted: { ...currentExtracted, ...augmented },
+        },
       };
       const hasContent = renderExtraction();
       if (hasContent) {
