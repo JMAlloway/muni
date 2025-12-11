@@ -69,7 +69,8 @@
     opportunityLabel: "",
     upload: null,
     extracted: null,
-    documents: { cover: "", responses: "" },
+    documents: {},
+    responseSections: [],
     currentDoc: "cover",
     sessionId: null,
     existingDocs: [],
@@ -506,7 +507,11 @@
     const dates = normalizeDates(extracted, root);
 
     if (els.summaryText) {
-      els.summaryText.textContent = summary || "No summary available yet.";
+      let displaySummary = summary || "No summary available yet.";
+      if (displaySummary.length > 500) {
+        displaySummary = displaySummary.substring(0, 497) + "...";
+      }
+      els.summaryText.textContent = displaySummary;
     }
 
     if (els.checklistItems) {
@@ -671,6 +676,33 @@
     });
   }
 
+  function renderDocumentTabs() {
+    const tabsContainer = document.querySelector(".editor-tabs");
+    if (!tabsContainer) return;
+
+    tabsContainer.innerHTML = "";
+
+    const coverTab = document.createElement("button");
+    coverTab.className = "editor-tab" + (state.currentDoc === "cover" ? " active" : "");
+    coverTab.type = "button";
+    coverTab.dataset.doc = "cover";
+    coverTab.innerHTML = "&#128221; Cover Letter";
+    coverTab.addEventListener("click", () => switchDocument("cover"));
+    tabsContainer.appendChild(coverTab);
+
+    (state.responseSections || []).forEach((section) => {
+      if (!section || section.toLowerCase() === "cover letter") return;
+      const key = section.toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+      const tab = document.createElement("button");
+      tab.className = "editor-tab" + (state.currentDoc === key ? " active" : "");
+      tab.type = "button";
+      tab.dataset.doc = key;
+      tab.innerHTML = `&#128203; ${section}`;
+      tab.addEventListener("click", () => switchDocument(key));
+      tabsContainer.appendChild(tab);
+    });
+  }
+
   async function generateDocuments() {
     if (!state.opportunityId) {
       showMessage("Select an opportunity before generating.", "error");
@@ -706,9 +738,24 @@
       }
       const data = await res.json();
       const docs = data.documents || {};
-      state.documents.cover = docs.cover_letter || "";
-      state.documents.responses = formatSoqText(docs.soq);
+
+      // Dynamic sections
+      state.responseSections = docs.required_sections_list || ["Cover Letter", "Statement of Qualifications"];
+      state.documents = { cover: docs.cover_letter || "" };
+
+      const responseSections = docs.response_sections || {};
+      Object.entries(responseSections).forEach(([key, value]) => {
+        state.documents[key] = typeof value === "string" ? value : formatSoqText(value);
+      });
+
+      // Fallback for old format
+      if (docs.soq && !Object.keys(responseSections).length) {
+        state.documents.responses = formatSoqText(docs.soq);
+        state.responseSections = ["Cover Letter", "Responses"];
+      }
+
       state.currentDoc = "cover";
+      renderDocumentTabs();
 
       // If extraction pane is still empty, backfill summary/checklist/dates from generated docs.
       const augmentedExtraction = {
@@ -757,9 +804,14 @@
 
   function switchDocument(doc) {
     if (!doc) return;
-    state.documents[state.currentDoc] = els.editableContent?.innerHTML || "";
+    if (state.currentDoc && els.editableContent) {
+      state.documents[state.currentDoc] = els.editableContent.innerHTML || "";
+    }
     state.currentDoc = doc;
     renderDocuments();
+    document.querySelectorAll(".editor-tab").forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.doc === doc);
+    });
     scheduleSave();
   }
 
@@ -953,7 +1005,6 @@
         switchDocTab("existing");
         handleStepAvailability();
         fetchExistingDocuments(state.opportunityId);
-        fetchOpportunityExtraction();
         scheduleSave();
       });
     }

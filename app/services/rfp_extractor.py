@@ -38,6 +38,28 @@ def _has_useful_content(payload: Dict[str, Any]) -> bool:
     return False
 
 
+def _safe_load_json(resp: str) -> Dict[str, Any]:
+    """
+    Attempt to parse JSON from an LLM response, handling blank strings and fenced blocks.
+    """
+    if not resp:
+        raise ValueError("Empty response")
+    txt = resp.strip()
+    if txt.startswith("```"):
+        txt = txt.strip("`")
+        if "\n" in txt:
+            parts = txt.split("\n", 1)
+            if parts and parts[0].lower().startswith("json"):
+                txt = parts[1]
+            else:
+                txt = "\n".join(parts[1:]) if len(parts) > 1 else parts[0]
+    if not txt.startswith("{") and not txt.startswith("["):
+        brace_start = txt.find("{")
+        if brace_start != -1:
+            txt = txt[brace_start:]
+    return json.loads(txt)
+
+
 def _clean_text(raw: str) -> str:
     txt = raw or ""
     txt = re.sub(r"\n{3,}", "\n\n", txt)
@@ -106,7 +128,7 @@ Return strict JSON with these keys:
 """.strip()
 
 COMBINED_PROMPT = """
-Analyze this RFP and return JSON with two keys:
+Analyze this RFP/solicitation document and return JSON with two keys:
 {
   "discovery": {
     "document_type": "RFQ|RFP|IFB|SOW|other",
@@ -114,17 +136,35 @@ Analyze this RFP and return JSON with two keys:
     "response_items": [{"id": "", "text": "", "type": "narrative|table|form|attachment", "word_limit": null, "page_limit": null, "points": null}],
     "deadlines": [{"event": "", "date": "", "time": "", "timezone": ""}],
     "submission": {"method": "email|portal|mail", "copies": null, "format": "", "address": ""},
-    "evaluation_weights": [{"criterion": "", "weight": null}]
+    "evaluation_weights": [{"criterion": "", "weight": null}],
+    "required_response_sections": []
   },
   "extracted": {
-    "title": "", "agency": "", "summary": "", "scope_of_work": "",
-    "contractor_requirements": [], "training_requirements": [], "insurance_limits": "",
-    "required_documents": [], "submission_instructions": "", "deadlines": [], "contacts": [],
-    "evaluation_criteria": [], "required_forms": [], "compliance_terms": [], "red_flags": []
+    "title": "",
+    "agency": "",
+    "summary": "",
+    "scope_of_work": "",
+    "contractor_requirements": [],
+    "training_requirements": [],
+    "insurance_limits": "",
+    "required_documents": [],
+    "submission_instructions": "",
+    "deadlines": [],
+    "contacts": [],
+    "evaluation_criteria": [],
+    "required_forms": [],
+    "compliance_terms": [],
+    "red_flags": []
   }
 }
-- arrays must be lists of strings (or objects if obvious like contacts).
-- If unknown, use "" or [].
+
+IMPORTANT INSTRUCTIONS:
+1. "summary" must be 2-3 sentences MAX describing what the agency is looking for. Be concise.
+2. "required_documents" must list EVERY document the vendor must submit (e.g., "Cover Letter", "Statement of Qualifications", "Price Proposal", "Insurance Certificate", "W-9", etc.)
+3. "required_forms" must list any specific forms by name/number (e.g., "Form A - Vendor Information", "Attachment B - Pricing Sheet")
+4. "deadlines" must capture ALL dates mentioned (proposal due date, questions deadline, pre-bid meeting, contract start, etc.)
+5. "discovery.required_response_sections" must list the sections/tabs the vendor's response should include based on the RFP's requirements
+6. Arrays must be lists of strings. If unknown, use "" or [].
 """.strip()
 
 
@@ -208,7 +248,7 @@ class RfpExtractor:
         try:
             logger.debug("rfp_extractor.discover start words=%s", len(first_chunk.split()))
             resp = self.llm.chat(_build_discovery_prompt(first_chunk), temperature=0)
-            parsed = json.loads(resp)
+            parsed = _safe_load_json(resp)
             logger.debug("rfp_extractor.discover ok keys=%s", list(parsed.keys()) if isinstance(parsed, dict) else [])
             return parsed if isinstance(parsed, dict) else {}
         except Exception:
@@ -232,7 +272,7 @@ class RfpExtractor:
                 msgs = _build_extraction_prompt(chunk)
                 logger.debug("rfp_extractor.extract_json chunk words=%s", len(chunk.split()))
                 resp = self.llm.chat(msgs, temperature=0)
-                parsed = json.loads(resp)
+                parsed = _safe_load_json(resp)
                 if isinstance(parsed, dict):
                     results.append(parsed)
             except Exception as exc:
@@ -251,7 +291,7 @@ class RfpExtractor:
         try:
             logger.debug("rfp_extractor.extract_combined start")
             resp = self.llm.chat(_build_combined_prompt(cleaned), temperature=0)
-            parsed = json.loads(resp)
+            parsed = _safe_load_json(resp)
             if isinstance(parsed, dict):
                 return {
                     "discovery": parsed.get("discovery") or {},

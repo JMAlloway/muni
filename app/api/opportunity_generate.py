@@ -70,8 +70,28 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
     instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
+
+    # Get required sections from discovery, or use defaults
+    discovery = extracted.get("discovery", {}) if isinstance(extracted, dict) else {}
+    required_sections = discovery.get("required_response_sections", [])
+
+    # Build dynamic document sections based on what RFP requires
+    if not required_sections:
+        # Fallback: infer from required_documents
+        required_docs = extracted.get("required_documents", []) if isinstance(extracted, dict) else []
+        required_sections = required_docs if required_docs else ["Cover Letter", "Statement of Qualifications"]
+
+    # Create dynamic response structure based on required sections
+    dynamic_sections = {}
+    for section in required_sections:
+        section_key = section.lower().replace(" ", "_").replace("-", "_")
+        dynamic_sections[section_key] = f"Content for {section}"
+
     return [
-        {"role": "system", "content": "You are an expert proposal writer. Generate concise submission artifacts."},
+        {
+            "role": "system",
+            "content": "You are an expert proposal writer. Generate professional, compliant submission documents tailored to the RFP requirements.",
+        },
         {
             "role": "user",
             "content": f"""
@@ -88,74 +108,32 @@ Use today's date: {today_str}
 Best available contact/address from extraction:
 {json.dumps(contact, indent=2)}
 
-Generate JSON:
+The RFP requires these response sections: {json.dumps(required_sections)}
+
+Generate JSON with this structure:
 {{
-  "cover_letter": "text following the provided cover letter layout",
-  "soq": {{
-     "cover_page": "filled cover page lines",
-     "company_overview": "Company overview text",
-     "legal_structure": "entity type",
-     "business_certifications": "MBE/WBE/SBE/EDGE or none",
-     "programs_served": "list text",
-     "criminal_history_policy": "text",
-     "recordkeeping_controls": "text",
-     "project_manager": "name/title/experience/certs",
-     "key_personnel": "list text with credentials/training",
-     "organizational_capacity": "text about capacity and timelines",
-     "relevant_projects": "three projects with customer/address/phone/description/year",
-     "low_income_programs": "list with details",
-     "timelines": "ability to meet required timeframes",
-     "contractor_licenses": "list",
-     "trainings_completed": "list",
-     "certifications": "list",
-     "training_plan": "plan if gaps",
-     "insurance": "coverage details + additional insured statement",
-     "compliance_statements": "bullets acknowledging required clauses",
-     "appendices": "list of appendices A-F as requested"
+  "cover_letter": "Professional cover letter text",
+  "response_sections": {{
+    // Generate a key for EACH required section
+    // Example: "technical_approach": "content...",
+    // Example: "past_performance": "content...",
+    // Example: "pricing": "content...",
   }},
-  "submission_instructions": "clear steps for email/portal/address, formatting, copies, attachments",
-  "submission_checklist": ["ordered list of submission items with limits/addresses/email"],
+  "submission_instructions": "Clear steps for submission",
+  "submission_checklist": ["Ordered list of items to submit with page limits/requirements"],
   "calendar_events": [
-     {{"title": "Proposal Due", "due_date": "<iso date if known>", "notes": ""}},
-     {{"title": "Questions Due", "due_date": "<iso date if known>", "notes": ""}}
-  ]
+    {{"title": "Proposal Due", "due_date": "<iso date>", "notes": ""}},
+    {{"title": "Questions Due", "due_date": "<iso date>", "notes": ""}}
+  ],
+  "required_sections_list": {json.dumps(required_sections)}
 }}
-Keep it concise, actionable, and grounded in the extracted data. If a date is unknown, leave it blank.
-Cover letter must follow this exact layout (no placeholders left blank):
-[Company Letterhead or Company Name]
-[Company Address]
-[City, State ZIP]
-[Phone Number]
-[Email Address]
-[Website]
 
-[Date]
-
-[Agency Name]
-[Contact Name, if provided]
-[Agency Address]
-[City, State ZIP]
-
-Re: [Opportunity Title]
-
-Dear [Contact Name or “Evaluation Committee”],
-
-[Company Name] is pleased to submit our Statement of Qualifications in response to the “[Opportunity Title]” issued by [Agency Name]. Our firm is fully qualified and prepared to deliver the required services outlined in the solicitation, including:
-• top 3–5 scope items from the RFP
-• compliance/certification requirements
-• required delivery timelines
-
-As a [entity type], we acknowledge and accept full responsibility for performing all required services in accordance with the project specifications, applicable standards, and all local, state, and federal requirements.
-
-We appreciate the opportunity to participate and look forward to contributing to the success of your program. Please contact me directly if further information is needed.
-
-Sincerely,
-[Authorized Representative Name]
-[Title]
-[Company Name]
-
-Fill every bracketed field using extracted RFP data and company profile; do not leave placeholders.
-SOQ must follow the 8 sections provided (cover page, company overview & profile, personnel, relevant experience, training & certifications, insurance, compliance statements, appendices). Checklist must include insurance limits and submission address/email if provided.
+IMPORTANT:
+- Generate content for EVERY section in required_sections_list
+- Cover letter must be professional and reference the specific opportunity
+- Each response section should be substantive (2-4 paragraphs minimum)
+- Use company profile data to personalize the response
+- Checklist must match the RFP's submission requirements exactly
 """.strip(),
         },
     ]
