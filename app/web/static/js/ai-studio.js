@@ -281,6 +281,29 @@
     );
   }
 
+  function normalizeDates(extracted, root) {
+    const raw =
+      extracted.key_dates ||
+      extracted.timeline ||
+      extracted.deadlines ||
+      (root && root.discovery && (root.discovery.key_dates || root.discovery.timeline || root.discovery.deadlines)) ||
+      [];
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((d) => {
+        if (!d) return null;
+        if (typeof d === "string") {
+          return { title: d, due_date: "" };
+        }
+        const title = d.title || d.event || d.name || "";
+        const due = d.due_date || d.date || "";
+        const time = d.time ? ` ${d.time}` : "";
+        const tz = d.timezone ? ` ${d.timezone}` : "";
+        return { title, due_date: `${due}${time}${tz}`.trim() };
+      })
+      .filter(Boolean);
+  }
+
   function hasExtractionContent(root) {
     const extracted = getExtractedObject(root);
     if (!extracted || !Object.keys(extracted).length) return false;
@@ -297,11 +320,7 @@
       .concat(extracted.compliance_terms || [])
       .concat((root && root.discovery && root.discovery.requirements) || [])
       .filter(Boolean);
-    const dates =
-      extracted.key_dates ||
-      extracted.timeline ||
-      (root && root.discovery && (root.discovery.key_dates || root.discovery.timeline)) ||
-      [];
+    const dates = normalizeDates(extracted, root);
     return Boolean((summary && summary.trim()) || (checklist && checklist.length) || (dates && dates.length));
   }
 
@@ -481,11 +500,7 @@
       .concat((root.discovery && root.discovery.requirements) || [])
       .filter(Boolean);
 
-    const dates =
-      extracted.key_dates ||
-      extracted.timeline ||
-      (root.discovery && (root.discovery.key_dates || root.discovery.timeline)) ||
-      [];
+    const dates = normalizeDates(extracted, root);
 
     if (els.summaryText) {
       els.summaryText.textContent = summary || "No summary available yet.";
@@ -687,6 +702,25 @@
       state.documents.cover = docs.cover_letter || "";
       state.documents.responses = formatSoqText(docs.soq);
       state.currentDoc = "cover";
+
+      // If extraction pane is still empty, backfill summary/checklist/dates from generated docs.
+      const augmentedExtraction = {
+        summary:
+          docs.submission_instructions ||
+          (Array.isArray(docs.submission_checklist) ? docs.submission_checklist.join(". ") : "") ||
+          (typeof docs.cover_letter === "string" ? docs.cover_letter.split("\n").slice(0, 2).join(" ") : ""),
+        checklist: docs.submission_checklist || docs.checklist || [],
+        key_dates: docs.calendar_events || [],
+      };
+      if (!hasExtractionContent(state.extracted)) {
+        const existingExtracted = getExtractedObject(state.extracted);
+        state.extracted = {
+          ...(state.extracted || {}),
+          extracted: { ...existingExtracted, ...augmentedExtraction },
+        };
+        renderExtraction();
+      }
+
       renderDocuments();
       handleStepAvailability();
       showMessage("Documents generated. Review and edit before export.", "success");

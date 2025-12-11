@@ -1,14 +1,41 @@
 import json
 import re
 import textwrap
+import logging
 from typing import Any, Dict, List
 
 from app.ai.client import get_llm_client
 from app.services.extraction_cache import ExtractionCache
 
+logger = logging.getLogger("rfp_extractor")
+
 # Tunable constants
 MAX_WORDS_PER_CHUNK = 3500  # heuristic for token limits
 MAX_PROMPT_CHARS = 12000
+
+def _has_useful_content(payload: Dict[str, Any]) -> bool:
+    if not payload:
+        return False
+    extracted = payload.get("extracted") or payload
+    if not isinstance(extracted, dict):
+        return False
+    fields = [
+        extracted.get("summary"),
+        extracted.get("scope_of_work"),
+        extracted.get("submission_instructions"),
+    ]
+    lists = [
+        extracted.get("required_documents") or [],
+        extracted.get("required_forms") or [],
+        extracted.get("compliance_terms") or [],
+        extracted.get("deadlines") or [],
+        extracted.get("contacts") or [],
+    ]
+    if any(f and str(f).strip() for f in fields):
+        return True
+    if any(isinstance(lst, list) and len(lst) for lst in lists):
+        return True
+    return False
 
 
 def _clean_text(raw: str) -> str:
@@ -179,10 +206,13 @@ class RfpExtractor:
         chunks = _chunk_text(cleaned, max_words=MAX_WORDS_PER_CHUNK)
         first_chunk = chunks[0] if chunks else cleaned
         try:
+            logger.debug("rfp_extractor.discover start words=%s", len(first_chunk.split()))
             resp = self.llm.chat(_build_discovery_prompt(first_chunk), temperature=0)
             parsed = json.loads(resp)
+            logger.debug("rfp_extractor.discover ok keys=%s", list(parsed.keys()) if isinstance(parsed, dict) else [])
             return parsed if isinstance(parsed, dict) else {}
         except Exception:
+            logger.exception("rfp_extractor.discover failed")
             return {}
 
     def extract_json(self, text: str) -> Dict[str, Any]:
@@ -200,11 +230,13 @@ class RfpExtractor:
                 break
             try:
                 msgs = _build_extraction_prompt(chunk)
+                logger.debug("rfp_extractor.extract_json chunk words=%s", len(chunk.split()))
                 resp = self.llm.chat(msgs, temperature=0)
                 parsed = json.loads(resp)
                 if isinstance(parsed, dict):
                     results.append(parsed)
-            except Exception:
+            except Exception as exc:
+                logger.warning("rfp_extractor.extract_json parse failed: %s", exc)
                 continue
 
         return _merge_json(results)
@@ -217,6 +249,7 @@ class RfpExtractor:
         if not cleaned or not self.llm:
             return {"discovery": {}, "extracted": _merge_json([])}
         try:
+            logger.debug("rfp_extractor.extract_combined start")
             resp = self.llm.chat(_build_combined_prompt(cleaned), temperature=0)
             parsed = json.loads(resp)
             if isinstance(parsed, dict):
@@ -224,8 +257,8 @@ class RfpExtractor:
                     "discovery": parsed.get("discovery") or {},
                     "extracted": parsed.get("extracted") or _merge_json([]),
                 }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("rfp_extractor.extract_combined failed: %s", exc)
         # Fallback to empty discovery + merged extraction to avoid crash
         return {"discovery": {}, "extracted": _merge_json([])}
 
@@ -243,7 +276,15 @@ class RfpExtractor:
         # Legacy multi-call for larger docs or fallback
         discovery = self.discover(text)
         extracted = self.extract_json(text)
-        return {"discovery": discovery, "extracted": extracted}
+        result = {"discovery": discovery, "extracted": extracted}
+
+        # If we still have nothing useful, try one more combined call on cleaned text.
+        if not _has_useful_content(result) and self.llm:
+            logger.debug("rfp_extractor.extract_all retry combined because content empty")
+            retry = self._extract_combined(cleaned)
+            if retry.get("discovery") or retry.get("extracted"):
+                return retry
+        return result
 
     async def extract_json_cached(self, text: str) -> Dict[str, Any]:
         """
