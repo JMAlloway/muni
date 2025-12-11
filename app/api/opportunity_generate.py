@@ -66,10 +66,11 @@ def _sanitize_text(val: str, max_chars: int = 8000) -> str:
     return cleaned[:max_chars]
 
 
-def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instructions_text: str = "") -> list[dict]:
+def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instructions_text: str = "", section_instructions: Dict[str, str] = None) -> list[dict]:
     instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
+    section_instructions = section_instructions or {}
 
     # Get narrative sections (what AI should generate)
     narrative_sections = extracted.get("narrative_sections", [])
@@ -103,9 +104,18 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
             elif word_limit:
                 limit_note = f" (LIMIT: {word_limit} words)"
 
-            sections_to_generate.append(f'"{name}": "Address: {reqs}{limit_note}"')
+            # Check for user-provided section-specific instructions
+            section_key = name.lower().replace(" ", "_").replace("'", "")
+            section_key_alt = re.sub(r"[^a-z0-9]+", "_", name.lower())
+            user_context = section_instructions.get(section_key) or section_instructions.get(section_key_alt) or ""
+            user_note = f" USER CONTEXT: {user_context}" if user_context else ""
+
+            sections_to_generate.append(f'"{name}": "Address: {reqs}{limit_note}{user_note}"')
         elif isinstance(section, str):
-            sections_to_generate.append(f'"{section}": "Provide detailed response"')
+            section_key = re.sub(r"[^a-z0-9]+", "_", section.lower())
+            user_context = section_instructions.get(section_key) or ""
+            user_note = f" USER CONTEXT: {user_context}" if user_context else ""
+            sections_to_generate.append(f'"{section}": "Provide detailed response{user_note}"')
 
     sections_json = ",\n    ".join(sections_to_generate)
 
@@ -225,16 +235,19 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
 
     company_profile = await _get_company_profile(user["id"])
     instruction_upload_ids = []
+    section_instructions = {}
     try:
         instruction_upload_ids = (payload or {}).get("instruction_upload_ids") or []
+        section_instructions = (payload or {}).get("section_instructions") or {}
     except Exception:
         instruction_upload_ids = []
+        section_instructions = {}
     llm = get_llm_client()
     if not llm:
         raise HTTPException(status_code=500, detail="LLM client unavailable")
 
     instructions_text = await _load_instruction_text(user["id"], instruction_upload_ids)
-    prompt = _build_doc_prompt(extracted, company_profile, instructions_text)
+    prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions)
     try:
         resp = llm.chat(prompt, temperature=0.4, format="json")
         data = json.loads(resp)
