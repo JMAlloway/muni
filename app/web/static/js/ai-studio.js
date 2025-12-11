@@ -421,6 +421,26 @@
         throw new Error(text || `Extraction failed (${res.status})`);
       }
       const data = await res.json();
+
+      // Check for warnings from backend (e.g., no text extracted, empty results)
+      if (data.warnings && data.warnings.length > 0) {
+        const warningMsg = data.warnings.join(" ");
+        showMessage(warningMsg, "error");
+        if (els.extractStatus) {
+          els.extractStatus.classList.remove("hidden");
+          els.extractStatus.textContent = warningMsg;
+        }
+      }
+
+      // Log extraction diagnostics for debugging
+      console.log("[extractRfp] Response:", {
+        text_extracted: data.text_extracted,
+        text_length: data.text_length,
+        warnings: data.warnings,
+        has_summary: Boolean(data.extracted?.extracted?.summary),
+        has_deadlines: (data.extracted?.extracted?.deadlines || []).length,
+      });
+
       state.extracted = data;
       let hasContent = renderExtraction();
       if (!hasContent) {
@@ -435,7 +455,13 @@
         hasContent = await augmentExtractionFromGeneration();
       }
       handleStepAvailability();
-      showMessage("Extraction complete.", "success");
+
+      // Show success or warning based on results
+      if (hasContent) {
+        showMessage("Extraction complete.", "success");
+      } else if (!data.warnings || data.warnings.length === 0) {
+        showMessage("Extraction complete but no key details found. Try a different document or check if it's a scanned PDF.", "error");
+      }
       scheduleSave();
     } catch (err) {
       showMessage(err.message || "Extraction failed.", "error");
