@@ -123,19 +123,24 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
     forms = extracted.get("attachments_forms", []) or extracted.get("required_forms", [])
     forms_list = ", ".join(forms[:10]) if forms else "W-9, Insurance Certificate, required forms"
 
+    # Build list of section names for checklist
+    section_names = [s.get("name", "") if isinstance(s, dict) else s for s in narrative_sections]
+    section_names_list = ", ".join(f'"{n}"' for n in section_names if n)
+
     return [
         {
             "role": "system",
             "content": """You are an expert government proposal writer with 20+ years experience winning contracts.
 
-Your task: Generate complete, submission-ready proposal content.
+Your task: Generate complete, submission-ready proposal content for EACH requested section.
 
 CRITICAL RULES:
 - Write REAL, substantive content - never placeholders like "[Company Name]" or "[Insert details]"
 - Use the actual company name and details from the profile provided
 - Each narrative section must be 2-4 well-developed paragraphs
 - Tailor content specifically to THIS RFP's requirements
-- Professional tone matching government solicitation expectations""",
+- Professional tone matching government solicitation expectations
+- Use EXACT section names as JSON keys (preserve spaces and capitalization)""",
         },
         {
             "role": "user",
@@ -155,17 +160,13 @@ Agency Contact: {json.dumps(contact, indent=2)}
 
 === GENERATE THIS JSON ===
 {{
-  "cover_letter": "Write a complete 1-page cover letter. Include: company letterhead info, today's date, agency contact, reference to specific RFP title, brief intro of company, statement of interest, summary of qualifications, closing with contact info.",
-
   "response_sections": {{
     {sections_json}
   }},
 
   "submission_checklist": [
-    "Cover Letter",
-    "[List each narrative section in order]",
-    "{forms_list}",
-    "[Any other required items]"
+    {section_names_list},
+    "{forms_list}"
   ],
 
   "calendar_events": [
@@ -173,12 +174,13 @@ Agency Contact: {json.dumps(contact, indent=2)}
   ]
 }}
 
-REMEMBER:
+CRITICAL REQUIREMENTS:
 1. Use the ACTUAL company name from the profile (not "[Company Name]")
-2. Reference the ACTUAL RFP title and agency
+2. Reference the ACTUAL RFP title and agency in each section
 3. Include SPECIFIC past project examples if available in company profile
 4. Each response section needs SUBSTANCE - minimum 2-4 paragraphs
-5. submission_checklist must include ALL required items (narratives AND forms)
+5. Use the EXACT section names as JSON keys (e.g., "Brief Narrative" not "brief_narrative")
+6. If USER CONTEXT is provided for a section, incorporate that specific information
 """.strip(),
         },
     ]

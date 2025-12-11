@@ -816,25 +816,23 @@
 
     tabsContainer.innerHTML = "";
 
-    const coverTab = document.createElement("button");
-    coverTab.className = "editor-tab" + (state.currentDoc === "cover" ? " active" : "");
-    coverTab.type = "button";
-    coverTab.dataset.doc = "cover";
-    coverTab.innerHTML = "&#128221; Cover Letter";
-    coverTab.addEventListener("click", () => switchDocument("cover"));
-    tabsContainer.appendChild(coverTab);
-
-    (state.responseSections || []).forEach((section) => {
-      if (!section || section.toLowerCase() === "cover letter") return;
-      const key = section.toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+    // Only render tabs for sections that were actually extracted - no hardcoded Cover Letter
+    (state.responseSections || []).forEach((section, index) => {
+      if (!section) return;
+      const key = section.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
       const tab = document.createElement("button");
-      tab.className = "editor-tab" + (state.currentDoc === key ? " active" : "");
+      tab.className = "editor-tab" + (state.currentDoc === key || (index === 0 && !state.currentDoc) ? " active" : "");
       tab.type = "button";
       tab.dataset.doc = key;
       tab.innerHTML = `&#128203; ${section}`;
       tab.addEventListener("click", () => switchDocument(key));
       tabsContainer.appendChild(tab);
     });
+
+    // Set first section as current if not set
+    if (!state.currentDoc && state.responseSections?.length) {
+      state.currentDoc = state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    }
   }
 
   async function generateDocuments() {
@@ -877,41 +875,53 @@
       }
       const data = await res.json();
       const docs = data.documents || {};
+
+      // Get narrative sections from extraction (these are what we actually need to generate)
       const narrativeSections =
-        docs.narrative_sections_list ||
-        state.extracted?.extracted?.extracted?.narrative_sections ||
         state.extracted?.extracted?.narrative_sections ||
+        state.extracted?.narrative_sections ||
         [];
 
+      // Use extracted sections as the source of truth for tabs
       state.responseSections = narrativeSections.map((s) =>
         typeof s === "string" ? s : s?.name || s?.title || "Section"
-      );
+      ).filter(Boolean);
 
+      // If no sections from extraction, fall back to response_sections keys from API
       if (!state.responseSections.length && docs.response_sections) {
-        state.responseSections = Object.keys(docs.response_sections).map((key) =>
-          key
-            .split("_")
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ")
-        );
+        state.responseSections = Object.keys(docs.response_sections);
       }
 
+      // Final fallback if nothing available
       if (!state.responseSections.length) {
-        state.responseSections = ["Cover Letter", "Company Overview", "Project Approach"];
+        state.responseSections = ["Project Response"];
       }
 
-      if (!state.responseSections.includes("Cover Letter")) {
-        state.responseSections.unshift("Cover Letter");
-      }
-
-      state.documents = { cover: docs.cover_letter || "" };
-
+      // Map generated content to normalized keys (matching how tabs are keyed)
+      state.documents = {};
       const responseSections = docs.response_sections || {};
+
+      // Store each section with normalized key
       Object.entries(responseSections).forEach(([key, value]) => {
-        state.documents[key] = typeof value === "string" ? value : formatSoqText(value);
+        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        state.documents[normalizedKey] = typeof value === "string" ? value : formatSoqText(value);
       });
 
-      state.currentDoc = "cover";
+      // Also map by the original section names (for fallback matching)
+      state.responseSections.forEach((sectionName) => {
+        const normalizedKey = sectionName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        // If not already set, try to find content from response_sections with original name
+        if (!state.documents[normalizedKey] && responseSections[sectionName]) {
+          state.documents[normalizedKey] = typeof responseSections[sectionName] === "string"
+            ? responseSections[sectionName]
+            : formatSoqText(responseSections[sectionName]);
+        }
+      });
+
+      // Set first section as current
+      state.currentDoc = state.responseSections.length
+        ? state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+        : null;
       renderDocumentTabs();
 
       // If extraction pane is still empty, backfill summary/checklist/dates from generated docs.
