@@ -70,71 +70,105 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
     instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
+
     # Get narrative sections (what AI should generate)
     narrative_sections = extracted.get("narrative_sections", [])
     if not narrative_sections:
         discovery = extracted.get("discovery", {}) if isinstance(extracted, dict) else {}
         narrative_sections = discovery.get("narrative_sections", [])
 
-    # If still empty, use smart defaults
+    # Get scope for context if no narratives found
+    scope = extracted.get("scope_of_work", "") or extracted.get("summary", "")
+
+    # If still empty, create smart defaults based on scope
     if not narrative_sections:
         narrative_sections = [
-            {"name": "Cover Letter", "requirements": "Professional introduction letter"},
-            {"name": "Company Overview", "requirements": "Background and qualifications"},
-            {"name": "Project Approach", "requirements": "How you will deliver the services"},
+            {"name": "Company Qualifications", "requirements": f"Describe relevant experience and qualifications for: {scope[:300]}"},
+            {"name": "Technical Approach", "requirements": f"Explain methodology and approach to deliver: {scope[:300]}"},
+            {"name": "Project Understanding", "requirements": "Demonstrate understanding of the scope and requirements"},
         ]
 
+    # Build detailed section instructions
     sections_to_generate = []
     for section in narrative_sections:
         if isinstance(section, dict):
             name = section.get("name", "")
-            reqs = section.get("requirements", "")
-            sections_to_generate.append(f'"{name}": "{reqs}"')
+            reqs = section.get("requirements", "Provide detailed response")
+            page_limit = section.get("page_limit")
+            word_limit = section.get("word_limit")
+
+            limit_note = ""
+            if page_limit:
+                limit_note = f" (LIMIT: {page_limit} pages)"
+            elif word_limit:
+                limit_note = f" (LIMIT: {word_limit} words)"
+
+            sections_to_generate.append(f'"{name}": "Address: {reqs}{limit_note}"')
         elif isinstance(section, str):
             sections_to_generate.append(f'"{section}": "Provide detailed response"')
 
     sections_json = ",\n    ".join(sections_to_generate)
 
+    # Get forms list for checklist
+    forms = extracted.get("attachments_forms", []) or extracted.get("required_forms", [])
+    forms_list = ", ".join(forms[:10]) if forms else "W-9, Insurance Certificate, required forms"
+
     return [
         {
             "role": "system",
-            "content": "You are an expert proposal writer. Generate professional, compliant submission documents tailored to the RFP requirements. Write substantive, detailed content for each section.",
+            "content": """You are an expert government proposal writer with 20+ years experience winning contracts.
+
+Your task: Generate complete, submission-ready proposal content.
+
+CRITICAL RULES:
+- Write REAL, substantive content - never placeholders like "[Company Name]" or "[Insert details]"
+- Use the actual company name and details from the profile provided
+- Each narrative section must be 2-4 well-developed paragraphs
+- Tailor content specifically to THIS RFP's requirements
+- Professional tone matching government solicitation expectations""",
         },
         {
             "role": "user",
             "content": f"""
-Extracted RFP JSON:
+=== RFP DETAILS ===
 {json.dumps(extracted, indent=2)}
 
-Company Profile:
+=== YOUR COMPANY PROFILE ===
 {json.dumps(company, indent=2)}
 
-RFP Instructions (verbatim, prioritize compliance):
-{instr[:8000]}
+=== SUBMISSION INSTRUCTIONS ===
+{instr[:6000]}
 
-Use today's date: {today_str}
-Best available contact/address from extraction:
-{json.dumps(contact, indent=2)}
+=== CONTEXT ===
+Today's Date: {today_str}
+Agency Contact: {json.dumps(contact, indent=2)}
 
-Generate JSON with this EXACT structure:
+=== GENERATE THIS JSON ===
 {{
-  "cover_letter": "Professional cover letter (use company letterhead format, reference the specific opportunity, 1 page)",
-  
+  "cover_letter": "Write a complete 1-page cover letter. Include: company letterhead info, today's date, agency contact, reference to specific RFP title, brief intro of company, statement of interest, summary of qualifications, closing with contact info.",
+
   "response_sections": {{
     {sections_json}
   }},
-  
-  "submission_checklist": ["List every item to submit in order"],
-  "calendar_events": [{{"title": "Event", "due_date": "YYYY-MM-DD", "notes": ""}}]
+
+  "submission_checklist": [
+    "Cover Letter",
+    "[List each narrative section in order]",
+    "{forms_list}",
+    "[Any other required items]"
+  ],
+
+  "calendar_events": [
+    {{"title": "Event from RFP", "due_date": "YYYY-MM-DD", "notes": "Details"}}
+  ]
 }}
 
-REQUIREMENTS:
-1. Generate REAL content for each response_sections key - no placeholders
-2. Each narrative section should be 2-4 paragraphs minimum with specific details from company profile
-3. Cover letter must be complete and ready to submit
-4. Use company profile data (name, address, experience, certifications) throughout
-5. Match the tone and requirements specified in the RFP
-6. submission_checklist should list ALL items (narratives + forms) in submission order
+REMEMBER:
+1. Use the ACTUAL company name from the profile (not "[Company Name]")
+2. Reference the ACTUAL RFP title and agency
+3. Include SPECIFIC past project examples if available in company profile
+4. Each response section needs SUBSTANCE - minimum 2-4 paragraphs
+5. submission_checklist must include ALL required items (narratives AND forms)
 """.strip(),
         },
     ]

@@ -704,6 +704,40 @@
   flex-shrink: 0;
 }
 
+/* Checklist section styles */
+.ai-tools-page .result-section li.checklist-header {
+  border-bottom: none;
+  padding-top: 14px;
+  padding-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.ai-tools-page .result-section li.checklist-header::before {
+  display: none;
+}
+
+.ai-tools-page .result-section li.checklist-header:first-child {
+  padding-top: 0;
+}
+
+.ai-tools-page .result-section li.checklist-narrative {
+  color: #059669;
+  padding-left: 8px;
+}
+
+.ai-tools-page .result-section li.checklist-narrative::before {
+  background: #059669;
+}
+
+.ai-tools-page .result-section li.checklist-form {
+  color: #6b7280;
+  padding-left: 8px;
+}
+
+.ai-tools-page .result-section li.checklist-form::before {
+  background: #9ca3af;
+}
+
 .ai-tools-page .result-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;

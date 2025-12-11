@@ -516,25 +516,51 @@
 
     if (els.checklistItems) {
       els.checklistItems.innerHTML = "";
+
+      // Get narrative sections (AI will generate these)
       const narratives = extracted.narrative_sections || [];
-      const forms = extracted.attachments_forms || extracted.required_forms || [];
-      const otherDocs = extracted.required_documents || [];
+      const narrativeNames = narratives
+        .map((n) => (typeof n === "string" ? n : n.name))
+        .filter(Boolean);
 
-      const allItems = [
-        ...narratives.map((n) => (typeof n === "string" ? n : n.name)).filter(Boolean),
-        ...otherDocs,
-        ...forms,
-      ];
-      const uniqueItems = [...new Set(allItems)];
+      // Get forms/attachments (user provides these)
+      const forms = extracted.attachments_forms || [];
+      const otherForms = extracted.required_forms || [];
+      const allForms = [...new Set([...forms, ...otherForms])];
 
-      if (!uniqueItems.length) {
-        els.checklistItems.innerHTML = `<li>No checklist items detected yet.</li>`;
-      } else {
-        uniqueItems.slice(0, 15).forEach((item) => {
+      // Render AI-generated sections first
+      if (narrativeNames.length) {
+        const aiHeader = document.createElement("li");
+        aiHeader.className = "checklist-header";
+        aiHeader.innerHTML = "<strong>📝 AI Will Generate:</strong>";
+        els.checklistItems.appendChild(aiHeader);
+
+        narrativeNames.slice(0, 10).forEach((item) => {
           const li = document.createElement("li");
+          li.className = "checklist-narrative";
           li.textContent = item;
           els.checklistItems.appendChild(li);
         });
+      }
+
+      // Render user-provided forms
+      if (allForms.length) {
+        const formsHeader = document.createElement("li");
+        formsHeader.className = "checklist-header";
+        formsHeader.innerHTML = "<strong>📎 You Need to Provide:</strong>";
+        els.checklistItems.appendChild(formsHeader);
+
+        allForms.slice(0, 10).forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "checklist-form";
+          li.textContent = item;
+          els.checklistItems.appendChild(li);
+        });
+      }
+
+      // Fallback if nothing found
+      if (!narrativeNames.length && !allForms.length) {
+        els.checklistItems.innerHTML = `<li>No checklist items detected yet. Try re-running extraction.</li>`;
       }
     }
 

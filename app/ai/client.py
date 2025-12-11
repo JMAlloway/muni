@@ -151,7 +151,7 @@ def get_llm_client():
         if not api_key:
             print("[AI client] OPENAI selected but no key -> rule-based")
             return None
-        model = os.getenv("OPENAI_MODEL") or getattr(settings, "openai_model", None) or "gpt-4o-mini"
+        model = os.getenv("OPENAI_MODEL") or getattr(settings, "openai_model", None) or "gpt-4o"
         print(f"[AI client] Using OpenAI model={model}")
         return OpenAIChatClient(api_key=api_key, model=model)
 

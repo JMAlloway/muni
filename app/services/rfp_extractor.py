@@ -128,64 +128,84 @@ Return strict JSON with these keys:
 """.strip()
 
 COMBINED_PROMPT = """
-Analyze this RFP/solicitation document and return JSON with two keys:
+You are an expert RFP analyst. Analyze this solicitation and extract structured data.
+
+MOST IMPORTANT: Identify what the proposer must WRITE vs what they must ATTACH.
+
+Return this JSON structure:
 {
   "discovery": {
     "document_type": "RFQ|RFP|IFB|SOW|other",
-    "sections": [{"title": "", "page": null, "has_questions": false}],
-    "response_items": [{"id": "", "text": "", "type": "narrative|table|form|attachment", "word_limit": null, "page_limit": null, "points": null}],
     "deadlines": [{"event": "", "date": "", "time": "", "timezone": ""}],
     "submission": {"method": "email|portal|mail", "copies": null, "format": "", "address": ""},
-    "evaluation_weights": [{"criterion": "", "weight": null}],
     "narrative_sections": [],
     "attachments_forms": []
   },
   "extracted": {
     "title": "",
     "agency": "",
-    "summary": "",
+    "summary": "2-3 sentences max",
     "scope_of_work": "",
-    "contractor_requirements": [],
-    "training_requirements": [],
-    "insurance_limits": "",
-    "required_documents": [],
     "submission_instructions": "",
     "deadlines": [],
     "contacts": [],
     "evaluation_criteria": [],
-    "required_forms": [],
-    "compliance_terms": [],
-    "red_flags": [],
     "narrative_sections": [],
-    "attachments_forms": []
+    "attachments_forms": [],
+    "required_forms": []
   }
 }
 
-CRITICAL INSTRUCTIONS:
+=== NARRATIVE SECTIONS (CRITICAL - AI WILL GENERATE THESE) ===
 
-1. "summary" must be 2-3 sentences MAX. Be concise.
+These are sections the proposer must WRITE original content for. Look carefully for:
 
-2. SEPARATE narrative sections from forms/attachments:
+TRIGGER PHRASES:
+- "provide a narrative", "submit a narrative", "brief narrative"
+- "describe your", "describe the", "description of"
+- "explain your", "explain how"
+- "statement of qualifications", "qualifications statement"
+- "technical approach", "approach to the project"
+- "project understanding", "understanding of scope"
+- "management plan", "staffing plan", "personnel"
+- "past performance", "relevant experience", "similar projects"
+- "methodology", "work plan"
 
-   "narrative_sections" = Sections where the proposer must WRITE content (AI will generate these):
-   - Look for phrases like "provide a narrative", "describe", "explain", "brief narrative", "approach to", "qualifications", "experience", "personnel", "project plan"
-   - Examples: "Brief Narrative", "Description of Proposer", "Qualifications and Experience", "Personnel and Subcontractors", "Approach to the Project", "Technical Approach", "Management Plan", "Past Performance"
-   
-   "attachments_forms" = Pre-made forms/documents to ATTACH (user has these, AI does NOT generate):
-   - Look for phrases like "attach", "include form", "completed form", "execute and include", "affidavit", "certificate"
-   - Examples: "W-9", "Non-Collusion Affidavit", "Insurance Certificate", "Tax Forms", "Addenda Acknowledgment", "Signature Page"
+COMMON NARRATIVE SECTIONS:
+- Brief Narrative / Executive Summary
+- Company Background / Description of Proposer
+- Qualifications and Experience
+- Technical Approach / Methodology
+- Project Understanding
+- Personnel / Key Staff / Team Qualifications
+- Past Performance / References
+- Management Plan / Schedule
+- Cost Narrative (explanation, not the pricing itself)
 
-3. "required_documents" should contain ALL items to submit (both narratives and forms combined, for checklist display)
+For EACH narrative section found, extract:
+{
+  "name": "Exact section title from RFP",
+  "requirements": "What the RFP says to include in this section",
+  "page_limit": null or number,
+  "word_limit": null or number,
+  "points": null or number
+}
 
-4. "deadlines" must capture ALL dates (proposal due, questions deadline, pre-bid meeting, etc.)
+=== ATTACHMENTS/FORMS (USER ALREADY HAS THESE) ===
 
-5. For narrative_sections, extract the EXACT section name and any requirements:
-   Format: [{"name": "Brief Narrative", "requirements": "3 pages max, describe proposer and experience", "points": null}]
+Pre-made documents/forms to attach. Look for:
+- "attach", "include completed", "submit signed"
+- "W-9", "affidavit", "certificate", "bond", "license"
+- Forms in exhibits or appendices
+- Signature pages, acknowledgment forms
 
-6. For attachments_forms, just list the form names:
-   Format: ["W-9 Form", "Non-Collusion Affidavit", "Insurance Certificate"]
+Just list the names: ["W-9 Form", "Non-Collusion Affidavit", "Insurance Certificate"]
 
-7. Arrays must be lists. If unknown, use "" or [].
+=== IMPORTANT ===
+
+- narrative_sections should NEVER be empty for a real RFP - every RFP requires SOME written content
+- If you see "Exhibit A - Scope of Work" that describes what to deliver, the RESPONSE to that scope is a narrative section
+- Look in evaluation criteria - sections being scored usually require narrative responses
 """.strip()
 
 
