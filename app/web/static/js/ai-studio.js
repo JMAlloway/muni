@@ -516,10 +516,21 @@
 
     if (els.checklistItems) {
       els.checklistItems.innerHTML = "";
-      if (!checklist.length) {
+      const narratives = extracted.narrative_sections || [];
+      const forms = extracted.attachments_forms || extracted.required_forms || [];
+      const otherDocs = extracted.required_documents || [];
+
+      const allItems = [
+        ...narratives.map((n) => (typeof n === "string" ? n : n.name)).filter(Boolean),
+        ...otherDocs,
+        ...forms,
+      ];
+      const uniqueItems = [...new Set(allItems)];
+
+      if (!uniqueItems.length) {
         els.checklistItems.innerHTML = `<li>No checklist items detected yet.</li>`;
       } else {
-        checklist.slice(0, 12).forEach((item) => {
+        uniqueItems.slice(0, 15).forEach((item) => {
           const li = document.createElement("li");
           li.textContent = item;
           els.checklistItems.appendChild(li);
@@ -738,21 +749,39 @@
       }
       const data = await res.json();
       const docs = data.documents || {};
+      const narrativeSections =
+        docs.narrative_sections_list ||
+        state.extracted?.extracted?.extracted?.narrative_sections ||
+        state.extracted?.extracted?.narrative_sections ||
+        [];
 
-      // Dynamic sections
-      state.responseSections = docs.required_sections_list || ["Cover Letter", "Statement of Qualifications"];
+      state.responseSections = narrativeSections.map((s) =>
+        typeof s === "string" ? s : s?.name || s?.title || "Section"
+      );
+
+      if (!state.responseSections.length && docs.response_sections) {
+        state.responseSections = Object.keys(docs.response_sections).map((key) =>
+          key
+            .split("_")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")
+        );
+      }
+
+      if (!state.responseSections.length) {
+        state.responseSections = ["Cover Letter", "Company Overview", "Project Approach"];
+      }
+
+      if (!state.responseSections.includes("Cover Letter")) {
+        state.responseSections.unshift("Cover Letter");
+      }
+
       state.documents = { cover: docs.cover_letter || "" };
 
       const responseSections = docs.response_sections || {};
       Object.entries(responseSections).forEach(([key, value]) => {
         state.documents[key] = typeof value === "string" ? value : formatSoqText(value);
       });
-
-      // Fallback for old format
-      if (docs.soq && !Object.keys(responseSections).length) {
-        state.documents.responses = formatSoqText(docs.soq);
-        state.responseSections = ["Cover Letter", "Responses"];
-      }
 
       state.currentDoc = "cover";
       renderDocumentTabs();

@@ -137,7 +137,8 @@ Analyze this RFP/solicitation document and return JSON with two keys:
     "deadlines": [{"event": "", "date": "", "time": "", "timezone": ""}],
     "submission": {"method": "email|portal|mail", "copies": null, "format": "", "address": ""},
     "evaluation_weights": [{"criterion": "", "weight": null}],
-    "required_response_sections": []
+    "narrative_sections": [],
+    "attachments_forms": []
   },
   "extracted": {
     "title": "",
@@ -154,17 +155,37 @@ Analyze this RFP/solicitation document and return JSON with two keys:
     "evaluation_criteria": [],
     "required_forms": [],
     "compliance_terms": [],
-    "red_flags": []
+    "red_flags": [],
+    "narrative_sections": [],
+    "attachments_forms": []
   }
 }
 
-IMPORTANT INSTRUCTIONS:
-1. "summary" must be 2-3 sentences MAX describing what the agency is looking for. Be concise.
-2. "required_documents" must list EVERY document the vendor must submit (e.g., "Cover Letter", "Statement of Qualifications", "Price Proposal", "Insurance Certificate", "W-9", etc.)
-3. "required_forms" must list any specific forms by name/number (e.g., "Form A - Vendor Information", "Attachment B - Pricing Sheet")
-4. "deadlines" must capture ALL dates mentioned (proposal due date, questions deadline, pre-bid meeting, contract start, etc.)
-5. "discovery.required_response_sections" must list the sections/tabs the vendor's response should include based on the RFP's requirements
-6. Arrays must be lists of strings. If unknown, use "" or [].
+CRITICAL INSTRUCTIONS:
+
+1. "summary" must be 2-3 sentences MAX. Be concise.
+
+2. SEPARATE narrative sections from forms/attachments:
+
+   "narrative_sections" = Sections where the proposer must WRITE content (AI will generate these):
+   - Look for phrases like "provide a narrative", "describe", "explain", "brief narrative", "approach to", "qualifications", "experience", "personnel", "project plan"
+   - Examples: "Brief Narrative", "Description of Proposer", "Qualifications and Experience", "Personnel and Subcontractors", "Approach to the Project", "Technical Approach", "Management Plan", "Past Performance"
+   
+   "attachments_forms" = Pre-made forms/documents to ATTACH (user has these, AI does NOT generate):
+   - Look for phrases like "attach", "include form", "completed form", "execute and include", "affidavit", "certificate"
+   - Examples: "W-9", "Non-Collusion Affidavit", "Insurance Certificate", "Tax Forms", "Addenda Acknowledgment", "Signature Page"
+
+3. "required_documents" should contain ALL items to submit (both narratives and forms combined, for checklist display)
+
+4. "deadlines" must capture ALL dates (proposal due, questions deadline, pre-bid meeting, etc.)
+
+5. For narrative_sections, extract the EXACT section name and any requirements:
+   Format: [{"name": "Brief Narrative", "requirements": "3 pages max, describe proposer and experience", "points": null}]
+
+6. For attachments_forms, just list the form names:
+   Format: ["W-9 Form", "Non-Collusion Affidavit", "Insurance Certificate"]
+
+7. Arrays must be lists. If unknown, use "" or [].
 """.strip()
 
 
@@ -215,6 +236,8 @@ def _merge_json(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "required_forms": [],
         "compliance_terms": [],
         "red_flags": [],
+        "narrative_sections": [],
+        "attachments_forms": [],
     }
     if not results:
         return out

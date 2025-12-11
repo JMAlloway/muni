@@ -70,27 +70,35 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
     instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
+    # Get narrative sections (what AI should generate)
+    narrative_sections = extracted.get("narrative_sections", [])
+    if not narrative_sections:
+        discovery = extracted.get("discovery", {}) if isinstance(extracted, dict) else {}
+        narrative_sections = discovery.get("narrative_sections", [])
 
-    # Get required sections from discovery, or use defaults
-    discovery = extracted.get("discovery", {}) if isinstance(extracted, dict) else {}
-    required_sections = discovery.get("required_response_sections", [])
+    # If still empty, use smart defaults
+    if not narrative_sections:
+        narrative_sections = [
+            {"name": "Cover Letter", "requirements": "Professional introduction letter"},
+            {"name": "Company Overview", "requirements": "Background and qualifications"},
+            {"name": "Project Approach", "requirements": "How you will deliver the services"},
+        ]
 
-    # Build dynamic document sections based on what RFP requires
-    if not required_sections:
-        # Fallback: infer from required_documents
-        required_docs = extracted.get("required_documents", []) if isinstance(extracted, dict) else []
-        required_sections = required_docs if required_docs else ["Cover Letter", "Statement of Qualifications"]
+    sections_to_generate = []
+    for section in narrative_sections:
+        if isinstance(section, dict):
+            name = section.get("name", "")
+            reqs = section.get("requirements", "")
+            sections_to_generate.append(f'"{name}": "{reqs}"')
+        elif isinstance(section, str):
+            sections_to_generate.append(f'"{section}": "Provide detailed response"')
 
-    # Create dynamic response structure based on required sections
-    dynamic_sections = {}
-    for section in required_sections:
-        section_key = section.lower().replace(" ", "_").replace("-", "_")
-        dynamic_sections[section_key] = f"Content for {section}"
+    sections_json = ",\n    ".join(sections_to_generate)
 
     return [
         {
             "role": "system",
-            "content": "You are an expert proposal writer. Generate professional, compliant submission documents tailored to the RFP requirements.",
+            "content": "You are an expert proposal writer. Generate professional, compliant submission documents tailored to the RFP requirements. Write substantive, detailed content for each section.",
         },
         {
             "role": "user",
@@ -108,32 +116,25 @@ Use today's date: {today_str}
 Best available contact/address from extraction:
 {json.dumps(contact, indent=2)}
 
-The RFP requires these response sections: {json.dumps(required_sections)}
-
-Generate JSON with this structure:
+Generate JSON with this EXACT structure:
 {{
-  "cover_letter": "Professional cover letter text",
+  "cover_letter": "Professional cover letter (use company letterhead format, reference the specific opportunity, 1 page)",
+  
   "response_sections": {{
-    // Generate a key for EACH required section
-    // Example: "technical_approach": "content...",
-    // Example: "past_performance": "content...",
-    // Example: "pricing": "content...",
+    {sections_json}
   }},
-  "submission_instructions": "Clear steps for submission",
-  "submission_checklist": ["Ordered list of items to submit with page limits/requirements"],
-  "calendar_events": [
-    {{"title": "Proposal Due", "due_date": "<iso date>", "notes": ""}},
-    {{"title": "Questions Due", "due_date": "<iso date>", "notes": ""}}
-  ],
-  "required_sections_list": {json.dumps(required_sections)}
+  
+  "submission_checklist": ["List every item to submit in order"],
+  "calendar_events": [{{"title": "Event", "due_date": "YYYY-MM-DD", "notes": ""}}]
 }}
 
-IMPORTANT:
-- Generate content for EVERY section in required_sections_list
-- Cover letter must be professional and reference the specific opportunity
-- Each response section should be substantive (2-4 paragraphs minimum)
-- Use company profile data to personalize the response
-- Checklist must match the RFP's submission requirements exactly
+REQUIREMENTS:
+1. Generate REAL content for each response_sections key - no placeholders
+2. Each narrative section should be 2-4 paragraphs minimum with specific details from company profile
+3. Cover letter must be complete and ready to submit
+4. Use company profile data (name, address, experience, certifications) throughout
+5. Match the tone and requirements specified in the RFP
+6. submission_checklist should list ALL items (narratives + forms) in submission order
 """.strip(),
         },
     ]
