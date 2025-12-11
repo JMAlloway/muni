@@ -618,11 +618,22 @@
         checklist: docs.submission_checklist || docs.checklist || [],
         key_dates: docs.calendar_events || [],
       };
-      const existing = state.extracted?.extracted || state.extracted || {};
+
+      // Fix: Put augmented data at the correct nesting level
+      // state.extracted has shape: { ok, opportunity_id, extracted: { version, discovery, extracted: {...} } }
+      // getExtractedObject returns state.extracted.extracted.extracted, so we need to merge there
+      const currentExtracted = state.extracted?.extracted?.extracted || state.extracted?.extracted || {};
       state.extracted = {
         ...(state.extracted || {}),
-        extracted: { ...(state.extracted?.extracted || existing), ...augmented },
+        extracted: {
+          ...(state.extracted?.extracted || {}),
+          extracted: { ...currentExtracted, ...augmented },
+        },
       };
+
+      console.log("[augmentExtractionFromGeneration] Augmented data:", augmented);
+      console.log("[augmentExtractionFromGeneration] Updated state.extracted:", state.extracted);
+
       const hasContent = renderExtraction();
       if (hasContent) {
         showMessage("Used AI generation to fill summary/checklist/dates.", "success");
