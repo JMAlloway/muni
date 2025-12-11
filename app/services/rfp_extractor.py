@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 import textwrap
 from typing import Any, Dict, List
 
 from app.ai.client import get_llm_client
 from app.services.extraction_cache import ExtractionCache
+
+logger = logging.getLogger(__name__)
 
 # Tunable constants
 MAX_WORDS_PER_CHUNK = 3500  # heuristic for token limits
@@ -214,18 +217,32 @@ class RfpExtractor:
         Single LLM call returning both discovery + extracted blocks.
         """
         cleaned = _clean_text(text)
-        if not cleaned or not self.llm:
+        if not cleaned:
+            logger.warning("[RfpExtractor] No cleaned text to extract from")
+            return {"discovery": {}, "extracted": _merge_json([])}
+        if not self.llm:
+            logger.warning("[RfpExtractor] No LLM client available")
             return {"discovery": {}, "extracted": _merge_json([])}
         try:
+            logger.info("[RfpExtractor] Calling LLM for combined extraction (text length: %d chars)", len(cleaned))
             resp = self.llm.chat(_build_combined_prompt(cleaned), temperature=0)
+            logger.info("[RfpExtractor] LLM response received (length: %d chars)", len(resp) if resp else 0)
             parsed = json.loads(resp)
             if isinstance(parsed, dict):
+                discovery = parsed.get("discovery") or {}
+                extracted = parsed.get("extracted") or _merge_json([])
+                logger.info("[RfpExtractor] Extraction successful - summary: %s, deadlines: %d",
+                           bool(extracted.get("summary")), len(extracted.get("deadlines") or []))
                 return {
-                    "discovery": parsed.get("discovery") or {},
-                    "extracted": parsed.get("extracted") or _merge_json([]),
+                    "discovery": discovery,
+                    "extracted": extracted,
                 }
-        except Exception:
-            pass
+            else:
+                logger.warning("[RfpExtractor] LLM response was not a dict: %s", type(parsed))
+        except json.JSONDecodeError as e:
+            logger.error("[RfpExtractor] JSON parse error: %s. Response preview: %s", e, (resp or "")[:200])
+        except Exception as e:
+            logger.error("[RfpExtractor] Extraction failed: %s", e)
         # Fallback to empty discovery + merged extraction to avoid crash
         return {"discovery": {}, "extracted": _merge_json([])}
 

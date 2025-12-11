@@ -297,10 +297,12 @@
       .concat(extracted.compliance_terms || [])
       .concat((root && root.discovery && root.discovery.requirements) || [])
       .filter(Boolean);
+    // Backend uses 'deadlines', frontend also checks 'key_dates' and 'timeline'
     const dates =
       extracted.key_dates ||
       extracted.timeline ||
-      (root && root.discovery && (root.discovery.key_dates || root.discovery.timeline)) ||
+      extracted.deadlines ||
+      (root && root.discovery && (root.discovery.key_dates || root.discovery.timeline || root.discovery.deadlines)) ||
       [];
     return Boolean((summary && summary.trim()) || (checklist && checklist.length) || (dates && dates.length));
   }
@@ -481,11 +483,22 @@
       .concat((root.discovery && root.discovery.requirements) || [])
       .filter(Boolean);
 
-    const dates =
+    // Backend uses 'deadlines' with {event, date}, frontend expected 'key_dates' with {title, due_date}
+    // Handle both formats for compatibility
+    let dates =
       extracted.key_dates ||
       extracted.timeline ||
-      (root.discovery && (root.discovery.key_dates || root.discovery.timeline)) ||
+      extracted.deadlines ||
+      (root.discovery && (root.discovery.key_dates || root.discovery.timeline || root.discovery.deadlines)) ||
       [];
+    // Normalize deadlines format to key_dates format
+    if (Array.isArray(dates)) {
+      dates = dates.map((d) => ({
+        title: d.title || d.event || "Date",
+        due_date: d.due_date || d.date || "",
+        date: d.date || d.due_date || "",
+      }));
+    }
 
     if (els.summaryText) {
       els.summaryText.textContent = summary || "No summary available yet.";
