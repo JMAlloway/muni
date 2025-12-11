@@ -29,6 +29,7 @@
     extractStatus: document.getElementById("extractStatus"),
     generateBtn: document.getElementById("generateBtn"),
     generateError: document.getElementById("generateError"),
+    generateOptions: document.getElementById("generateOptions"),
     customInstructions: document.getElementById("customInstructions"),
     documentEditor: document.getElementById("documentEditor"),
     editableContent: document.getElementById("editableContent"),
@@ -479,6 +480,7 @@
     const root = state.extracted || {};
     const extracted = getExtractedObject(root);
     if (!extracted || Object.keys(extracted).length === 0) {
+      renderGenerateOptions({});
       if (els.extractStatus) {
         els.extractStatus.classList.remove("hidden");
         if (state.isExtracting || augmentingExtraction) {
@@ -516,25 +518,46 @@
 
     if (els.checklistItems) {
       els.checklistItems.innerHTML = "";
+
       const narratives = extracted.narrative_sections || [];
-      const forms = extracted.attachments_forms || extracted.required_forms || [];
-      const otherDocs = extracted.required_documents || [];
+      const narrativeNames = narratives
+        .map((n) => (typeof n === "string" ? n : n.name))
+        .filter(Boolean);
 
-      const allItems = [
-        ...narratives.map((n) => (typeof n === "string" ? n : n.name)).filter(Boolean),
-        ...otherDocs,
-        ...forms,
-      ];
-      const uniqueItems = [...new Set(allItems)];
+      const forms = extracted.attachments_forms || [];
+      const otherForms = extracted.required_forms || [];
+      const allForms = [...new Set([...forms, ...otherForms])];
 
-      if (!uniqueItems.length) {
-        els.checklistItems.innerHTML = `<li>No checklist items detected yet.</li>`;
-      } else {
-        uniqueItems.slice(0, 15).forEach((item) => {
+      if (narrativeNames.length) {
+        const aiHeader = document.createElement("li");
+        aiHeader.className = "checklist-header";
+        aiHeader.innerHTML = "<strong>📝 AI Will Generate:</strong>";
+        els.checklistItems.appendChild(aiHeader);
+
+        narrativeNames.forEach((item) => {
           const li = document.createElement("li");
+          li.className = "checklist-narrative";
           li.textContent = item;
           els.checklistItems.appendChild(li);
         });
+      }
+
+      if (allForms.length) {
+        const formsHeader = document.createElement("li");
+        formsHeader.className = "checklist-header";
+        formsHeader.innerHTML = "<strong>📎 You Need to Provide:</strong>";
+        els.checklistItems.appendChild(formsHeader);
+
+        allForms.forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "checklist-form";
+          li.textContent = item;
+          els.checklistItems.appendChild(li);
+        });
+      }
+
+      if (!narrativeNames.length && !allForms.length) {
+        els.checklistItems.innerHTML = `<li>No checklist items detected yet.</li>`;
       }
     }
 
@@ -573,8 +596,105 @@
         els.extractStatus.textContent = "";
       }
     }
+    // Narrative requirements panel
+    if (els.extractResults) {
+      let narrativeDetails = document.getElementById("narrativeDetails");
+      if (!narrativeDetails) {
+        narrativeDetails = document.createElement("div");
+        narrativeDetails.id = "narrativeDetails";
+        narrativeDetails.className = "narrative-details-panel";
+        els.extractResults.appendChild(narrativeDetails);
+      }
+      const narratives = extracted.narrative_sections || [];
+      if (narratives.length) {
+        let html = "<h4>📝 Sections AI Will Generate:</h4>";
+        html += "<div class='narrative-list'>";
+        narratives.forEach((n) => {
+          const name = typeof n === "string" ? n : n.name;
+          const reqs = typeof n === "object" ? n.requirements : "";
+          const limit = n && typeof n === "object" && n.page_limit
+            ? `${n.page_limit} pages`
+            : n && typeof n === "object" && n.word_limit
+            ? `${n.word_limit} words`
+            : "";
+          html += `<div class="narrative-item">
+            <strong>${name || ""}</strong>
+            ${limit ? `<span class="limit-badge">${limit}</span>` : ""}
+            ${reqs ? `<p class="narrative-reqs">${reqs}</p>` : ""}
+          </div>`;
+        });
+        html += "</div>";
+        narrativeDetails.innerHTML = html;
+      } else {
+        narrativeDetails.innerHTML = "";
+      }
+    }
+    renderGenerateOptions(extracted);
     handleStepAvailability();
     return hasContent;
+  }
+
+  function renderGenerateOptions(extracted) {
+    if (!els.generateOptions) return;
+    const narratives = (extracted && extracted.narrative_sections) || [];
+
+    if (!narratives.length) {
+      els.generateOptions.innerHTML = `
+        <div class="generate-option selected">
+          <input type="checkbox" checked>
+          <div class="option-content">
+            &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
+          </div>
+        </div>
+        <div class="generate-option selected">
+          <input type="checkbox" checked>
+          <div class="option-content">
+            &#128203; <div><strong>Project Response</strong><span>Based on RFP requirements</span></div>
+          </div>
+        </div>
+      `;
+      els.generateOptions.querySelectorAll(".generate-option").forEach((card) => {
+        card.addEventListener("click", () => {
+          card.classList.toggle("selected");
+          const input = card.querySelector("input");
+          if (input) input.checked = card.classList.contains("selected");
+        });
+      });
+      return;
+    }
+
+    let html = `
+      <div class="generate-option selected">
+        <input type="checkbox" checked>
+        <div class="option-content">
+          &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
+        </div>
+      </div>
+    `;
+
+    narratives.forEach((section, idx) => {
+      const name = typeof section === "string" ? section : section.name || "Section";
+      const requirements = typeof section === "object" ? section.requirements || "" : "";
+      const shortReq = requirements.length > 60 ? `${requirements.substring(0, 57)}...` : requirements;
+      const icon = idx % 2 === 0 ? "&#128203;" : "&#128196;";
+      html += `
+        <div class="generate-option selected" data-section="${name}">
+          <input type="checkbox" checked>
+          <div class="option-content">
+            ${icon} <div><strong>${name}</strong><span>${shortReq || "Required narrative section"}</span></div>
+          </div>
+        </div>
+      `;
+    });
+
+    els.generateOptions.innerHTML = html;
+    els.generateOptions.querySelectorAll(".generate-option").forEach((card) => {
+      card.addEventListener("click", () => {
+        card.classList.toggle("selected");
+        const input = card.querySelector("input");
+        if (input) input.checked = card.classList.contains("selected");
+      });
+    });
   }
 
   async function augmentExtractionFromGeneration() {

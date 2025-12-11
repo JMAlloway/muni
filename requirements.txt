@@ -33,3 +33,4 @@ stripe==11.2.0
 PyMuPDF==1.24.12
 python-docx==1.1.2
 fpdf2==2.7.9
+psycopg2

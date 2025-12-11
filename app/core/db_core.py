@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.core.settings import settings
 from app.core.models_core import opportunities
@@ -14,7 +15,18 @@ from app.ai.categorizer import classify_opportunity
 from app.ai.taxonomy import normalize_category_name
 
 # Example DSN: postgresql+psycopg://user:password@host/dbname
-engine = create_async_engine(settings.DB_URL, echo=False, future=True)
+engine_kwargs = {"echo": False, "future": True}
+
+# For SQLite, increase busy timeout and reuse a single shared connection to reduce lock errors.
+if settings.DB_URL and settings.DB_URL.startswith("sqlite"):
+    engine_kwargs.update(
+        {
+            "connect_args": {"timeout": 30, "check_same_thread": False},
+            "poolclass": StaticPool,
+        }
+    )
+
+engine = create_async_engine(settings.DB_URL, **engine_kwargs)
 
 
 def _ensure_ai_category(raw) -> None:

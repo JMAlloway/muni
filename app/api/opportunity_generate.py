@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/opportunities", tags=["opportunity-generate"])
 
 response_lib = ResponseLibrary()
 
+
 async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
     try:
         async with engine.begin() as conn:
@@ -61,7 +62,6 @@ def _contact_from_extracted(extracted: Dict[str, Any]) -> Dict[str, str]:
 def _sanitize_text(val: str, max_chars: int = 8000) -> str:
     if not val:
         return ""
-    # Strip control chars and trim length
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", val)
     return cleaned[:max_chars]
 
@@ -70,71 +70,111 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
     instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
-    # Get narrative sections (what AI should generate)
+
+    # Get narrative sections with their requirements
     narrative_sections = extracted.get("narrative_sections", [])
     if not narrative_sections:
         discovery = extracted.get("discovery", {}) if isinstance(extracted, dict) else {}
         narrative_sections = discovery.get("narrative_sections", [])
 
-    # If still empty, use smart defaults
-    if not narrative_sections:
-        narrative_sections = [
-            {"name": "Cover Letter", "requirements": "Professional introduction letter"},
-            {"name": "Company Overview", "requirements": "Background and qualifications"},
-            {"name": "Project Approach", "requirements": "How you will deliver the services"},
-        ]
-
     sections_to_generate = []
     for section in narrative_sections:
         if isinstance(section, dict):
             name = section.get("name", "")
-            reqs = section.get("requirements", "")
-            sections_to_generate.append(f'"{name}": "{reqs}"')
-        elif isinstance(section, str):
-            sections_to_generate.append(f'"{section}": "Provide detailed response"')
+            reqs = section.get("requirements", "Provide detailed response")
+            page_limit = section.get("page_limit")
+            word_limit = section.get("word_limit")
 
-    sections_json = ",\n    ".join(sections_to_generate)
+            limit_note = ""
+            if page_limit:
+                limit_note = f" (max {page_limit} pages)"
+            elif word_limit:
+                limit_note = f" (max {word_limit} words)"
+
+            sections_to_generate.append({
+                "name": name,
+                "requirements": reqs,
+                "limit": limit_note,
+            })
+        elif isinstance(section, str):
+            sections_to_generate.append({
+                "name": section,
+                "requirements": "Provide detailed response",
+                "limit": "",
+            })
+
+    # If still empty, derive from scope of work
+    if not sections_to_generate:
+        scope = extracted.get("scope_of_work", "") or ""
+        sections_to_generate = [
+            {
+                "name": "Cover Letter",
+                "requirements": "Professional introduction referencing the specific opportunity",
+                "limit": "",
+            },
+            {
+                "name": "Company Qualifications",
+                "requirements": f"Relevant experience and qualifications for: {scope[:200]}",
+                "limit": "",
+            },
+            {
+                "name": "Technical Approach",
+                "requirements": f"Methodology and approach to deliver: {scope[:200]}",
+                "limit": "",
+            },
+        ]
+
+    sections_json_parts = []
+    for s in sections_to_generate:
+        sections_json_parts.append(
+            f'    "{s["name"]}": "Write content addressing: {s["requirements"]}{s["limit"]}"'
+        )
+    sections_json = ",\n".join(sections_json_parts)
 
     return [
         {
             "role": "system",
-            "content": "You are an expert proposal writer. Generate professional, compliant submission documents tailored to the RFP requirements. Write substantive, detailed content for each section.",
+            "content": """You are an expert government proposal writer with 20+ years of experience winning contracts. 
+Generate professional, compliant, and compelling proposal content.
+Write substantive content - never use placeholders or generic filler.
+Tailor every section to the specific RFP requirements and company qualifications.""",
         },
         {
             "role": "user",
             "content": f"""
-Extracted RFP JSON:
+RFP REQUIREMENTS:
 {json.dumps(extracted, indent=2)}
 
-Company Profile:
+COMPANY PROFILE:
 {json.dumps(company, indent=2)}
 
-RFP Instructions (verbatim, prioritize compliance):
-{instr[:8000]}
+SUBMISSION INSTRUCTIONS:
+{instr[:6000]}
 
-Use today's date: {today_str}
-Best available contact/address from extraction:
+TODAY'S DATE: {today_str}
+
+AGENCY CONTACT:
 {json.dumps(contact, indent=2)}
 
-Generate JSON with this EXACT structure:
+Generate a complete proposal response with this EXACT JSON structure:
 {{
-  "cover_letter": "Professional cover letter (use company letterhead format, reference the specific opportunity, 1 page)",
+  "cover_letter": "Professional cover letter (1 page, address to agency contact, reference specific RFP title and number)",
   
   "response_sections": {{
-    {sections_json}
+{sections_json}
   }},
   
-  "submission_checklist": ["List every item to submit in order"],
-  "calendar_events": [{{"title": "Event", "due_date": "YYYY-MM-DD", "notes": ""}}]
+  "submission_checklist": ["Ordered list of every item to include in the submission package"],
+  "calendar_events": [{{"title": "Event name", "due_date": "YYYY-MM-DD", "notes": "Details"}}]
 }}
 
 REQUIREMENTS:
-1. Generate REAL content for each response_sections key - no placeholders
-2. Each narrative section should be 2-4 paragraphs minimum with specific details from company profile
-3. Cover letter must be complete and ready to submit
-4. Use company profile data (name, address, experience, certifications) throughout
-5. Match the tone and requirements specified in the RFP
-6. submission_checklist should list ALL items (narratives + forms) in submission order
+1. Cover letter must reference the specific opportunity by name
+2. Each response section must be 2-4 substantive paragraphs
+3. Use specific details from the company profile (names, experience, certifications)
+4. Match the RFP's tone and address stated requirements
+5. Include concrete examples of relevant past projects
+6. Submission checklist must include ALL items (narratives AND forms/attachments)
 """.strip(),
         },
     ]
@@ -195,6 +235,7 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
         instruction_upload_ids = (payload or {}).get("instruction_upload_ids") or []
     except Exception:
         instruction_upload_ids = []
+
     llm = get_llm_client()
     if not llm:
         raise HTTPException(status_code=500, detail="LLM client unavailable")
@@ -207,10 +248,8 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"LLM error: {exc}")
 
-    # store generated answers in response library for reuse (question/answer pairs)
     try:
         if data and isinstance(data, dict):
-            # we only store the cover letter for now
             cover = data.get("cover_letter") or ""
             if cover:
                 await response_lib.store_response(

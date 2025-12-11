@@ -5,7 +5,7 @@ from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
 
 router = APIRouter(tags=["ai-tools"])
-STATIC_VER = "20251210.2"
+STATIC_VER = "20251211.0"
 
 
 @router.get("/ai-tools", response_class=HTMLResponse)
@@ -153,19 +153,9 @@ async def ai_tools_page(request: Request):
         </div>
       </div>
       <div class="step-content">
-        <div class="generate-options">
-          <label class="generate-option selected">
-            <input type="checkbox" checked>
-            <div class="option-content">
-              &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
-            </div>
-          </label>
-          <label class="generate-option selected">
-            <input type="checkbox" checked>
-            <div class="option-content">
-              &#128203; <div><strong>Statement of Qualifications</strong><span>Company capabilities &amp; experience</span></div>
-            </div>
-          </label>
+        <div id="generateOptions" class="generate-options">
+          <!-- Dynamically populated from extracted narrative sections -->
+          <div class="loading-placeholder">Loading sections from extraction...</div>
         </div>
         <div class="custom-instructions form-group">
           <label class="form-label">Custom Instructions (optional)</label>

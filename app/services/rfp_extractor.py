@@ -128,64 +128,94 @@ Return strict JSON with these keys:
 """.strip()
 
 COMBINED_PROMPT = """
-Analyze this RFP/solicitation document and return JSON with two keys:
+You are an expert RFP analyst. Analyze this solicitation document and extract structured information.
+
+CRITICAL: Separate what the proposer must WRITE vs what they must ATTACH.
+
+Return JSON with this structure:
 {
-  "discovery": {
-    "document_type": "RFQ|RFP|IFB|SOW|other",
-    "sections": [{"title": "", "page": null, "has_questions": false}],
-    "response_items": [{"id": "", "text": "", "type": "narrative|table|form|attachment", "word_limit": null, "page_limit": null, "points": null}],
-    "deadlines": [{"event": "", "date": "", "time": "", "timezone": ""}],
-    "submission": {"method": "email|portal|mail", "copies": null, "format": "", "address": ""},
-    "evaluation_weights": [{"criterion": "", "weight": null}],
-    "narrative_sections": [],
-    "attachments_forms": []
-  },
   "extracted": {
-    "title": "",
-    "agency": "",
-    "summary": "",
-    "scope_of_work": "",
-    "contractor_requirements": [],
-    "training_requirements": [],
-    "insurance_limits": "",
-    "required_documents": [],
-    "submission_instructions": "",
-    "deadlines": [],
-    "contacts": [],
-    "evaluation_criteria": [],
-    "required_forms": [],
-    "compliance_terms": [],
-    "red_flags": [],
-    "narrative_sections": [],
-    "attachments_forms": []
+    "title": "RFP title",
+    "agency": "Issuing agency name",
+    "summary": "2-3 sentence summary of what is being solicited",
+    "scope_of_work": "Brief description of the work/services required",
+    
+    "narrative_sections": [
+      {
+        "name": "Exact section name from RFP",
+        "requirements": "What must be included in this section",
+        "page_limit": null,
+        "word_limit": null,
+        "points": null
+      }
+    ],
+    
+    "attachments_forms": [
+      "W-9 Form",
+      "Insurance Certificate",
+      "Non-Collusion Affidavit"
+    ],
+    
+    "deadlines": [
+      {"event": "Proposal Due", "date": "2024-03-15", "time": "2:00 PM", "timezone": "EST"}
+    ],
+    
+    "submission_instructions": "How and where to submit",
+    "evaluation_criteria": ["Criteria 1 - 30%", "Criteria 2 - 25%"],
+    "contacts": [{"name": "", "email": "", "phone": ""}]
   }
 }
 
-CRITICAL INSTRUCTIONS:
+INSTRUCTIONS FOR narrative_sections:
+- These are sections the proposer must WRITE (AI will generate content for these)
+- Look for: "provide a narrative", "describe your approach", "explain your qualifications", 
+  "include a description of", "submit a statement of", "technical approach", "management plan",
+  "personnel qualifications", "past performance", "project understanding"
+- Extract the EXACT requirements stated for each section
+- Include any page/word limits mentioned
 
-1. "summary" must be 2-3 sentences MAX. Be concise.
+INSTRUCTIONS FOR attachments_forms:
+- These are pre-made documents to ATTACH (user already has these, AI does NOT generate)
+- Look for: "attach completed form", "include certificate", "submit signed affidavit",
+  "W-9", "insurance certificate", "bond", "license", "registration"
+- Just list the form/document names
 
-2. SEPARATE narrative sections from forms/attachments:
+Be thorough - RFPs often bury requirements throughout the document.
+""".strip()
 
-   "narrative_sections" = Sections where the proposer must WRITE content (AI will generate these):
-   - Look for phrases like "provide a narrative", "describe", "explain", "brief narrative", "approach to", "qualifications", "experience", "personnel", "project plan"
-   - Examples: "Brief Narrative", "Description of Proposer", "Qualifications and Experience", "Personnel and Subcontractors", "Approach to the Project", "Technical Approach", "Management Plan", "Past Performance"
-   
-   "attachments_forms" = Pre-made forms/documents to ATTACH (user has these, AI does NOT generate):
-   - Look for phrases like "attach", "include form", "completed form", "execute and include", "affidavit", "certificate"
-   - Examples: "W-9", "Non-Collusion Affidavit", "Insurance Certificate", "Tax Forms", "Addenda Acknowledgment", "Signature Page"
+NARRATIVE_EXTRACTION_PROMPT = """
+Analyze this RFP and identify ALL sections where the proposer must write narrative content.
 
-3. "required_documents" should contain ALL items to submit (both narratives and forms combined, for checklist display)
+For each narrative section found, extract:
+1. Section name (exactly as written in the RFP)
+2. What the section must address/include
+3. Page or word limits (if specified)
+4. Evaluation points/weight (if specified)
+5. Any specific formatting requirements
 
-4. "deadlines" must capture ALL dates (proposal due, questions deadline, pre-bid meeting, etc.)
+Common narrative sections include:
+- Executive Summary / Cover Letter
+- Company Background / Qualifications
+- Technical Approach / Methodology  
+- Project Understanding / Scope
+- Personnel / Key Staff / Team
+- Past Performance / Experience / References
+- Management Plan / Schedule
+- Cost Narrative (not the pricing, but explanation)
 
-5. For narrative_sections, extract the EXACT section name and any requirements:
-   Format: [{"name": "Brief Narrative", "requirements": "3 pages max, describe proposer and experience", "points": null}]
+Return JSON array:
+[
+  {
+    "name": "Brief Narrative",
+    "requirements": "Describe proposer background, relevant experience, and approach to the project. Must address understanding of scope.",
+    "page_limit": 3,
+    "word_limit": null,
+    "points": 25,
+    "formatting": "12pt font, 1 inch margins"
+  }
+]
 
-6. For attachments_forms, just list the form names:
-   Format: ["W-9 Form", "Non-Collusion Affidavit", "Insurance Certificate"]
-
-7. Arrays must be lists. If unknown, use "" or [].
+Extract EVERY narrative section mentioned, even if requirements are vague.
 """.strip()
 
 
@@ -325,29 +355,42 @@ class RfpExtractor:
         # Fallback to empty discovery + merged extraction to avoid crash
         return {"discovery": {}, "extracted": _merge_json([])}
 
+    def _extract_narratives(self, text: str) -> List[Dict[str, Any]]:
+        """
+        Focused extraction of narrative sections when the main extraction misses them.
+        """
+        cleaned = _clean_text(text)
+        if not cleaned or not self.llm:
+            return []
+        try:
+            resp = self.llm.chat(
+                [
+                    {"role": "system", "content": "You are an expert RFP analyst."},
+                    {"role": "user", "content": f"{NARRATIVE_EXTRACTION_PROMPT}\n\nSource text:\n\"\"\"\n{cleaned[:MAX_PROMPT_CHARS]}\n\"\"\"\n"},
+                ],
+                temperature=0,
+            )
+            parsed = _safe_load_json(resp)
+            if isinstance(parsed, list):
+                return parsed
+        except Exception as exc:
+            logger.warning("rfp_extractor._extract_narratives failed: %s", exc)
+        return []
+
     def extract_all(self, text: str) -> Dict[str, Any]:
         cleaned = _clean_text(text)
-        word_count = len(cleaned.split())
+        # Pass 1: main combined extraction
+        combined = self._extract_combined(cleaned)
+        extracted = combined.get("extracted") or {}
 
-        # Single call for small/medium docs
-        if word_count and word_count <= MAX_WORDS_PER_CHUNK:
-            combined = self._extract_combined(cleaned)
-            # If combined failed, fall back to legacy
-            if combined.get("discovery") or combined.get("extracted"):
-                return combined
+        # Pass 2: if narratives missing, run focused extraction
+        if not extracted.get("narrative_sections"):
+            narratives = self._extract_narratives(cleaned)
+            if narratives:
+                extracted["narrative_sections"] = narratives
+                combined["extracted"] = extracted
 
-        # Legacy multi-call for larger docs or fallback
-        discovery = self.discover(text)
-        extracted = self.extract_json(text)
-        result = {"discovery": discovery, "extracted": extracted}
-
-        # If we still have nothing useful, try one more combined call on cleaned text.
-        if not _has_useful_content(result) and self.llm:
-            logger.debug("rfp_extractor.extract_all retry combined because content empty")
-            retry = self._extract_combined(cleaned)
-            if retry.get("discovery") or retry.get("extracted"):
-                return retry
-        return result
+        return combined
 
     async def extract_json_cached(self, text: str) -> Dict[str, Any]:
         """
