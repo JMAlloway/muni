@@ -5,7 +5,7 @@ from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
 
 router = APIRouter(tags=["ai-tools"])
-STATIC_VER = "20251210.1"
+STATIC_VER = "20251210.2"
 
 
 @router.get("/ai-tools", response_class=HTMLResponse)
@@ -58,19 +58,34 @@ async def ai_tools_page(request: Request):
             <span class="select-arrow">&#9662;</span>
           </div>
         </div>
-        <div id="uploadArea" class="upload-area">
-          <div class="upload-icon">&#128196;</div>
-          <p class="upload-text">Drop your RFP here or click to browse</p>
-          <p class="upload-hint">PDF, DOCX, or TXT up to 25MB</p>
-          <input type="file" id="rfpUploadInput" hidden accept=".pdf,.docx,.doc,.txt" />
-        </div>
-        <div id="uploadedFile" class="uploaded-file hidden">
-          <div class="file-icon">&#128196;</div>
-          <div class="file-details">
-            <span id="fileName" class="file-name"></span>
-            <span id="fileSize" class="file-size"></span>
+        <div class="document-switcher">
+          <div class="doc-tabs" role="tablist">
+            <button class="doc-tab active" type="button" data-tab="existing">Use Existing Document</button>
+            <button class="doc-tab" type="button" data-tab="upload">Upload New Document</button>
           </div>
-          <button id="removeFile" class="file-remove" type="button" title="Remove file">&times;</button>
+          <div class="doc-pane active" id="existingDocPane">
+            <p class="doc-hint">Select any previously uploaded RFP or addendum for this opportunity.</p>
+            <div id="existingDocsList" class="doc-list">
+              <div class="doc-empty">Pick an opportunity to load your documents.</div>
+            </div>
+          </div>
+          <div class="doc-pane" id="uploadDocPane">
+            <p class="doc-hint">Upload a new file for this opportunity.</p>
+            <div id="uploadArea" class="upload-area">
+              <div class="upload-icon">&#128196;</div>
+              <p class="upload-text">Drop your RFP here or click to browse</p>
+              <p class="upload-hint">PDF, DOCX, or TXT up to 25MB</p>
+              <input type="file" id="rfpUploadInput" hidden accept=".pdf,.docx,.doc,.txt" />
+            </div>
+            <div id="uploadedFile" class="uploaded-file hidden">
+              <div class="file-icon">&#128196;</div>
+              <div class="file-details">
+                <span id="fileName" class="file-name"></span>
+                <span id="fileSize" class="file-size"></span>
+              </div>
+              <button id="removeFile" class="file-remove" type="button" title="Remove file">&times;</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="step-actions">

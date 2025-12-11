@@ -47,9 +47,13 @@
     improveBtn: document.getElementById("improveBtn"),
     shortenBtn: document.getElementById("shortenBtn"),
     expandBtn: document.getElementById("expandBtn"),
+    existingDocsList: document.getElementById("existingDocsList"),
+    existingDocPane: document.getElementById("existingDocPane"),
+    uploadDocPane: document.getElementById("uploadDocPane"),
     editorTabs: document.querySelectorAll(".editor-tab"),
     toolbarBtns: document.querySelectorAll(".toolbar-btn"),
     optionCards: document.querySelectorAll(".generate-option"),
+    docTabButtons: document.querySelectorAll(".doc-tab"),
   };
 
   const steps = {
@@ -68,9 +72,13 @@
     documents: { cover: "", responses: "" },
     currentDoc: "cover",
     sessionId: null,
+    existingDocs: [],
+    allowAugment: false,
+    isExtracting: false,
   };
 
   let saveTimer = null;
+  let augmentingExtraction = false;
 
   function setButtonLoading(btn, text) {
     if (!btn) return;
@@ -143,6 +151,13 @@
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
+  function formatDate(dateStr) {
+    if (!dateStr) return "Unknown date";
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
   function handleStepAvailability() {
     if (els.step1Next) {
       els.step1Next.disabled = !(state.opportunityId && state.upload);
@@ -165,13 +180,144 @@
     }
   }
 
+  function switchDocTab(tab) {
+    const target = tab === "upload" ? "upload" : "existing";
+    els.docTabButtons.forEach((btn) => {
+      const isActive = btn.dataset.tab === target;
+      btn.classList.toggle("active", isActive);
+    });
+    if (els.existingDocPane) {
+      els.existingDocPane.classList.toggle("active", target === "existing");
+    }
+    if (els.uploadDocPane) {
+      els.uploadDocPane.classList.toggle("active", target === "upload");
+    }
+  }
+
+  function renderExistingDocuments(selectedId = null) {
+    if (!els.existingDocsList) return;
+    const docs = state.existingDocs || [];
+    const activeId = selectedId || (state.upload && state.upload.id);
+    if (!docs.length) {
+      els.existingDocsList.innerHTML = `<div class="doc-empty">No documents uploaded yet for this opportunity.</div>`;
+      return;
+    }
+    els.existingDocsList.innerHTML = "";
+    docs.forEach((doc) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const isSelected = String(activeId ?? "") === String(doc.id ?? "");
+      btn.className = `doc-card${isSelected ? " selected" : ""}`;
+      btn.dataset.uploadId = doc.id;
+      btn.innerHTML = `
+        <div class="doc-icon">&#128462;</div>
+        <div class="doc-meta">
+          <div class="doc-name">${doc.filename || "Untitled"}</div>
+          <div class="doc-details">${formatBytes(doc.size)} &bull; Uploaded ${formatDate(doc.created_at)}</div>
+        </div>
+        <div class="doc-arrow">&#10140;</div>
+      `;
+      els.existingDocsList.appendChild(btn);
+    });
+  }
+
+  function selectExistingDocument(doc) {
+    if (!doc) return;
+    state.upload = doc;
+    state.extracted = null;
+    if (els.extractResults) {
+      els.extractResults.classList.add("hidden");
+    }
+    renderUpload(doc);
+    renderExistingDocuments(doc.id);
+    handleStepAvailability();
+    showMessage(`Selected ${doc.filename || "document"}. Run extraction to continue.`, "success");
+    scheduleSave();
+  }
+
+  async function fetchExistingDocuments(opportunityId = state.opportunityId, preselectId = null) {
+    if (!opportunityId || !els.existingDocsList) return [];
+    els.existingDocsList.innerHTML = `<div class="doc-empty">Loading documents...</div>`;
+    try {
+      const res = await fetch(`/uploads/list/${encodeURIComponent(opportunityId)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Unable to load documents (${res.status})`);
+      }
+      const data = await res.json();
+      state.existingDocs = Array.isArray(data) ? data : [];
+      const selectedId =
+        preselectId ||
+        (state.upload && state.upload.id) ||
+        (state.existingDocs.length === 1 ? state.existingDocs[0].id : null);
+      const selectedDoc = state.existingDocs.find((d) => String(d.id) === String(selectedId));
+      if (selectedDoc) {
+        state.upload = selectedDoc;
+        renderUpload(selectedDoc);
+      } else if (state.opportunityId === opportunityId) {
+        state.upload = null;
+        if (els.uploadedFile) els.uploadedFile.classList.add("hidden");
+        if (els.uploadArea) els.uploadArea.style.display = "block";
+      }
+      renderExistingDocuments(selectedDoc ? selectedDoc.id : null);
+      handleStepAvailability();
+      return state.existingDocs;
+    } catch (err) {
+      els.existingDocsList.innerHTML = `<div class="doc-empty error">${err.message || "Could not load documents."}</div>`;
+      handleStepAvailability();
+      return [];
+    }
+  }
+
+  function getExtractedObject(root) {
+    if (!root) return {};
+    return (
+      (root.extracted && (root.extracted.extracted || root.extracted.discovery || root.extracted)) ||
+      root.discovery ||
+      root ||
+      {}
+    );
+  }
+
+  function hasExtractionContent(root) {
+    const extracted = getExtractedObject(root);
+    if (!extracted || !Object.keys(extracted).length) return false;
+    const summary =
+      extracted.summary ||
+      extracted.scope_of_work ||
+      (root && root.discovery && root.discovery.summary) ||
+      (root && root.summary) ||
+      "";
+    const checklist = []
+      .concat(extracted.required_documents || [])
+      .concat(extracted.required_forms || [])
+      .concat(extracted.checklist || [])
+      .concat(extracted.compliance_terms || [])
+      .concat((root && root.discovery && root.discovery.requirements) || [])
+      .filter(Boolean);
+    const dates =
+      extracted.key_dates ||
+      extracted.timeline ||
+      (root && root.discovery && (root.discovery.key_dates || root.discovery.timeline)) ||
+      [];
+    return Boolean((summary && summary.trim()) || (checklist && checklist.length) || (dates && dates.length));
+  }
+
   async function fetchTrackedOpportunities() {
     const select = els.genOpportunity;
     if (!select) return;
     select.innerHTML = `<option value="">Loading tracked opportunities...</option>`;
     try {
-      const res = await fetch("/api/tracked/my", { credentials: "include" });
-      if (!res.ok) throw new Error(`Unable to load tracked (${res.status})`);
+      const res = await fetch("/api/tracked/my", {
+        credentials: "include",
+        headers: { "X-CSRF-Token": getCsrf() },
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `Unable to load tracked (${res.status})`);
+      }
       const data = await res.json();
       select.innerHTML = `<option value="">Select a tracked solicitation</option>`;
       (Array.isArray(data) ? data : []).forEach((row) => {
@@ -186,7 +332,12 @@
         select.value = state.opportunityId;
       }
     } catch (err) {
-      showMessage("Could not load tracked opportunities. Try refreshing.", "error");
+      showMessage(err.message || "Could not load tracked opportunities. Try refreshing.", "error");
+      if (state.opportunityLabel && state.opportunityId) {
+        select.innerHTML = `<option value="${state.opportunityId}">${state.opportunityLabel}</option>`;
+      } else {
+        select.innerHTML = `<option value="">Unable to load tracked opportunities</option>`;
+      }
     }
   }
 
@@ -221,6 +372,7 @@
         els.extractResults.classList.add("hidden");
       }
       renderUpload(uploaded, file);
+      await fetchExistingDocuments(state.opportunityId, uploaded.id);
       handleStepAvailability();
       showMessage("Upload successful. Ready to extract.", "success");
       scheduleSave();
@@ -248,6 +400,12 @@
       showMessage("Upload a file before running extraction.", "error");
       return;
     }
+    state.allowAugment = true;
+    state.isExtracting = true;
+    if (els.extractStatus) {
+      els.extractStatus.classList.remove("hidden");
+      els.extractStatus.textContent = "Extracting RFP... please wait.";
+    }
     clearMessage();
     setButtonLoading(els.extractBtn, "Analyzing RFP...");
     try {
@@ -262,8 +420,18 @@
       }
       const data = await res.json();
       state.extracted = data;
-      renderExtraction();
-      await fetchOpportunityExtraction();
+      let hasContent = renderExtraction();
+      if (!hasContent) {
+        const refreshed = await fetchOpportunityExtraction();
+        hasContent = hasExtractionContent(refreshed);
+      }
+      if (!hasContent && state.allowAugment) {
+        if (els.extractStatus) {
+          els.extractStatus.classList.remove("hidden");
+          els.extractStatus.textContent = "Generating fallback with AI...";
+        }
+        hasContent = await augmentExtractionFromGeneration();
+      }
       handleStepAvailability();
       showMessage("Extraction complete.", "success");
       scheduleSave();
@@ -275,27 +443,36 @@
       }
     } finally {
       setButtonLoading(els.extractBtn, null);
+      state.isExtracting = false;
+      if (els.extractStatus && !state.extracted) {
+        els.extractStatus.classList.remove("hidden");
+        els.extractStatus.textContent = "No extraction results yet. Try running extraction again.";
+      }
     }
   }
 
   function renderExtraction() {
-    if (!els.extractResults) return;
+    if (!els.extractResults) return false;
     const root = state.extracted || {};
-    const extracted = root.extracted || root.discovery || root || {};
+    const extracted = getExtractedObject(root);
     if (!extracted || Object.keys(extracted).length === 0) {
       if (els.extractStatus) {
         els.extractStatus.classList.remove("hidden");
-        els.extractStatus.textContent = "No extraction results yet. Try running extraction again.";
+        if (state.isExtracting || augmentingExtraction) {
+          els.extractStatus.textContent = "Extracting RFP... please wait.";
+        } else {
+          els.extractStatus.textContent = "No extraction results yet. Try running extraction again.";
+        }
       }
       els.extractResults.classList.add("hidden");
-      return;
+      return false;
     }
     const summary =
       extracted.summary ||
       extracted.scope_of_work ||
       (root.discovery && root.discovery.summary) ||
       root.summary ||
-      "No summary available yet.";
+      "";
     const checklist = []
       .concat(extracted.required_documents || [])
       .concat(extracted.required_forms || [])
@@ -310,7 +487,9 @@
       (root.discovery && (root.discovery.key_dates || root.discovery.timeline)) ||
       [];
 
-    if (els.summaryText) els.summaryText.textContent = summary;
+    if (els.summaryText) {
+      els.summaryText.textContent = summary || "No summary available yet.";
+    }
 
     if (els.checklistItems) {
       els.checklistItems.innerHTML = "";
@@ -333,29 +512,93 @@
           row.textContent = `${d.title || "Date"} - ${d.due_date || d.date || ""}`;
           els.keyDates.appendChild(row);
         });
-      } else if (data.due_date) {
-        els.keyDates.textContent = `Due date: ${data.due_date}`;
+      } else if (root.due_date) {
+        els.keyDates.textContent = `Due date: ${root.due_date}`;
       } else {
         els.keyDates.textContent = "No key dates captured.";
       }
     }
 
     els.extractResults.classList.remove("hidden");
-    const isEmpty =
-      (!summary || summary.toLowerCase().includes("no summary")) &&
-      (!checklist.length) &&
-      (!dates || !dates.length);
+    const hasContent = Boolean(
+      (summary && summary.trim()) || (checklist && checklist.length) || (dates && dates.length)
+    );
     if (els.extractStatus) {
-      if (isEmpty) {
+      if (!hasContent) {
         els.extractStatus.classList.remove("hidden");
-        els.extractStatus.textContent =
-          "Extraction returned no summary/checklist/dates. Try rerunning or check the uploaded file.";
+        if (state.isExtracting || augmentingExtraction) {
+          els.extractStatus.textContent = "Extracting RFP... please wait.";
+        } else if (state.allowAugment) {
+          els.extractStatus.textContent =
+            "No key details yet. Try rerunning extraction or upload a clearer document.";
+        } else {
+          els.extractStatus.textContent = "No extraction results yet. Try running extraction again.";
+        }
       } else {
         els.extractStatus.classList.add("hidden");
         els.extractStatus.textContent = "";
       }
     }
     handleStepAvailability();
+    return hasContent;
+  }
+
+  async function augmentExtractionFromGeneration() {
+    if (!state.opportunityId || augmentingExtraction || !state.allowAugment) return false;
+    augmentingExtraction = true;
+    if (els.extractStatus) {
+      els.extractStatus.classList.remove("hidden");
+      els.extractStatus.textContent = "Generating fallback with AI...";
+    }
+    try {
+      const payload = {
+        instruction_upload_ids: state.upload?.id ? [state.upload.id] : [],
+      };
+      const res = await fetch(
+        `/api/opportunities/${encodeURIComponent(state.opportunityId)}/generate`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCsrf(),
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) {
+        return false;
+      }
+      const data = await res.json();
+      const docs = data.documents || {};
+      const augmented = {
+        summary:
+          docs.submission_instructions ||
+          (Array.isArray(docs.submission_checklist) ? docs.submission_checklist.join(". ") : "") ||
+          (typeof docs.cover_letter === "string" ? docs.cover_letter.split("\n").slice(0, 2).join(" ") : ""),
+        checklist: docs.submission_checklist || docs.checklist || [],
+        key_dates: docs.calendar_events || [],
+      };
+      const existing = state.extracted?.extracted || state.extracted || {};
+      state.extracted = {
+        ...(state.extracted || {}),
+        extracted: { ...(state.extracted?.extracted || existing), ...augmented },
+      };
+      const hasContent = renderExtraction();
+      if (hasContent) {
+        showMessage("Used AI generation to fill summary/checklist/dates.", "success");
+        return true;
+      }
+    } catch (err) {
+      showMessage(err.message || "Fallback generation failed.", "error");
+    } finally {
+      augmentingExtraction = false;
+      if (els.extractStatus && !state.isExtracting && !state.extracted?.extracted) {
+        els.extractStatus.classList.remove("hidden");
+        els.extractStatus.textContent = "No extraction results yet. Try running extraction again.";
+      }
+    }
+    return false;
   }
 
   async function fetchOpportunityExtraction() {
@@ -366,12 +609,20 @@
       });
       if (!res.ok) return;
       const data = await res.json();
-      state.extracted = data;
-      renderExtraction();
-      handleStepAvailability();
+      const hasNew = hasExtractionContent(data);
+      const hasExisting = hasExtractionContent(state.extracted);
+      if (hasNew || !hasExisting) {
+        state.extracted = data;
+        const hasContent = renderExtraction();
+        if (!hasContent && state.allowAugment) {
+          await augmentExtractionFromGeneration();
+        }
+      }
     } catch (err) {
       showMessage(err.message || "Could not load extracted data.", "error");
     }
+    handleStepAvailability();
+    return state.extracted;
   }
 
   function formatSoqText(val) {
@@ -545,6 +796,9 @@
       if (els.genOpportunity && state.opportunityId) {
         els.genOpportunity.value = state.opportunityId;
       }
+      if (state.opportunityId) {
+        await fetchExistingDocuments(state.opportunityId, state.upload?.id);
+      }
       if (state.upload) {
         renderUpload(state.upload);
       }
@@ -645,11 +899,39 @@
         const select = e.target;
         state.opportunityId = select.value;
         state.opportunityLabel = select.options[select.selectedIndex]?.text || "";
+        state.allowAugment = false;
+        state.upload = null;
         state.extracted = null;
+        state.existingDocs = [];
+        if (els.uploadedFile) els.uploadedFile.classList.add("hidden");
+        if (els.uploadArea) els.uploadArea.style.display = "block";
+        if (els.existingDocsList) {
+          els.existingDocsList.innerHTML = `<div class="doc-empty">Loading documents...</div>`;
+        }
         if (els.extractResults) els.extractResults.classList.add("hidden");
+        switchDocTab("existing");
         handleStepAvailability();
+        fetchExistingDocuments(state.opportunityId);
         fetchOpportunityExtraction();
         scheduleSave();
+      });
+    }
+
+    if (els.docTabButtons && els.docTabButtons.length) {
+      els.docTabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => switchDocTab(btn.dataset.tab));
+      });
+    }
+
+    if (els.existingDocsList) {
+      els.existingDocsList.addEventListener("click", (e) => {
+        const card = e.target.closest(".doc-card");
+        if (!card) return;
+        const uploadId = Number(card.dataset.uploadId);
+        const doc = state.existingDocs.find((d) => Number(d.id) === uploadId);
+        if (doc) {
+          selectExistingDocument(doc);
+        }
       });
     }
 
@@ -677,9 +959,11 @@
     if (els.removeFile) {
       els.removeFile.addEventListener("click", () => {
         state.upload = null;
+        state.allowAugment = false;
         if (els.uploadedFile) els.uploadedFile.classList.add("hidden");
         if (els.uploadArea) els.uploadArea.style.display = "block";
         if (els.rfpUploadInput) els.rfpUploadInput.value = "";
+        renderExistingDocuments();
         handleStepAvailability();
         scheduleSave();
       });
