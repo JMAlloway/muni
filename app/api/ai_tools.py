@@ -5,7 +5,7 @@ from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
 
 router = APIRouter(tags=["ai-tools"])
-STATIC_VER = "20251211.0"
+STATIC_VER = "20251211.1"
 
 
 @router.get("/ai-tools", response_class=HTMLResponse)

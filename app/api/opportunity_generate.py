@@ -66,10 +66,16 @@ def _sanitize_text(val: str, max_chars: int = 8000) -> str:
     return cleaned[:max_chars]
 
 
-def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instructions_text: str = "") -> list[dict]:
+def _build_doc_prompt(
+    extracted: Dict[str, Any],
+    company: Dict[str, Any],
+    instructions_text: str = "",
+    section_instructions: Dict[str, str] | None = None,
+) -> list[dict]:
     instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
+    section_instructions = section_instructions or {}
 
     # Get narrative sections with their requirements
     narrative_sections = extracted.get("narrative_sections", [])
@@ -126,8 +132,19 @@ def _build_doc_prompt(extracted: Dict[str, Any], company: Dict[str, Any], instru
 
     sections_json_parts = []
     for s in sections_to_generate:
+        name = s["name"]
+        reqs = s["requirements"]
+        limit = s["limit"]
+        key = name.lower().replace(" ", "_").replace("'", "")
+        key_alt = re.sub(r"[^a-z0-9]+", "_", name.lower())
+        user_context = section_instructions.get(key) or section_instructions.get(key_alt) or ""
+        if user_context:
+            safe_context = user_context.replace("\\", "\\\\").replace('"', '\\"')
+            user_note = f" USER CONTEXT: {safe_context}"
+        else:
+            user_note = ""
         sections_json_parts.append(
-            f'    "{s["name"]}": "Write content addressing: {s["requirements"]}{s["limit"]}"'
+            f'    "{name}": "Write content addressing: {reqs}{limit}{user_note}"'
         )
     sections_json = ",\n".join(sections_json_parts)
 
@@ -231,17 +248,20 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
 
     company_profile = await _get_company_profile(user["id"])
     instruction_upload_ids = []
+    section_instructions: Dict[str, str] = {}
     try:
         instruction_upload_ids = (payload or {}).get("instruction_upload_ids") or []
+        section_instructions = (payload or {}).get("section_instructions") or {}
     except Exception:
         instruction_upload_ids = []
+        section_instructions = {}
 
     llm = get_llm_client()
     if not llm:
         raise HTTPException(status_code=500, detail="LLM client unavailable")
 
     instructions_text = await _load_instruction_text(user["id"], instruction_upload_ids)
-    prompt = _build_doc_prompt(extracted, company_profile, instructions_text)
+    prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions)
     try:
         resp = llm.chat(prompt, temperature=0.4, format="json")
         data = json.loads(resp)

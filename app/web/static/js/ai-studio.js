@@ -636,65 +636,87 @@
 
   function renderGenerateOptions(extracted) {
     if (!els.generateOptions) return;
+
     const narratives = (extracted && extracted.narrative_sections) || [];
 
+    // Fallback: show a single project response option if nothing was extracted
     if (!narratives.length) {
       els.generateOptions.innerHTML = `
-        <div class="generate-option selected">
-          <input type="checkbox" checked>
-          <div class="option-content">
-            &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
+        <div class="generate-option selected" data-section="Project Response">
+          <div class="option-header">
+            <input type="checkbox" checked>
+            <div class="option-content">
+              &#128203; <div><strong>Project Response</strong><span>Based on RFP requirements</span></div>
+            </div>
           </div>
-        </div>
-        <div class="generate-option selected">
-          <input type="checkbox" checked>
-          <div class="option-content">
-            &#128203; <div><strong>Project Response</strong><span>Based on RFP requirements</span></div>
+          <div class="section-instructions">
+            <input type="text" class="section-instruction-input" data-section="project_response"
+                   placeholder="Add specific context for this section (optional)">
           </div>
         </div>
       `;
-      els.generateOptions.querySelectorAll(".generate-option").forEach((card) => {
-        card.addEventListener("click", () => {
-          card.classList.toggle("selected");
-          const input = card.querySelector("input");
-          if (input) input.checked = card.classList.contains("selected");
-        });
-      });
+      bindOptionCardEvents();
       return;
     }
 
-    let html = `
-      <div class="generate-option selected">
-        <input type="checkbox" checked>
-        <div class="option-content">
-          &#128221; <div><strong>Cover Letter</strong><span>Professional introduction letter</span></div>
-        </div>
-      </div>
-    `;
-
-    narratives.forEach((section, idx) => {
+    let html = "";
+    narratives.forEach((section, index) => {
       const name = typeof section === "string" ? section : section.name || "Section";
       const requirements = typeof section === "object" ? section.requirements || "" : "";
-      const shortReq = requirements.length > 60 ? `${requirements.substring(0, 57)}...` : requirements;
-      const icon = idx % 2 === 0 ? "&#128203;" : "&#128196;";
+      const shortReq = requirements.length > 80 ? `${requirements.substring(0, 77)}...` : requirements;
+      const icon = index % 2 === 0 ? "&#128203;" : "&#128196;";
+      const sectionKey = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
       html += `
         <div class="generate-option selected" data-section="${name}">
-          <input type="checkbox" checked>
-          <div class="option-content">
-            ${icon} <div><strong>${name}</strong><span>${shortReq || "Required narrative section"}</span></div>
+          <div class="option-header">
+            <input type="checkbox" checked>
+            <div class="option-content">
+              ${icon} <div><strong>${name}</strong><span>${shortReq || "Required narrative section"}</span></div>
+            </div>
+          </div>
+          <div class="section-instructions">
+            <input type="text" class="section-instruction-input" data-section="${sectionKey}"
+                   placeholder="Add specific details for this section (e.g., pricing, personnel names)">
           </div>
         </div>
       `;
     });
 
     els.generateOptions.innerHTML = html;
+    bindOptionCardEvents();
+  }
+
+  function bindOptionCardEvents() {
+    if (!els.generateOptions) return;
+
     els.generateOptions.querySelectorAll(".generate-option").forEach((card) => {
-      card.addEventListener("click", () => {
+      const header = card.querySelector(".option-header") || card;
+      const checkbox = card.querySelector("input[type='checkbox']");
+
+      header.addEventListener("click", (e) => {
+        if (e.target.classList.contains("section-instruction-input")) return;
         card.classList.toggle("selected");
-        const input = card.querySelector("input");
-        if (input) input.checked = card.classList.contains("selected");
+        if (checkbox) checkbox.checked = card.classList.contains("selected");
       });
     });
+
+    els.generateOptions.querySelectorAll(".section-instruction-input").forEach((input) => {
+      input.addEventListener("click", (e) => e.stopPropagation());
+    });
+  }
+
+  function getSectionInstructions() {
+    const instructions = {};
+    if (!els.generateOptions) return instructions;
+    els.generateOptions.querySelectorAll(".section-instruction-input").forEach((input) => {
+      const section = input.dataset.section;
+      const value = input.value.trim();
+      if (section && value) {
+        instructions[section] = value;
+      }
+    });
+    return instructions;
   }
 
   async function augmentExtractionFromGeneration() {
@@ -850,6 +872,10 @@
       };
       if (els.customInstructions && els.customInstructions.value.trim()) {
         payload.custom_instructions = els.customInstructions.value.trim();
+      }
+      const sectionInstructions = getSectionInstructions();
+      if (Object.keys(sectionInstructions).length > 0) {
+        payload.section_instructions = sectionInstructions;
       }
       const res = await fetch(
         `/api/opportunities/${encodeURIComponent(state.opportunityId)}/generate`,
