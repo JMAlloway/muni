@@ -835,25 +835,22 @@
 
     tabsContainer.innerHTML = "";
 
-    const coverTab = document.createElement("button");
-    coverTab.className = "editor-tab" + (state.currentDoc === "cover" ? " active" : "");
-    coverTab.type = "button";
-    coverTab.dataset.doc = "cover";
-    coverTab.innerHTML = "&#128221; Cover Letter";
-    coverTab.addEventListener("click", () => switchDocument("cover"));
-    tabsContainer.appendChild(coverTab);
-
-    (state.responseSections || []).forEach((section) => {
-      if (!section || section.toLowerCase() === "cover letter") return;
-      const key = section.toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+    (state.responseSections || []).forEach((section, index) => {
+      if (!section) return;
+      const key = section.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const isActive = state.currentDoc === key || (!state.currentDoc && index === 0);
       const tab = document.createElement("button");
-      tab.className = "editor-tab" + (state.currentDoc === key ? " active" : "");
+      tab.className = "editor-tab" + (isActive ? " active" : "");
       tab.type = "button";
       tab.dataset.doc = key;
       tab.innerHTML = `&#128203; ${section}`;
       tab.addEventListener("click", () => switchDocument(key));
       tabsContainer.appendChild(tab);
     });
+
+    if (!state.currentDoc && state.responseSections?.length) {
+      state.currentDoc = state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    }
   }
 
   async function generateDocuments() {
@@ -896,40 +893,44 @@
       const data = await res.json();
       const docs = data.documents || {};
       const narrativeSections =
-        docs.narrative_sections_list ||
-        state.extracted?.extracted?.extracted?.narrative_sections ||
         state.extracted?.extracted?.narrative_sections ||
+        state.extracted?.extracted?.extracted?.narrative_sections ||
+        docs.narrative_sections_list ||
         [];
 
-      state.responseSections = narrativeSections.map((s) =>
-        typeof s === "string" ? s : s?.name || s?.title || "Section"
-      );
+      state.responseSections = (narrativeSections || [])
+        .map((s) => (typeof s === "string" ? s : s?.name || s?.title || "Section"))
+        .filter(Boolean);
 
       if (!state.responseSections.length && docs.response_sections) {
-        state.responseSections = Object.keys(docs.response_sections).map((key) =>
-          key
-            .split("_")
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ")
-        );
+        state.responseSections = Object.keys(docs.response_sections);
       }
 
       if (!state.responseSections.length) {
-        state.responseSections = ["Cover Letter", "Company Overview", "Project Approach"];
+        state.responseSections = ["Project Response"];
       }
 
-      if (!state.responseSections.includes("Cover Letter")) {
-        state.responseSections.unshift("Cover Letter");
-      }
-
-      state.documents = { cover: docs.cover_letter || "" };
-
+      state.documents = {};
       const responseSections = docs.response_sections || {};
+
+      // Map API response sections by normalized key
       Object.entries(responseSections).forEach(([key, value]) => {
-        state.documents[key] = typeof value === "string" ? value : formatSoqText(value);
+        const normKey = key.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        state.documents[normKey] = typeof value === "string" ? value : formatSoqText(value);
       });
 
-      state.currentDoc = "cover";
+      // Also map using exact section names from extraction if available
+      state.responseSections.forEach((sectionName) => {
+        const normKey = sectionName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        if (!state.documents[normKey] && responseSections[sectionName]) {
+          const value = responseSections[sectionName];
+          state.documents[normKey] = typeof value === "string" ? value : formatSoqText(value);
+        }
+      });
+
+      state.currentDoc = state.responseSections.length
+        ? state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+        : null;
       renderDocumentTabs();
 
       // If extraction pane is still empty, backfill summary/checklist/dates from generated docs.

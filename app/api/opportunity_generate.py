@@ -131,6 +131,7 @@ def _build_doc_prompt(
         ]
 
     sections_json_parts = []
+    section_names = []
     for s in sections_to_generate:
         name = s["name"]
         reqs = s["requirements"]
@@ -143,10 +144,12 @@ def _build_doc_prompt(
             user_note = f" USER CONTEXT: {safe_context}"
         else:
             user_note = ""
+        section_names.append(name)
         sections_json_parts.append(
             f'    "{name}": "Write content addressing: {reqs}{limit}{user_note}"'
         )
     sections_json = ",\n".join(sections_json_parts)
+    section_names_list = ", ".join(f'"{n}"' for n in section_names if n)
 
     return [
         {
@@ -175,23 +178,24 @@ AGENCY CONTACT:
 
 Generate a complete proposal response with this EXACT JSON structure:
 {{
-  "cover_letter": "Professional cover letter (1 page, address to agency contact, reference specific RFP title and number)",
-  
   "response_sections": {{
 {sections_json}
   }},
   
-  "submission_checklist": ["Ordered list of every item to include in the submission package"],
+  "submission_checklist": [
+    {section_names_list}
+  ],
   "calendar_events": [{{"title": "Event name", "due_date": "YYYY-MM-DD", "notes": "Details"}}]
 }}
 
 REQUIREMENTS:
-1. Cover letter must reference the specific opportunity by name
-2. Each response section must be 2-4 substantive paragraphs
-3. Use specific details from the company profile (names, experience, certifications)
-4. Match the RFP's tone and address stated requirements
-5. Include concrete examples of relevant past projects
-6. Submission checklist must include ALL items (narratives AND forms/attachments)
+1. Each response section must be 2-4 substantive paragraphs
+2. Use specific details from the company profile (names, experience, certifications)
+3. Match the RFP's tone and address stated requirements
+4. Include concrete examples of relevant past projects
+5. Submission checklist must include ALL narrative/form items required for submission
+6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
+7. If USER CONTEXT is provided for a section, incorporate that specific information
 """.strip(),
         },
     ]
@@ -267,19 +271,6 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
         data = json.loads(resp)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"LLM error: {exc}")
-
-    try:
-        if data and isinstance(data, dict):
-            cover = data.get("cover_letter") or ""
-            if cover:
-                await response_lib.store_response(
-                    user,
-                    question="Cover letter",
-                    answer=cover,
-                    metadata={"opportunity_id": opportunity_id, "type": "cover_letter"},
-                )
-    except Exception:
-        pass
 
     return {"opportunity_id": opportunity_id, "documents": data}
 
