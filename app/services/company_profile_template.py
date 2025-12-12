@@ -103,6 +103,7 @@ def _sanitize_profile(
     template: Dict[str, Any],
     depth: int = 1,
     field_counter: MutableMapping[str, int] | None = None,
+    allow_unknown: bool = True,
 ) -> Dict[str, Any]:
     """
     Validate and clone a user-provided profile, allowing only known keys and safe types.
@@ -124,7 +125,12 @@ def _sanitize_profile(
 
     for key, value in profile.items():
         if key not in template:
-            raise ValueError(f"Unknown company profile field: {key}")
+            if not allow_unknown:
+                raise ValueError(f"Unknown company profile field: {key}")
+            if value is None:
+                continue
+            sanitized[key] = _sanitize_extra(value, depth=depth + 1, field_counter=field_counter)
+            continue
         if value is None:
             continue
 
@@ -136,6 +142,45 @@ def _sanitize_profile(
         )
 
     return sanitized
+
+
+def _sanitize_extra(value: Any, depth: int, field_counter: MutableMapping[str, int]) -> Any:
+    """
+    Sanitize values without a template (legacy/extra fields). Allows safe scalars and simple
+    containers while still enforcing depth and size limits.
+    """
+    if depth > _MAX_DEPTH:
+        raise ValueError(f"Company profile exceeds maximum depth of {_MAX_DEPTH}.")
+
+    if isinstance(value, dict):
+        field_counter["count"] += len(value)
+        if field_counter["count"] > _MAX_TOTAL_FIELDS:
+            raise ValueError(f"Company profile exceeds maximum field count of {_MAX_TOTAL_FIELDS}.")
+        cleaned: Dict[str, Any] = {}
+        for k, v in value.items():
+            if v is None:
+                continue
+            cleaned[k] = _sanitize_extra(v, depth + 1, field_counter)
+        return cleaned
+
+    if isinstance(value, list):
+        if len(value) > _MAX_LIST_LENGTH:
+            raise ValueError(f"Company profile lists are limited to {_MAX_LIST_LENGTH} items.")
+        field_counter["count"] += len(value)
+        if field_counter["count"] > _MAX_TOTAL_FIELDS:
+            raise ValueError(f"Company profile exceeds maximum field count of {_MAX_TOTAL_FIELDS}.")
+        return [_sanitize_extra(v, depth + 1, field_counter) for v in value if v is not None]
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        if len(value) > _MAX_STRING_LENGTH:
+            raise ValueError(f"String values are limited to {_MAX_STRING_LENGTH} characters.")
+        return value
+
+    raise ValueError("Unsupported company profile value type.")
 
 
 def _sanitize_value(value: Any, template_value: Any, depth: int, field_counter: MutableMapping[str, int]) -> Any:
