@@ -5,16 +5,21 @@ from app.api._layout import page_shell
 from app.auth.session import get_current_user_email
 
 router = APIRouter(tags=["ai-tools"])
-STATIC_VER = "20251211.2"
+STATIC_VER = "20251211.4"
 
 
 @router.get("/ai-tools", response_class=HTMLResponse)
-async def ai_tools_page(request: Request):
+async def ai_tools_page(request: Request) -> HTMLResponse:
     user_email = get_current_user_email(request)
+    csrf_token = request.cookies.get("csrftoken", "")
     body = f"""
 <link rel="stylesheet" href="/static/css/ai-studio.css?v={STATIC_VER}">
 
-<main class="ai-tools-page">
+<noscript>
+  <div class="state-card error" role="alert">JavaScript is required for AI Proposal Studio. Please enable JavaScript to continue.</div>
+</noscript>
+
+<main class="ai-tools-page hidden">
   <div class="wizard-container">
     <div class="wizard-header">
       <div style="display:flex;align-items:center;gap:14px;">
@@ -38,7 +43,7 @@ async def ai_tools_page(request: Request):
       <span id="progressPercent">0% complete</span>
     </div>
 
-    <div id="statusMessage" class="state-card hidden"></div>
+    <div id="statusMessage" class="state-card hidden" role="status" aria-live="polite"></div>
 
     <div id="step1" class="wizard-step active">
       <div class="step-header">
@@ -60,22 +65,28 @@ async def ai_tools_page(request: Request):
         </div>
         <div class="document-switcher">
           <div class="doc-tabs" role="tablist">
-            <button class="doc-tab active" type="button" data-tab="existing">Use Existing Document</button>
-            <button class="doc-tab" type="button" data-tab="upload">Upload New Document</button>
+            <button class="doc-tab active" type="button" data-tab="existing" id="tab-existing" aria-selected="true" aria-controls="existingDocPane">Use Existing Document</button>
+            <button class="doc-tab" type="button" data-tab="upload" id="tab-upload" aria-selected="false" aria-controls="uploadDocPane">Upload New Document</button>
           </div>
-          <div class="doc-pane active" id="existingDocPane">
+          <div class="doc-pane active" id="existingDocPane" role="tabpanel" aria-labelledby="tab-existing">
             <p class="doc-hint">Select any previously uploaded RFP or addendum for this opportunity.</p>
             <div id="existingDocsList" class="doc-list">
               <div class="doc-empty">Pick an opportunity to load your documents.</div>
             </div>
           </div>
-          <div class="doc-pane" id="uploadDocPane">
+          <div class="doc-pane" id="uploadDocPane" role="tabpanel" aria-labelledby="tab-upload">
             <p class="doc-hint">Upload a new file for this opportunity.</p>
             <div id="uploadArea" class="upload-area">
               <div class="upload-icon">&#128196;</div>
               <p class="upload-text">Drop your RFP here or click to browse</p>
               <p class="upload-hint">PDF, DOCX, or TXT up to 25MB</p>
               <input type="file" id="rfpUploadInput" hidden accept=".pdf,.docx,.doc,.txt" />
+            </div>
+            <div id="uploadProgress" class="upload-progress hidden">
+              <div id="uploadProgressBar">Uploading...</div>
+              <div class="upload-progress-bar">
+                <div id="uploadProgressFill" class="upload-progress-fill"></div>
+              </div>
             </div>
             <div id="uploadedFile" class="uploaded-file hidden">
               <div class="file-icon">&#128196;</div>
@@ -278,7 +289,18 @@ async def ai_tools_page(request: Request):
   </div>
   <div id="saveIndicator" class="save-indicator hidden">Saved</div>
 </main>
-
+<input type="hidden" id="csrfTokenField" value="{csrf_token}">
 <script src="/static/js/ai-studio.js?v={STATIC_VER}"></script>
     """
-    return HTMLResponse(page_shell(body, title="AI Studio", user_email=user_email))
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    return HTMLResponse(page_shell(body, title="AI Studio", user_email=user_email), headers={"Content-Security-Policy": csp})

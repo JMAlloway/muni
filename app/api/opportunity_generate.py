@@ -2,7 +2,9 @@ import json
 import datetime
 import logging
 import re
+import time
 from typing import Any, Dict
+from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -18,6 +20,14 @@ from app.services.response_library import ResponseLibrary
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-generate"])
 
 response_lib = ResponseLibrary()
+_rl_requests = defaultdict(deque)
+RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_MAX = 6  # per user per window
+MAX_UPLOAD_IDS = 10
+MAX_INSTRUCTION_BYTES = 1_000_000  # 1 MB cap for instruction text
+MAX_PROMPT_JSON_CHARS = 20000
+MAX_INSTR_CHARS = 6000
+DEFAULT_TEMPERATURE = 0.4
 
 
 async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
@@ -59,11 +69,33 @@ def _contact_from_extracted(extracted: Dict[str, Any]) -> Dict[str, str]:
     return contact
 
 
+def _check_rate_limit(user_id: Any) -> None:
+    now = time.time()
+    dq = _rl_requests[user_id]
+    while dq and dq[0] < now - RATE_LIMIT_WINDOW:
+        dq.popleft()
+    if len(dq) >= RATE_LIMIT_MAX:
+        raise HTTPException(status_code=429, detail="Too many generate requests. Please wait and try again.")
+    dq.append(now)
+
+
 def _sanitize_text(val: str, max_chars: int = 8000) -> str:
     if not val:
         return ""
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", val)
+    # Remove obvious prompt injection markers
+    cleaned = cleaned.replace("<<", "").replace(">>", "")
     return cleaned[:max_chars]
+
+
+def _truncate_json_for_prompt(obj: Any, max_chars: int) -> str:
+    try:
+        txt = json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+    except Exception:
+        txt = "{}"
+    if len(txt) > max_chars:
+        txt = txt[:max_chars] + "...(truncated)"
+    return txt
 
 
 def _build_doc_prompt(
@@ -72,7 +104,9 @@ def _build_doc_prompt(
     instructions_text: str = "",
     section_instructions: Dict[str, str] | None = None,
 ) -> list[dict]:
-    instr = _sanitize_text(instructions_text) or _sanitize_text(extracted.get("submission_instructions", ""))
+    instr = _sanitize_text(instructions_text, max_chars=MAX_INSTR_CHARS) or _sanitize_text(
+        extracted.get("submission_instructions", ""), max_chars=MAX_INSTR_CHARS
+    )
     today_str = datetime.date.today().strftime("%B %d, %Y")
     contact = _contact_from_extracted(extracted or {})
     section_instructions = section_instructions or {}
@@ -132,6 +166,7 @@ def _build_doc_prompt(
 
     sections_json_parts = []
     section_names = []
+    context_lines = []
     for s in sections_to_generate:
         name = s["name"]
         reqs = s["requirements"]
@@ -141,15 +176,20 @@ def _build_doc_prompt(
         user_context = section_instructions.get(key) or section_instructions.get(key_alt) or ""
         if user_context:
             safe_context = user_context.replace("\\", "\\\\").replace('"', '\\"')
-            user_note = f" USER CONTEXT: {safe_context}"
+            user_note = f"MUST INCLUDE USER CONTEXT: {safe_context}. Then address: {reqs}{limit}"
+            context_lines.append(f'- {name}: {safe_context}')
         else:
-            user_note = ""
+            user_note = f"Address: {reqs}{limit}"
         section_names.append(name)
         sections_json_parts.append(
-            f'    "{name}": "Write content addressing: {reqs}{limit}{user_note}"'
+            f'    "{name}": "{user_note}"'
         )
     sections_json = ",\n".join(sections_json_parts)
     section_names_list = ", ".join(f'"{n}"' for n in section_names if n)
+    user_context_block = "\n".join(context_lines) if context_lines else "None provided."
+
+    extracted_json = _truncate_json_for_prompt(extracted, MAX_PROMPT_JSON_CHARS)
+    company_json = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
 
     return [
         {
@@ -163,10 +203,10 @@ Tailor every section to the specific RFP requirements and company qualifications
             "role": "user",
             "content": f"""
 RFP REQUIREMENTS:
-{json.dumps(extracted, indent=2)}
+{extracted_json}
 
 COMPANY PROFILE:
-{json.dumps(company, indent=2)}
+{company_json}
 
 SUBMISSION INSTRUCTIONS:
 {instr[:6000]}
@@ -175,6 +215,9 @@ TODAY'S DATE: {today_str}
 
 AGENCY CONTACT:
 {json.dumps(contact, indent=2)}
+
+USER CONTEXT PROVIDED (per section):
+{user_context_block}
 
 Generate a complete proposal response with this EXACT JSON structure:
 {{
@@ -195,7 +238,7 @@ REQUIREMENTS:
 4. Include concrete examples of relevant past projects
 5. Submission checklist must include ALL narrative/form items required for submission
 6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
-7. If USER CONTEXT is provided for a section, incorporate that specific information
+7. If USER CONTEXT is provided for a section, incorporate that specific information prominently
 """.strip(),
         },
     ]
@@ -204,33 +247,42 @@ REQUIREMENTS:
 async def _load_instruction_text(user_id: Any, upload_ids: list[int]) -> str:
     if not upload_ids:
         return ""
+    ids = list(upload_ids)[:MAX_UPLOAD_IDS]
+    placeholders = ",".join([f":id{i}" for i in range(len(ids))])
+    params = {f"id{i}": uid for i, uid in enumerate(ids)}
+    params["uid"] = user_id
+
+    async with engine.begin() as conn:
+        res = await conn.exec_driver_sql(
+            f"SELECT id, storage_key, mime, filename, size FROM user_uploads WHERE user_id = :uid AND id IN ({placeholders})",
+            params,
+        )
+        rows = [dict(r._mapping) for r in res.fetchall()]
+
     processor = DocumentProcessor()
     chunks: list[str] = []
-    for uid in upload_ids:
+    total_bytes = 0
+    for rec in rows:
         try:
-            async with engine.begin() as conn:
-                res = await conn.exec_driver_sql(
-                    "SELECT storage_key, mime, filename FROM user_uploads WHERE id = :id AND user_id = :uid",
-                    {"id": uid, "uid": user_id},
-                )
-                row = res.first()
-            if not row:
-                continue
-            rec = dict(row._mapping)
-            data = read_storage_bytes(rec["storage_key"])
+            size = rec.get("size") or 0
+            total_bytes += size
+            if total_bytes > MAX_INSTRUCTION_BYTES:
+                break
+            data = await asyncio.to_thread(read_storage_bytes, rec.get("storage_key"))
             if not data:
                 continue
             extraction = processor.extract_text(data, rec.get("mime"), rec.get("filename"))
             txt = extraction.get("text") or ""
             if txt:
-                chunks.append(txt)
+                chunks.append(txt[:MAX_INSTR_CHARS])
         except Exception:
             continue
-    return "\n\n".join(chunks)
+    return "\n\n".join(chunks)[:MAX_INSTR_CHARS]
 
 
 @router.post("/{opportunity_id}/generate")
 async def generate_submission_docs(opportunity_id: str, payload: dict | None = None, user=Depends(require_user_with_team)):
+    _check_rate_limit(user.get("id"))
     await ensure_user_can_access_opportunity(user, opportunity_id)
     async with engine.begin() as conn:
         res = await conn.exec_driver_sql(
@@ -262,15 +314,18 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
 
     llm = get_llm_client()
     if not llm:
-        raise HTTPException(status_code=500, detail="LLM client unavailable")
+        raise HTTPException(status_code=503, detail="LLM client unavailable")
 
     instructions_text = await _load_instruction_text(user["id"], instruction_upload_ids)
     prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions)
     try:
-        resp = llm.chat(prompt, temperature=0.4, format="json")
+        resp = llm.chat(prompt, temperature=DEFAULT_TEMPERATURE, format="json")
         data = json.loads(resp)
+        if not isinstance(data, dict) or "response_sections" not in data:
+            raise ValueError("Invalid LLM response")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"LLM error: {exc}")
+        logging.error("LLM generation failed", exc_info=exc)
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
 
     return {"opportunity_id": opportunity_id, "documents": data}
 

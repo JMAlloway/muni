@@ -2,11 +2,17 @@
 import os
 import time
 import requests
+import logging
+import re
+from urllib.parse import urlparse
+from typing import Any, Callable, Dict, List, Sequence
 
 from app.core.settings import settings
 
+logger = logging.getLogger("ai_client")
 
-def retry_with_backoff(fn, max_retries: int = 3, base_delay: float = 1.0):
+
+def retry_with_backoff(fn: Callable[[], Any], max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 30.0):
     """
     Retry the callable with exponential backoff for transient failures.
     """
@@ -16,11 +22,8 @@ def retry_with_backoff(fn, max_retries: int = 3, base_delay: float = 1.0):
         except Exception as exc:
             if attempt == max_retries - 1:
                 raise
-            delay = base_delay * (2 ** attempt)
-            try:
-                print(f"[AI client] Retry {attempt + 1}/{max_retries} after {delay}s: {exc}")
-            except Exception:
-                pass
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            logger.warning("AI client retry %s/%s after %.1fs: %s", attempt + 1, max_retries, delay, exc)
             time.sleep(delay)
 
 
@@ -34,14 +37,17 @@ class OllamaGenerateClient:
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def chat(self, messages, temperature=0, format=None):
+    def chat(self, messages: Sequence[Dict[str, Any]], temperature: float = 0, format: str | None = None) -> str:
         """
         messages: list of {role, content}
         We just smash them into one prompt and send to /api/generate.
         """
-        # turn chat messages into a single prompt
+        if not isinstance(messages, (list, tuple)):
+            raise ValueError("messages must be a list/tuple of dicts")
         parts = []
         for m in messages:
+            if not isinstance(m, dict):
+                raise ValueError("message must be a dict with role/content")
             role = m.get("role", "user")
             content = m.get("content", "")
             parts.append(f"{role.upper()}: {content}")
@@ -82,50 +88,65 @@ class OpenAIChatClient:
         self.client = OpenAI(api_key=api_key)
         self.model = model
 
-    def chat(self, messages, temperature=0, format=None):
-        try:
-            def _call():
-                return self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=temperature,
-                    response_format={"type": "json_object"} if format == "json" else None,
-                )
-            resp = retry_with_backoff(_call)
-            content = resp.choices[0].message.content if resp.choices else ""
-            return (content or "").strip()
-        except Exception as exc:
-            print(f"[AI client] OpenAI chat error: {exc}")
-            return ""
+    def chat(self, messages: Sequence[Dict[str, Any]], temperature: float = 0, format: str | None = None) -> str:
+        if not isinstance(messages, (list, tuple)):
+            raise ValueError("messages must be a list/tuple of dicts")
 
-    def chat_stream(self, messages, temperature=0, on_chunk=None):
+        def _call():
+            return self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                response_format={"type": "json_object"} if format == "json" else None,
+            )
+
+        resp = retry_with_backoff(_call)
+        content = resp.choices[0].message.content if resp.choices else ""
+        return (content or "").strip()
+
+    def chat_stream(self, messages: Sequence[Dict[str, Any]], temperature: float = 0, on_chunk=None) -> str:
         """
         Stream a chat completion and optionally invoke a callback per chunk.
         Returns the full aggregated response text.
         """
-        try:
-            stream = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                stream=True,
-            )
-            full = ""
-            for chunk in stream:
+        if not isinstance(messages, (list, tuple)):
+            raise ValueError("messages must be a list/tuple of dicts")
+
+        stream = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+            stream=True,
+        )
+        full = ""
+        for chunk in stream:
+            try:
+                delta = chunk.choices[0].delta.content or ""
+            except Exception:
+                delta = ""
+            full += delta
+            if on_chunk and delta:
                 try:
-                    delta = chunk.choices[0].delta.content or ""
+                    on_chunk(delta)
                 except Exception:
-                    delta = ""
-                full += delta
-                if on_chunk and delta:
-                    try:
-                        on_chunk(delta)
-                    except Exception:
-                        pass
-            return full.strip()
-        except Exception as exc:
-            print(f"[AI client] OpenAI chat stream error: {exc}")
-            return ""
+                    pass
+        return full.strip()
+
+
+def _validate_ollama_base(base_url: str) -> str:
+    parsed = urlparse(base_url)
+    host = parsed.hostname or ""
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Invalid Ollama URL scheme")
+    # Restrict to allowed hosts to avoid SSRF
+    allowed_hosts_env = os.getenv("OLLAMA_ALLOWED_HOSTS", "")
+    if allowed_hosts_env:
+        allowed_hosts = {h.strip().lower() for h in allowed_hosts_env.split(",") if h.strip()}
+    else:
+        allowed_hosts = {"127.0.0.1", "localhost", "::1"}
+    if host.lower() not in allowed_hosts:
+        raise ValueError("Ollama base URL host not in allowlist")
+    return base_url.rstrip("/")
 
 
 def get_llm_client():
@@ -134,7 +155,7 @@ def get_llm_client():
     """
     # Global AI toggle: if disabled, return None so all callers fall back
     if not getattr(settings, "AI_ENABLED", True):
-        print("[AI client] AI disabled via settings.AI_ENABLED")
+        logger.info("[AI client] AI disabled via settings.AI_ENABLED")
         return None
 
     provider_env = os.getenv("AI_PROVIDER", "").strip().lower()
@@ -149,15 +170,17 @@ def get_llm_client():
 
     if provider == "openai":
         if not api_key:
-            print("[AI client] OPENAI selected but no key -> rule-based")
+            logger.warning("[AI client] OPENAI selected but no key -> rule-based")
             return None
         model = os.getenv("OPENAI_MODEL") or getattr(settings, "openai_model", None) or "gpt-4o-mini"
-        print(f"[AI client] Using OpenAI model={model}")
+        logger.info("[AI client] Using OpenAI model=%s", model)
         return OpenAIChatClient(api_key=api_key, model=model)
 
     # otherwise: default to local Ollama
-    base = os.getenv("OLLAMA_BASE_URL") or getattr(settings, "ollama_base_url", "http://127.0.0.1:11434")
+    base_env = os.getenv("OLLAMA_BASE_URL")
+    base_setting = getattr(settings, "ollama_base_url", "http://127.0.0.1:11434")
+    base = _validate_ollama_base(base_env or base_setting)
     model = os.getenv("OLLAMA_MODEL") or getattr(settings, "ollama_model", "gemma3:4b")  # we saw this in /api/tags
 
-    print(f"[AI client] Using local Ollama (generate) at {base} model={model}")
+    logger.info("[AI client] Using local Ollama (generate) at %s model=%s", base, model)
     return OllamaGenerateClient(base, model)

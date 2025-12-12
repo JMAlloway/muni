@@ -1,7 +1,12 @@
 (function () {
   const getCsrf = () => {
+    const hiddenToken = document.getElementById("csrfTokenField")?.value;
+    if (hiddenToken) return hiddenToken;
     const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-    return match ? match[1] : "";
+    if (!match || !match[1]) {
+      throw new Error("Missing CSRF token. Please reload and try again.");
+    }
+    return match[1];
   };
 
   const els = {
@@ -51,6 +56,9 @@
     existingDocsList: document.getElementById("existingDocsList"),
     existingDocPane: document.getElementById("existingDocPane"),
     uploadDocPane: document.getElementById("uploadDocPane"),
+    uploadProgress: document.getElementById("uploadProgress"),
+    uploadProgressBar: document.getElementById("uploadProgressBar"),
+    uploadProgressFill: document.getElementById("uploadProgressFill"),
     editorTabs: document.querySelectorAll(".editor-tab"),
     toolbarBtns: document.querySelectorAll(".toolbar-btn"),
     optionCards: document.querySelectorAll(".generate-option"),
@@ -81,6 +89,24 @@
 
   let saveTimer = null;
   let augmentingExtraction = false;
+  const MAX_UPLOAD_MB = 25;
+  const allowedTypes = [".pdf", ".doc", ".docx", ".txt"];
+
+  function sanitizeHtml(html) {
+    if (!html) return "";
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    doc.querySelectorAll("script, style").forEach((n) => n.remove());
+    doc.querySelectorAll("*").forEach((el) => {
+      [...el.attributes].forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith("on") || name === "srcdoc") {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+    return doc.body.innerHTML || "";
+  }
 
   function setButtonLoading(btn, text) {
     if (!btn) return;
@@ -187,6 +213,9 @@
     els.docTabButtons.forEach((btn) => {
       const isActive = btn.dataset.tab === target;
       btn.classList.toggle("active", isActive);
+      if (btn.hasAttribute("aria-selected")) {
+        btn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }
     });
     if (els.existingDocPane) {
       els.existingDocPane.classList.toggle("active", target === "existing");
@@ -368,9 +397,87 @@
       return null;
     }
     if (!file) return null;
+    const ext = (file.name || "").toLowerCase();
+    const allowed = allowedTypes.some((t) => ext.endsWith(t));
+    if (!allowed) {
+      showMessage(`Unsupported file type. Allowed: ${allowedTypes.join(", ")}`, "error");
+      return null;
+    }
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      showMessage(`File too large. Max ${MAX_UPLOAD_MB} MB.`, "error");
+      return null;
+    }
     const fd = new FormData();
     fd.append("opportunity_id", state.opportunityId);
     fd.append("files", file, file.name);
+    const xhr = new XMLHttpRequest();
+    try {
+      setButtonLoading(els.step1Next, null);
+      showMessage("Uploading file...", "info");
+      if (els.uploadProgress) {
+        els.uploadProgress.classList.remove("hidden");
+      }
+      xhr.upload.onprogress = (evt) => {
+        if (!evt.lengthComputable) return;
+        const pct = Math.round((evt.loaded / evt.total) * 100);
+        if (els.uploadProgressBar) {
+          els.uploadProgressBar.textContent = `Uploading... ${pct}%`;
+        }
+        if (els.uploadProgressFill) {
+          els.uploadProgressFill.style.width = `${pct}%`;
+        }
+      };
+      const res = await new Promise((resolve, reject) => {
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch (err) {
+                reject(err);
+              }
+            } else {
+              reject(new Error(xhr.responseText || `Upload failed (${xhr.status})`));
+            }
+          }
+        };
+        xhr.open("POST", "/uploads/add", true);
+        xhr.withCredentials = true;
+        try {
+          xhr.setRequestHeader("X-CSRF-Token", getCsrf());
+        } catch (err) {
+          // CSRF error is surfaced when sending
+        }
+        xhr.send(fd);
+      });
+      const uploaded = res.files?.[0];
+      if (!uploaded) throw new Error("Upload failed. No file returned.");
+      state.upload = uploaded;
+      state.extracted = null;
+      if (els.extractResults) {
+        els.extractResults.classList.add("hidden");
+      }
+      renderUpload(uploaded, file);
+      await fetchExistingDocuments(state.opportunityId, uploaded.id);
+      handleStepAvailability();
+      showMessage("Upload successful. Ready to extract.", "success");
+      scheduleSave();
+      return uploaded;
+    } catch (err) {
+      showMessage(err.message || "Upload failed.", "error");
+      return null;
+    } finally {
+      if (els.uploadProgressBar) {
+        els.uploadProgressBar.textContent = "";
+      }
+      if (els.uploadProgressFill) {
+        els.uploadProgressFill.style.width = "0%";
+      }
+      if (els.uploadProgress) {
+        els.uploadProgress.classList.add("hidden");
+      }
+      handleStepAvailability();
+    }
     try {
       setButtonLoading(els.step1Next, null);
       showMessage("Uploading file...", "info");
@@ -430,11 +537,15 @@
     clearMessage();
     setButtonLoading(els.extractBtn, "Analyzing RFP...");
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
       const res = await fetch(`/api/rfp-extract/${uploadId}`, {
         method: "POST",
         credentials: "include",
         headers: { "X-CSRF-Token": getCsrf() },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `Extraction failed (${res.status})`);
@@ -730,6 +841,8 @@
       const payload = {
         instruction_upload_ids: state.upload?.id ? [state.upload.id] : [],
       };
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
       const res = await fetch(
         `/api/opportunities/${encodeURIComponent(state.opportunityId)}/generate`,
         {
@@ -742,6 +855,7 @@
           body: JSON.stringify(payload),
         }
       );
+      clearTimeout(timeout);
       if (!res.ok) {
         return false;
       }
@@ -819,7 +933,7 @@
   function renderDocuments() {
     if (!els.documentEditor || !els.editableContent || !els.previewContent) return;
     els.documentEditor.classList.remove("hidden");
-    const content = state.documents[state.currentDoc] || "";
+    const content = sanitizeHtml(state.documents[state.currentDoc] || "");
     els.editableContent.innerHTML = content;
     updatePreview();
     updateWordCount();
@@ -968,7 +1082,7 @@
 
   function updatePreview() {
     if (!els.editableContent || !els.previewContent) return;
-    els.previewContent.innerHTML = els.editableContent.innerHTML;
+    els.previewContent.innerHTML = sanitizeHtml(els.editableContent.innerHTML);
   }
 
   function updateWordCount() {
@@ -981,7 +1095,7 @@
   function switchDocument(doc) {
     if (!doc) return;
     if (state.currentDoc && els.editableContent) {
-      state.documents[state.currentDoc] = els.editableContent.innerHTML || "";
+      state.documents[state.currentDoc] = sanitizeHtml(els.editableContent.innerHTML || "");
     }
     state.currentDoc = doc;
     renderDocuments();
@@ -1275,12 +1389,16 @@
     });
 
     if (els.editableContent) {
+      let inputTimer;
       els.editableContent.addEventListener("input", () => {
-        updatePreview();
-        updateWordCount();
-        state.documents[state.currentDoc] = els.editableContent.innerHTML;
-        handleStepAvailability();
-        scheduleSave();
+        clearTimeout(inputTimer);
+        inputTimer = setTimeout(() => {
+          updatePreview();
+          updateWordCount();
+          state.documents[state.currentDoc] = sanitizeHtml(els.editableContent.innerHTML);
+          handleStepAvailability();
+          scheduleSave();
+        }, 200);
       });
     }
 
@@ -1356,6 +1474,8 @@
   }
 
   async function init() {
+    const root = document.querySelector("main.ai-tools-page");
+    if (root) root.classList.remove("hidden");
     bindEvents();
     fetchTrackedOpportunities();
     const params = new URLSearchParams(window.location.search);

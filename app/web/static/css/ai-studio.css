@@ -420,6 +420,33 @@
   background: #fafbfc;
 }
 
+.ai-tools-page .upload-progress {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.ai-tools-page .upload-progress-bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.ai-tools-page .upload-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #0f9d58, #34d399);
+  transition: width 0.2s ease;
+}
+
 .ai-tools-page .upload-area:hover {
   border-color: var(--brand-primary);
   background: rgba(18, 106, 69, 0.03);

@@ -2,7 +2,7 @@ import json
 import re
 import textwrap
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from app.ai.client import get_llm_client
 from app.services.extraction_cache import ExtractionCache
@@ -12,6 +12,8 @@ logger = logging.getLogger("rfp_extractor")
 # Tunable constants
 MAX_WORDS_PER_CHUNK = 3500  # heuristic for token limits
 MAX_PROMPT_CHARS = 12000
+MAX_CHUNKS = 12  # limit LLM calls on very large docs
+MAX_TOTAL_CHARS = 400000  # early truncation guard (~60-70k words)
 
 def _has_useful_content(payload: Dict[str, Any]) -> bool:
     if not payload:
@@ -77,11 +79,46 @@ def _clean_text(raw: str) -> str:
     return "\n".join(filtered).strip()
 
 
-def _chunk_text(txt: str, max_words: int = MAX_WORDS_PER_CHUNK) -> List[str]:
-    words = txt.split()
-    if not words:
-        return []
-    return [" ".join(words[i : i + max_words]) for i in range(0, len(words), max_words)]
+def _chunk_text(txt: str, max_words: int = MAX_WORDS_PER_CHUNK, max_chunks: int = MAX_CHUNKS) -> Tuple[List[str], bool]:
+    """
+    Split text into word-limited chunks without loading all words into memory at once.
+    Returns (chunks, truncated_flag) where truncated_flag is True if max_chunks cap was hit.
+    """
+    if not txt:
+        return [], False
+
+    chunks: List[str] = []
+    current: List[str] = []
+    truncated = False
+    count = 0
+
+    for match in re.finditer(r"\S+", txt):
+        current.append(match.group(0))
+        count += 1
+        if count >= max_words:
+            chunks.append(" ".join(current))
+            current = []
+            count = 0
+            if max_chunks and len(chunks) >= max_chunks:
+                truncated = True
+                break
+
+    if current and (not max_chunks or len(chunks) < max_chunks):
+        chunks.append(" ".join(current))
+
+    return chunks, truncated
+
+
+def _trim_text(raw: str) -> Tuple[str, bool]:
+    """
+    Apply a hard character cap before heavy processing to avoid memory blowups.
+    Returns (trimmed_text, was_truncated).
+    """
+    if not raw:
+        return "", False
+    if len(raw) <= MAX_TOTAL_CHARS:
+        return raw, False
+    return raw[:MAX_TOTAL_CHARS], True
 
 
 DISCOVERY_PROMPT = """
@@ -285,6 +322,35 @@ def _merge_json(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     return out
 
 
+def _merge_discovery(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Merge discovery results across chunks.
+    """
+    base: Dict[str, Any] = {
+        "document_type": "",
+        "sections": [],
+        "response_items": [],
+        "deadlines": [],
+        "submission": {},
+        "evaluation_weights": [],
+        "required_response_sections": [],
+    }
+    if not results:
+        return base
+    for res in results:
+        if not isinstance(res, dict):
+            continue
+        base["document_type"] = base["document_type"] or res.get("document_type", "")
+        for key in ("sections", "response_items", "deadlines", "evaluation_weights", "required_response_sections"):
+            val = res.get(key) or []
+            if isinstance(val, list):
+                base[key].extend(val)
+        submission = res.get("submission")
+        if isinstance(submission, dict) and submission and not base["submission"]:
+            base["submission"] = submission
+    return base
+
+
 class RfpExtractor:
     """LLM-backed extractor for RFP documents into EasyRFP JSON schema."""
 
@@ -293,10 +359,11 @@ class RfpExtractor:
         self.cache = ExtractionCache()
 
     def discover(self, text: str) -> Dict[str, Any]:
-        cleaned = _clean_text(text)
+        trimmed, _ = _trim_text(text)
+        cleaned = _clean_text(trimmed)
         if not cleaned or not self.llm:
             return {}
-        chunks = _chunk_text(cleaned, max_words=MAX_WORDS_PER_CHUNK)
+        chunks, _ = _chunk_text(cleaned, max_words=MAX_WORDS_PER_CHUNK, max_chunks=1)
         first_chunk = chunks[0] if chunks else cleaned
         try:
             logger.debug("rfp_extractor.discover start words=%s", len(first_chunk.split()))
@@ -309,21 +376,24 @@ class RfpExtractor:
             return {}
 
     def extract_json(self, text: str) -> Dict[str, Any]:
-        cleaned = _clean_text(text)
+        trimmed, _ = _trim_text(text)
+        cleaned = _clean_text(trimmed)
         if not cleaned:
             return _merge_json([])
 
-        chunks = _chunk_text(cleaned, max_words=MAX_WORDS_PER_CHUNK)
+        chunks, chunk_limited = _chunk_text(cleaned, max_words=MAX_WORDS_PER_CHUNK)
         if not chunks:
             chunks = [cleaned]
 
         results: List[Dict[str, Any]] = []
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
             if not self.llm:
+                break
+            if MAX_CHUNKS and idx >= MAX_CHUNKS:
                 break
             try:
                 msgs = _build_extraction_prompt(chunk)
-                logger.debug("rfp_extractor.extract_json chunk words=%s", len(chunk.split()))
+                logger.debug("rfp_extractor.extract_json chunk=%s words=%s", idx + 1, len(chunk.split()))
                 resp = self.llm.chat(msgs, temperature=0)
                 parsed = _safe_load_json(resp)
                 if isinstance(parsed, dict):
@@ -332,28 +402,56 @@ class RfpExtractor:
                 logger.warning("rfp_extractor.extract_json parse failed: %s", exc)
                 continue
 
-        return _merge_json(results)
+        merged = _merge_json(results)
+        if chunk_limited or (MAX_CHUNKS and len(chunks) >= MAX_CHUNKS):
+            merged.setdefault("warning", "Extraction capped to first chunks; content may be partial.")
+        return merged
 
-    def _extract_combined(self, text: str) -> Dict[str, Any]:
+    def _extract_combined(self, text: str, truncated_input: bool = False) -> Dict[str, Any]:
         """
         Single LLM call returning both discovery + extracted blocks.
         """
         cleaned = _clean_text(text)
         if not cleaned or not self.llm:
             return {"discovery": {}, "extracted": _merge_json([])}
-        try:
-            logger.debug("rfp_extractor.extract_combined start")
-            resp = self.llm.chat(_build_combined_prompt(cleaned), temperature=0)
-            parsed = _safe_load_json(resp)
-            if isinstance(parsed, dict):
-                return {
-                    "discovery": parsed.get("discovery") or {},
-                    "extracted": parsed.get("extracted") or _merge_json([]),
-                }
-        except Exception as exc:
-            logger.warning("rfp_extractor.extract_combined failed: %s", exc)
-        # Fallback to empty discovery + merged extraction to avoid crash
-        return {"discovery": {}, "extracted": _merge_json([])}
+
+        chunks, chunk_limited = _chunk_text(cleaned, max_words=MAX_WORDS_PER_CHUNK, max_chunks=MAX_CHUNKS)
+        if not chunks:
+            chunks = [cleaned]
+
+        discoveries: List[Dict[str, Any]] = []
+        extracted_chunks: List[Dict[str, Any]] = []
+        warnings: List[str] = []
+
+        for idx, chunk in enumerate(chunks):
+            if MAX_CHUNKS and idx >= MAX_CHUNKS:
+                chunk_limited = True
+                break
+            try:
+                logger.debug("rfp_extractor.extract_combined chunk=%s words=%s", idx + 1, len(chunk.split()))
+                resp = self.llm.chat(_build_combined_prompt(chunk), temperature=0)
+                parsed = _safe_load_json(resp)
+                if isinstance(parsed, dict):
+                    disc = parsed.get("discovery") or {}
+                    ext = parsed.get("extracted") or {}
+                    discoveries.append(disc if isinstance(disc, dict) else {})
+                    if isinstance(ext, dict):
+                        extracted_chunks.append(ext)
+            except Exception as exc:
+                logger.warning("rfp_extractor.extract_combined failed chunk=%s: %s", idx + 1, exc)
+                continue
+
+        if truncated_input:
+            warnings.append(f"Input truncated to first {MAX_TOTAL_CHARS} characters for processing.")
+        if chunk_limited:
+            warnings.append(f"Only the first {MAX_CHUNKS} chunks were processed; remaining text was skipped.")
+
+        merged_extracted = _merge_json(extracted_chunks)
+        merged_discovery = _merge_discovery(discoveries)
+        result = {"discovery": merged_discovery, "extracted": merged_extracted}
+        if warnings:
+            result["warning"] = " ".join(warnings)
+        return result
 
     def _extract_narratives(self, text: str) -> List[Dict[str, Any]]:
         """
@@ -378,9 +476,10 @@ class RfpExtractor:
         return []
 
     def extract_all(self, text: str) -> Dict[str, Any]:
-        cleaned = _clean_text(text)
+        trimmed, truncated = _trim_text(text)
+        cleaned = _clean_text(trimmed)
         # Pass 1: main combined extraction
-        combined = self._extract_combined(cleaned)
+        combined = self._extract_combined(cleaned, truncated_input=truncated)
         extracted = combined.get("extracted") or {}
 
         # Pass 2: if narratives missing, run focused extraction
@@ -396,21 +495,27 @@ class RfpExtractor:
         """
         Async helper that checks cache before running extract_json.
         """
-        cached = await self.cache.get(text)
+        trimmed, truncated = _trim_text(text)
+        cached = await self.cache.get(trimmed)
         if cached:
             return cached
-        result = self.extract_json(text)
-        await self.cache.set(text, result)
+        result = self.extract_json(trimmed)
+        if truncated:
+            result.setdefault("warning", "Input truncated before caching; content may be partial.")
+        await self.cache.set(trimmed, result)
         return result
 
     async def extract_all_cached(self, text: str) -> Dict[str, Any]:
         """
         Async helper wrapping extract_all with caching on extracted payload.
         """
-        cached = await self.cache.get(text)
+        trimmed, truncated = _trim_text(text)
+        cached = await self.cache.get(trimmed)
         if cached and isinstance(cached, dict) and cached.get("extracted"):
             # cache may store just extracted; normalize shape
             return {"discovery": cached.get("discovery") or {}, "extracted": cached.get("extracted") or cached}
-        result = self.extract_all(text)
-        await self.cache.set(text, result)
+        result = self.extract_all(trimmed)
+        if truncated:
+            result.setdefault("warning", "Input truncated before caching; content may be partial.")
+        await self.cache.set(trimmed, result)
         return result
