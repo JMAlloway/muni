@@ -99,6 +99,7 @@
     currentDoc: "cover",
     sessionId: null,
     existingDocs: [],
+    sectionDocs: {},
     allowAugment: false,
     isExtracting: false,
   };
@@ -195,6 +196,25 @@
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
+  function validateFile(file) {
+    if (!file) return false;
+    const ext = (file.name || "").toLowerCase();
+    const allowed = allowedTypes.some((t) => ext.endsWith(t));
+    if (!allowed) {
+      showMessage(`Unsupported file type. Allowed: ${allowedTypes.join(", ")}`, "error");
+      return false;
+    }
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      showMessage(`File too large. Max ${MAX_UPLOAD_MB} MB.`, "error");
+      return false;
+    }
+    return true;
+  }
+
+  function normalizeId(val) {
+    return val == null ? "" : String(val);
+  }
+
   function formatDate(dateStr) {
     if (!dateStr) return "Unknown date";
     const d = new Date(dateStr);
@@ -266,6 +286,40 @@
       `;
       els.existingDocsList.appendChild(btn);
     });
+  }
+
+  function ensureSectionDocs(sectionKey) {
+    if (!state.sectionDocs) state.sectionDocs = {};
+    if (!state.sectionDocs[sectionKey]) state.sectionDocs[sectionKey] = [];
+    return state.sectionDocs[sectionKey];
+  }
+
+  function renderSectionChips(sectionKey) {
+    const container = els.generateOptions?.querySelector(`.support-chips[data-section="${sectionKey}"]`);
+    if (!container) return;
+    const docs = ensureSectionDocs(sectionKey);
+    if (!docs.length) {
+      container.innerHTML = `<span class="chip empty">No docs</span>`;
+      return;
+    }
+    container.innerHTML = "";
+    docs.forEach((doc) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.dataset.docId = normalizeId(doc.id);
+      chip.dataset.section = sectionKey;
+      chip.innerHTML = `${escapeHtml(doc.filename || "Doc")} <button type="button" class="chip-remove" aria-label="Remove">&times;</button>`;
+      container.appendChild(chip);
+    });
+  }
+
+  function removeDocFromSection(sectionKey, docId) {
+    const docs = ensureSectionDocs(sectionKey);
+    const key = normalizeId(docId);
+    const next = docs.filter((d) => normalizeId(d.id) !== key);
+    state.sectionDocs[sectionKey] = next;
+    renderSectionChips(sectionKey);
+    scheduleSave();
   }
 
   function selectExistingDocument(doc) {
@@ -539,6 +593,55 @@
     els.uploadArea.style.display = "none";
   }
 
+  async function uploadSectionFiles(sectionKey, files) {
+    if (!state.opportunityId) {
+      showMessage("Select an opportunity before uploading.", "error");
+      return;
+    }
+    const list = Array.from(files || []).filter(Boolean);
+    const valid = list.filter((f) => validateFile(f));
+    if (!valid.length) return;
+    const fd = new FormData();
+    fd.append("opportunity_id", state.opportunityId);
+    valid.forEach((f) => fd.append("files", f, f.name));
+    try {
+      showMessage(`Uploading docs for ${sectionKey.replace(/_/g, " ") || "section"}...`, "info");
+      const res = await fetch("/uploads/add", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRF-Token": getCsrf() },
+        body: fd,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Upload failed (${res.status})`);
+      }
+      const data = await res.json();
+      const uploaded = (data.files || []).map((f) => ({
+        ...f,
+        created_at: f.created_at || new Date().toISOString(),
+      }));
+
+      // merge into existing docs map
+      const map = new Map((state.existingDocs || []).map((d) => [normalizeId(d.id), d]));
+      uploaded.forEach((u) => map.set(normalizeId(u.id), { ...map.get(normalizeId(u.id)), ...u }));
+      state.existingDocs = Array.from(map.values());
+
+      const docs = ensureSectionDocs(sectionKey);
+      uploaded.forEach((u) => {
+        const key = normalizeId(u.id);
+        if (!docs.find((d) => normalizeId(d.id) === key)) {
+          docs.push(u);
+        }
+      });
+      renderSectionChips(sectionKey);
+      scheduleSave();
+      showMessage("Supporting docs uploaded.", "success");
+    } catch (err) {
+      showMessage(err.message || "Upload failed.", "error");
+    }
+  }
+
   async function extractRfp(uploadId) {
     if (!uploadId) {
       showMessage("Upload a file before running extraction.", "error");
@@ -778,12 +881,29 @@
           <div class="option-header">
             <input type="checkbox" checked>
             <div class="option-content">
-              &#128203; <div><strong>Project Response</strong><span>Based on RFP requirements</span></div>
+              &#128203; <div>
+                <strong>Project Response</strong>
+                <div class="section-blurb">
+                  <span class="blurb-short">Based on RFP requirements</span>
+                  <span class="blurb-full" hidden>Based on RFP requirements</span>
+                  <button class="blurb-toggle" type="button" aria-expanded="false" title="Show full description">…</button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="section-instructions">
-            <input type="text" class="section-instruction-input" data-section="project_response"
-                   placeholder="Add specific context for this section (optional)">
+            <div class="instruction-row">
+              <textarea class="section-instruction-input" rows="1" data-section="project_response"
+                   placeholder="Add specific context for this section (optional)"></textarea>
+              <button type="button" class="instruction-toggle" aria-expanded="false" title="Expand instructions">Expand</button>
+            </div>
+          </div>
+          <div class="section-support" data-section="project_response">
+            <div class="support-actions">
+              <button type="button" class="support-attach-btn" data-section="project_response">&#128228; Attach docs</button>
+              <input type="file" class="support-file-input" data-section="project_response" hidden multiple accept=".pdf,.docx,.doc,.txt" />
+            </div>
+            <div class="support-chips" data-section="project_response"></div>
           </div>
         </div>
       `;
@@ -795,7 +915,8 @@
     narratives.forEach((section, index) => {
       const name = typeof section === "string" ? section : section.name || "Section";
       const requirements = typeof section === "object" ? section.requirements || "" : "";
-      const shortReq = requirements.length > 80 ? `${requirements.substring(0, 77)}...` : requirements;
+      const safeReq = escapeHtml(requirements || "Required narrative section");
+      const shortReq = safeReq.length > 90 ? `${safeReq.substring(0, 87)}...` : safeReq;
       const icon = index % 2 === 0 ? "&#128203;" : "&#128196;";
       const sectionKey = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
@@ -804,12 +925,29 @@
           <div class="option-header">
             <input type="checkbox" checked>
             <div class="option-content">
-              ${icon} <div><strong>${name}</strong><span>${shortReq || "Required narrative section"}</span></div>
+              ${icon} <div>
+                <strong>${escapeHtml(name)}</strong>
+                <div class="section-blurb">
+                  <span class="blurb-short">${shortReq || "Required narrative section"}</span>
+                  <span class="blurb-full" hidden>${safeReq || "Required narrative section"}</span>
+                  <button class="blurb-toggle" type="button" aria-expanded="false" title="Show full description">…</button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="section-instructions">
-            <input type="text" class="section-instruction-input" data-section="${sectionKey}"
-                   placeholder="Add specific details for this section (e.g., pricing, personnel names)">
+            <div class="instruction-row">
+              <textarea class="section-instruction-input" rows="1" data-section="${sectionKey}"
+                   placeholder="Add specific details for this section (e.g., pricing, personnel names)"></textarea>
+              <button type="button" class="instruction-toggle" aria-expanded="false" title="Expand instructions">Expand</button>
+            </div>
+          </div>
+          <div class="section-support" data-section="${sectionKey}">
+            <div class="support-actions">
+              <button type="button" class="support-attach-btn" data-section="${sectionKey}">&#128228; Attach docs</button>
+              <input type="file" class="support-file-input" data-section="${sectionKey}" hidden multiple accept=".pdf,.docx,.doc,.txt" />
+            </div>
+            <div class="support-chips" data-section="${sectionKey}"></div>
           </div>
         </div>
       `;
@@ -822,12 +960,23 @@
   function bindOptionCardEvents() {
     if (!els.generateOptions) return;
 
+    const autoSize = (el) => {
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = `${Math.min(240, el.scrollHeight)}px`;
+    };
+
     els.generateOptions.querySelectorAll(".generate-option").forEach((card) => {
       const header = card.querySelector(".option-header") || card;
       const checkbox = card.querySelector("input[type='checkbox']");
 
       header.addEventListener("click", (e) => {
-        if (e.target.classList.contains("section-instruction-input")) return;
+        if (
+          e.target.classList.contains("section-instruction-input") ||
+          e.target.classList.contains("blurb-toggle") ||
+          e.target.classList.contains("instruction-toggle")
+        )
+          return;
         card.classList.toggle("selected");
         if (checkbox) checkbox.checked = card.classList.contains("selected");
       });
@@ -835,6 +984,78 @@
 
     els.generateOptions.querySelectorAll(".section-instruction-input").forEach((input) => {
       input.addEventListener("click", (e) => e.stopPropagation());
+      input.addEventListener("input", () => autoSize(input));
+      autoSize(input);
+    });
+
+    els.generateOptions.querySelectorAll(".instruction-toggle").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const wrapper = btn.closest(".section-instructions");
+        const input = wrapper?.querySelector(".section-instruction-input");
+        if (!input) return;
+        const expanded = input.classList.toggle("expanded");
+        btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+        btn.textContent = expanded ? "Collapse" : "Expand";
+        input.style.maxHeight = expanded ? "240px" : "80px";
+        autoSize(input);
+      });
+    });
+
+    els.generateOptions.querySelectorAll(".blurb-toggle").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const card = btn.closest(".generate-option");
+        const full = card?.querySelector(".blurb-full");
+        const short = card?.querySelector(".blurb-short");
+        if (!full || !short) return;
+        const expanded = !full.hasAttribute("hidden");
+        if (expanded) {
+          full.setAttribute("hidden", "");
+          short.classList.remove("hidden");
+          btn.textContent = "…";
+          btn.setAttribute("aria-expanded", "false");
+        } else {
+          full.removeAttribute("hidden");
+          short.classList.add("hidden");
+          btn.textContent = "Hide";
+          btn.setAttribute("aria-expanded", "true");
+        }
+      });
+    });
+
+    els.generateOptions.querySelectorAll(".support-attach-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const sectionKey = btn.dataset.section;
+        const input = els.generateOptions.querySelector(`.support-file-input[data-section="${sectionKey}"]`);
+        input?.click();
+      });
+    });
+
+    els.generateOptions.querySelectorAll(".support-file-input").forEach((input) => {
+      input.addEventListener("change", (e) => {
+        e.stopPropagation();
+        const sectionKey = input.dataset.section;
+        const files = input.files;
+        if (files && files.length) {
+          uploadSectionFiles(sectionKey, files);
+        }
+        input.value = "";
+      });
+    });
+
+    els.generateOptions.querySelectorAll(".support-chips").forEach((chips) => {
+      const sectionKey = chips.dataset.section;
+      chips.addEventListener("click", (e) => {
+        const btn = e.target.closest(".chip-remove");
+        if (!btn) return;
+        const chip = btn.closest(".chip");
+        const docId = chip?.dataset.docId;
+        if (!docId) return;
+        removeDocFromSection(sectionKey, docId);
+      });
+      renderSectionChips(sectionKey);
     });
   }
 
@@ -851,6 +1072,18 @@
     return instructions;
   }
 
+  function getInstructionUploadIds() {
+    const ids = [];
+    if (state.upload?.id) ids.push(state.upload.id);
+    const sectionDocs = state.sectionDocs || {};
+    Object.values(sectionDocs).forEach((docs) => {
+      (docs || []).forEach((d) => {
+        if (d?.id || d?.id === 0) ids.push(d.id);
+      });
+    });
+    return [...new Set(ids.map((v) => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : v)))];
+  }
+
   async function augmentExtractionFromGeneration() {
     if (!state.opportunityId || augmentingExtraction || !state.allowAugment) return false;
     augmentingExtraction = true;
@@ -860,7 +1093,7 @@
     }
     try {
       const payload = {
-        instruction_upload_ids: state.upload?.id ? [state.upload.id] : [],
+        instruction_upload_ids: getInstructionUploadIds(),
       };
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
@@ -1077,7 +1310,7 @@
     setButtonLoading(els.generateBtn, "Generating...");
     try {
       const payload = {
-        instruction_upload_ids: state.upload?.id ? [state.upload.id] : [],
+        instruction_upload_ids: getInstructionUploadIds(),
       };
       if (els.customInstructions && els.customInstructions.value.trim()) {
         payload.custom_instructions = els.customInstructions.value.trim();
@@ -1228,6 +1461,7 @@
       currentDoc: state.currentDoc,
       currentStep: state.currentStep,
       notes: els.customInstructions?.value || "",
+      sectionDocs: state.sectionDocs || {},
       sections,
       latestSections,
       coverDraft,
@@ -1287,6 +1521,7 @@
       state.upload = st.upload || null;
       state.extracted = st.extracted || null;
       state.documents = st.documents || { cover: "", responses: "" };
+      state.sectionDocs = st.sectionDocs || {};
       state.responseSections =
         (Array.isArray(st.sections) && st.sections.length && st.sections) ||
         (Array.isArray(st.responseSections) && st.responseSections.length && st.responseSections) ||
@@ -1716,6 +1951,7 @@
         state.upload = null;
         state.extracted = null;
         state.existingDocs = [];
+        state.sectionDocs = {};
         if (els.uploadedFile) els.uploadedFile.classList.add("hidden");
         if (els.uploadArea) els.uploadArea.style.display = "block";
         if (els.existingDocsList) {
