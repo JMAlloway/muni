@@ -213,7 +213,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 
     nav_links = _nav_links_html(user_email)
 
-    notif_js = '(function(){const s=document.createElement("script");s.src="/static/js/notifications.js";document.body.appendChild(s);}());'
+    notif_js = '(function(){const s=document.createElement("script");s.src="/static/js/notifications.js?v=20251212";document.body.appendChild(s);}());'
 
 
     template = """

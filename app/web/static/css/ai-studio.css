@@ -915,16 +915,110 @@
   animation: fadeIn 0.4s ease;
 }
 
+.ai-tools-page .document-editor:fullscreen {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-tools-page .document-editor:-webkit-full-screen,
+.ai-tools-page .document-editor:-moz-full-screen {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-tools-page .document-editor:fullscreen .editor-split,
+.ai-tools-page .document-editor:-webkit-full-screen .editor-split,
+.ai-tools-page .document-editor:-moz-full-screen .editor-split {
+  min-height: calc(100vh - 180px);
+  height: auto;
+}
+
+.ai-tools-page .document-editor:fullscreen .editor-pane,
+.ai-tools-page .document-editor:fullscreen .preview-pane,
+.ai-tools-page .document-editor:-webkit-full-screen .editor-pane,
+.ai-tools-page .document-editor:-webkit-full-screen .preview-pane,
+.ai-tools-page .document-editor:-moz-full-screen .editor-pane,
+.ai-tools-page .document-editor:-moz-full-screen .preview-pane {
+  min-height: 0;
+}
+
+.ai-tools-page .document-editor:fullscreen .editable-content,
+.ai-tools-page .document-editor:-webkit-full-screen .editable-content,
+.ai-tools-page .document-editor:-moz-full-screen .editable-content,
+.ai-tools-page .document-editor:fullscreen .document-preview,
+.ai-tools-page .document-editor:-webkit-full-screen .document-preview,
+.ai-tools-page .document-editor:-moz-full-screen .document-preview {
+  min-height: calc(100vh - 240px);
+}
+
 .ai-tools-page .document-editor.hidden {
   display: none;
+}
+
+.ai-tools-page .editor-tabs-wrapper {
+  display: flex;
+  align-items: center;
+  background: #f8fafb;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
 }
 
 .ai-tools-page .editor-tabs {
   display: flex;
   align-items: center;
-  background: #f8fafb;
-  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  flex: 1;
   padding: 0 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ai-tools-page .editor-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ai-tools-page .tab-nav-arrow {
+  flex-shrink: 0;
+  width: 32px;
+  height: 100%;
+  min-height: 48px;
+  background: linear-gradient(90deg, #f8fafb 70%, transparent);
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+  z-index: 2;
+}
+
+.ai-tools-page .tab-nav-arrow:hover {
+  color: var(--brand-primary);
+  background: linear-gradient(90deg, #e8f5e9 70%, transparent);
+}
+
+.ai-tools-page .tab-nav-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ai-tools-page .tab-nav-left {
+  background: linear-gradient(270deg, transparent, #f8fafb 30%);
+}
+
+.ai-tools-page .tab-nav-right {
+  background: linear-gradient(90deg, transparent, #f8fafb 30%);
 }
 
 .ai-tools-page .editor-tab {
@@ -1043,7 +1137,7 @@
 .ai-tools-page .editor-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  min-height: 360px;
+  min-height: 60vh;
 }
 
 .ai-tools-page .editor-pane,
@@ -1141,6 +1235,8 @@
   padding: 20px;
   background: #f1f5f9;
   overflow-y: auto;
+   min-height: 320px;
+   display: flex;
 }
 
 .ai-tools-page .preview-page {
@@ -1148,8 +1244,11 @@
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   padding: 36px 44px;
-  min-height: 420px;
+  min-height: 100%;
   max-width: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-tools-page .preview-content {
@@ -1157,6 +1256,7 @@
   font-size: 12pt;
   line-height: 1.6;
   color: #1a1a1a;
+  flex: 1;
 }
 
 .ai-tools-page .preview-content h1 {

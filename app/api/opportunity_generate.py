@@ -1,3 +1,4 @@
+import asyncio
 import json
 import datetime
 import logging
@@ -7,6 +8,7 @@ from typing import Any, Dict
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app.auth.session import get_current_user_email
 from app.core.db_core import engine
@@ -232,13 +234,29 @@ Generate a complete proposal response with this EXACT JSON structure:
 }}
 
 REQUIREMENTS:
-1. Each response section must be 2-4 substantive paragraphs
-2. Use specific details from the company profile (names, experience, certifications)
-3. Match the RFP's tone and address stated requirements
-4. Include concrete examples of relevant past projects
-5. Submission checklist must include ALL narrative/form items required for submission
-6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
-7. If USER CONTEXT is provided for a section, incorporate that specific information prominently
+1. OUTPUT FORMAT: Each response section must be HTML-formatted for professional display:
+   - Use <h2>Section Title</h2> for main headings
+   - Use <h3>Subsection</h3> for sub-points
+   - Wrap paragraphs in <p>...</p> tags
+   - Use <ul><li>...</li></ul> for bullet lists
+   - Use <strong>Company Name</strong> for emphasis on key terms
+   - Use <em>...</em> for certifications and titles
+
+2. STRUCTURE: Each section should include:
+   - Opening paragraph introducing the topic
+   - 2-3 supporting paragraphs with specific details
+   - Bullet list of key qualifications or deliverables where appropriate
+   - Closing paragraph with commitment statement
+
+3. CONTENT:
+   - Use specific details from the company profile (names, experience, certifications)
+   - Match the RFP's tone and address stated requirements
+   - Include concrete examples of relevant past projects
+   - Reference specific certifications, years of experience, team members
+
+4. Submission checklist must include ALL narrative/form items required for submission
+5. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
+6. If USER CONTEXT is provided for a section, incorporate that specific information prominently
 """.strip(),
         },
     ]
@@ -328,6 +346,68 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
         raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
 
     return {"opportunity_id": opportunity_id, "documents": data}
+
+
+class RefineRequest(BaseModel):
+    content: str
+    action: str  # "improve", "shorten", or "expand"
+    section_name: str | None = None
+
+
+@router.post("/{opportunity_id}/refine")
+async def refine_content(opportunity_id: str, payload: RefineRequest, request: Request, user=Depends(require_user_with_team)):
+    """Refine content using AI - improve, shorten, or expand."""
+    await ensure_user_can_access_opportunity(user, opportunity_id)
+    _check_rate_limit(user.get("id"))
+
+    action = (payload.action or "").lower()
+    if action not in ("improve", "shorten", "expand"):
+        raise HTTPException(status_code=400, detail="Invalid action. Use: improve, shorten, or expand")
+
+    content = _sanitize_text(payload.content, max_chars=15000)
+    if not content.strip():
+        raise HTTPException(status_code=400, detail="No content to refine")
+
+    prompts = {
+        "improve": """Improve the following RFP response text. Make it more professional,
+clear, and compelling while preserving the key information and meaning.
+Keep the same approximate length. Return ONLY the improved text, no explanations.""",
+        "shorten": """Shorten the following RFP response text by approximately 30-40%.
+Remove redundancy and verbose language while keeping all essential information.
+Maintain a professional tone. Return ONLY the shortened text, no explanations.""",
+        "expand": """Expand the following RFP response text by approximately 30-50%.
+Add more detail, examples, and supporting information while maintaining accuracy.
+Keep a professional tone. Return ONLY the expanded text, no explanations.""",
+    }
+
+    system_prompt = prompts[action]
+    user_prompt = f"Text to {action}:\n\n{content}"
+
+    try:
+        llm = get_llm_client()
+        if not llm:
+            raise HTTPException(status_code=503, detail="LLM client unavailable")
+
+        result = await asyncio.to_thread(
+            llm.chat,
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+        )
+
+        refined_text = (result or "").strip()
+        if not refined_text:
+            raise HTTPException(status_code=500, detail="AI returned empty response")
+
+        return {"refined_content": refined_text, "action": action}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error("Refine error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/{opportunity_id}/extracted")

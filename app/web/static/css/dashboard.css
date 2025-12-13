@@ -262,14 +262,6 @@ body {
   flex-direction: column;
 }
 
-.tracker-dashboard-page .topbar {
-  display: none;
-}
-
-.tracker-dashboard-page .page {
-  padding-top: 32px;
-}
-
 /* ===== TOP BAR ===== */
 .topbar {
   display: flex;
@@ -485,7 +477,7 @@ body {
 /* ===== PAGE CONTENT ===== */
 .page {
   padding: 32px;
-  max-width: 1260px;
+  max-width: 1400px;
   flex: 1;
 }
 
@@ -1564,7 +1556,7 @@ body {
 
 .grid-3 {
   display: grid;
-  grid-template-columns: minmax(0, 2.35fr) minmax(280px, 0.85fr);
+  grid-template-columns: 2fr 1fr;
   gap: 24px;
 }
 

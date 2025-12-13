@@ -53,6 +53,9 @@
     improveBtn: document.getElementById("improveBtn"),
     shortenBtn: document.getElementById("shortenBtn"),
     expandBtn: document.getElementById("expandBtn"),
+    tabNavLeft: document.querySelector(".tab-nav-left"),
+    tabNavRight: document.querySelector(".tab-nav-right"),
+    fullscreenBtn: document.querySelector(".tab-action"),
     existingDocsList: document.getElementById("existingDocsList"),
     existingDocPane: document.getElementById("existingDocPane"),
     uploadDocPane: document.getElementById("uploadDocPane"),
@@ -538,7 +541,7 @@
     setButtonLoading(els.extractBtn, "Analyzing RFP...");
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 60000);
       const res = await fetch(`/api/rfp-extract/${uploadId}`, {
         method: "POST",
         credentials: "include",
@@ -571,10 +574,15 @@
       showMessage("Extraction complete.", "success");
       scheduleSave();
     } catch (err) {
-      showMessage(err.message || "Extraction failed.", "error");
+      const msg = err?.message || "";
+      if (err?.name === "AbortError" || msg.toLowerCase().includes("aborted")) {
+        showMessage("Extraction timed out. Please try again.", "error");
+      } else {
+        showMessage(msg || "Extraction failed.", "error");
+      }
       if (els.extractStatus) {
         els.extractStatus.classList.remove("hidden");
-        els.extractStatus.textContent = err.message || "Extraction failed.";
+        els.extractStatus.textContent = msg || "Extraction failed.";
       }
     } finally {
       setButtonLoading(els.extractBtn, null);
@@ -964,6 +972,60 @@
 
     if (!state.currentDoc && state.responseSections?.length) {
       state.currentDoc = state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    }
+
+    setTimeout(updateTabNavArrows, 100);
+  }
+
+  function updateTabNavArrows() {
+    const tabsContainer = document.querySelector(".editor-tabs");
+    const leftArrow = document.querySelector(".tab-nav-left");
+    const rightArrow = document.querySelector(".tab-nav-right");
+
+    if (!tabsContainer || !leftArrow || !rightArrow) return;
+
+    const canScrollLeft = tabsContainer.scrollLeft > 0;
+    const canScrollRight = tabsContainer.scrollLeft < tabsContainer.scrollWidth - tabsContainer.clientWidth - 1;
+
+    leftArrow.style.display = tabsContainer.scrollWidth > tabsContainer.clientWidth ? "flex" : "none";
+    rightArrow.style.display = tabsContainer.scrollWidth > tabsContainer.clientWidth ? "flex" : "none";
+
+    leftArrow.disabled = !canScrollLeft;
+    rightArrow.disabled = !canScrollRight;
+  }
+
+  function scrollTabs(direction) {
+    const tabsContainer = document.querySelector(".editor-tabs");
+    if (!tabsContainer) return;
+
+    const scrollAmount = 200;
+    tabsContainer.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+
+    setTimeout(updateTabNavArrows, 300);
+  }
+
+  function toggleFullscreen() {
+    const target = document.getElementById("documentEditor") || document.documentElement;
+    if (!target) return;
+
+    const requestFs =
+      target.requestFullscreen ||
+      target.webkitRequestFullscreen ||
+      target.mozRequestFullScreen ||
+      target.msRequestFullscreen;
+    const exitFs =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.mozCancelFullScreen ||
+      document.msExitFullscreen;
+
+    if (!document.fullscreenElement && requestFs) {
+      requestFs.call(target).catch(() => showMessage("Fullscreen not available in this browser.", "error"));
+    } else if (document.fullscreenElement && exitFs) {
+      exitFs.call(document);
     }
   }
 
@@ -1384,6 +1446,26 @@
       els.generateBtn.addEventListener("click", generateDocuments);
     }
 
+    // Tab navigation arrows
+    const tabNavLeft = document.querySelector(".tab-nav-left");
+    const tabNavRight = document.querySelector(".tab-nav-right");
+    const tabsContainer = document.querySelector(".editor-tabs");
+    const fullscreenBtn = document.querySelector(".tab-action");
+
+    if (tabNavLeft) {
+      tabNavLeft.addEventListener("click", () => scrollTabs("left"));
+    }
+    if (tabNavRight) {
+      tabNavRight.addEventListener("click", () => scrollTabs("right"));
+    }
+    if (tabsContainer) {
+      tabsContainer.addEventListener("scroll", updateTabNavArrows);
+    }
+    if (fullscreenBtn) {
+      fullscreenBtn.addEventListener("click", toggleFullscreen);
+    }
+    window.addEventListener("resize", updateTabNavArrows);
+
     els.editorTabs.forEach((tab) => {
       tab.addEventListener("click", () => switchDocument(tab.dataset.doc));
     });
@@ -1432,25 +1514,77 @@
       });
     });
 
-    function simulateAiAction(btn) {
+    async function performAiAction(btn, action) {
       if (!btn) return;
+
+      const content = els.editableContent?.innerHTML || "";
+      if (!content.trim()) {
+        showMessage("No content to " + action, "error");
+        return;
+      }
+
       const original = btn.innerHTML;
-      setButtonLoading(btn, "Working...");
-      setTimeout(() => {
+      setButtonLoading(btn, action === "improve" ? "Improving..." : action === "shorten" ? "Shortening..." : "Expanding...");
+
+      [els.improveBtn, els.shortenBtn, els.expandBtn].forEach((b) => {
+        if (b) b.disabled = true;
+      });
+
+      try {
+        const res = await fetch(
+          `/api/opportunities/${encodeURIComponent(state.opportunityId)}/refine`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRF-Token": getCsrf(),
+            },
+            body: JSON.stringify({
+              content: content,
+              action: action,
+              section_name: state.currentDoc || null,
+            }),
+          }
+        );
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `${action} failed`);
+        }
+
+        const data = await res.json();
+
+        if (els.editableContent && data.refined_content) {
+          els.editableContent.innerHTML = data.refined_content;
+          if (state.currentDoc) {
+            state.documents[state.currentDoc] = data.refined_content;
+          }
+          renderDocuments();
+          scheduleSave();
+        }
+
+        showSaveIndicator(action.charAt(0).toUpperCase() + action.slice(1) + "d");
+      } catch (err) {
+        console.error(`${action} error:`, err);
+        showMessage(err.message || `Failed to ${action}`, "error");
+      } finally {
         setButtonLoading(btn, null);
         btn.innerHTML = original;
-        showSaveIndicator("Updated");
-      }, 1200);
+        [els.improveBtn, els.shortenBtn, els.expandBtn].forEach((b) => {
+          if (b) b.disabled = false;
+        });
+      }
     }
 
     if (els.improveBtn) {
-      els.improveBtn.addEventListener("click", () => simulateAiAction(els.improveBtn));
+      els.improveBtn.addEventListener("click", () => performAiAction(els.improveBtn, "improve"));
     }
     if (els.shortenBtn) {
-      els.shortenBtn.addEventListener("click", () => simulateAiAction(els.shortenBtn));
+      els.shortenBtn.addEventListener("click", () => performAiAction(els.shortenBtn, "shorten"));
     }
     if (els.expandBtn) {
-      els.expandBtn.addEventListener("click", () => simulateAiAction(els.expandBtn));
+      els.expandBtn.addEventListener("click", () => performAiAction(els.expandBtn, "expand"));
     }
 
     if (els.exportWord) {

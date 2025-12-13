@@ -196,6 +196,32 @@ async def mark_notification_read(request: Request, notification_id: str):
     return {"ok": True}
 
 
+@router.post("/api/notifications/read-all", response_class=JSONResponse)
+async def mark_all_notifications_read(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with AsyncSessionLocal() as session:
+        await _ensure_table(session)
+        user_row = await _get_user(session, user_email)
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id = user_row[0]
+        await session.execute(
+            text(
+                """
+                UPDATE notifications
+                SET read_at = COALESCE(read_at, :ts)
+                WHERE recipient_user_id = :uid
+                """
+            ),
+            {"uid": user_id, "ts": dt.datetime.utcnow()},
+        )
+        await session.commit()
+    return {"ok": True}
+
+
 async def _accept_team_invite(session, user_email: str, team_id: Optional[str]):
     res = await session.execute(
         text("SELECT id FROM users WHERE lower(email) = lower(:email) LIMIT 1"),

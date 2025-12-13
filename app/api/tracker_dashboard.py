@@ -291,19 +291,32 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
     }
 
     def render_activity() -> str:
+        verb_icons = {
+            "added to tracking": "📋",
+            "uploaded": "📤",
+            "completed": "✅",
+            "awarded": "🎉",
+            "submitted": "🚀",
+        }
+
         blocks = []
         for entry in activity_entries:
             who = entry.get("who") or ""
             name = who.split("@")[0] or "User"
-            init = _initials(who)
-            idx = email_to_idx.get(who.lower())
-            color = _color_for(who, idx)
+            verb = entry.get("verb") or ""
+
+            icon = "📋"
+            for key, emoji in verb_icons.items():
+                if key in verb.lower():
+                    icon = emoji
+                    break
+
             blocks.append(
                 f"""
                 <div class="activity-item">
-                  <div class="activity-avatar" style="background:{color};">{_esc(init)}</div>
+                  <div class="activity-icon">{icon}</div>
                   <div class="activity-content">
-                    <div class="activity-text"><strong>{_esc(name)}</strong> {_esc(entry.get('verb'))} {_esc(entry.get('obj'))}</div>
+                    <div class="activity-text"><strong>{_esc(name)}</strong> {_esc(verb)} {_esc(entry.get('obj'))}</div>
                     <div class="activity-time">Just now</div>
                   </div>
                 </div>
@@ -347,7 +360,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
         <span class="stat-change positive">+{tracked_this_week} this week</span>
       </div>
       <div class="stat-card fade-in stagger-2">
-        <div class="stat-icon">???</div>
+        <div class="stat-icon">?</div>
         <div class="stat-label">Due This Week</div>
         <div class="stat-value"><span class="counter" data-target="{due_soon_count}">0</span></div>
         <span class="stat-change negative">{due_soon_count} urgent</span>
@@ -604,7 +617,7 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
               <div class="timeline-content">
                 <div class="timeline-date">${it.due_display || it.due_iso}</div>
                 <div class="timeline-title">${it.title}</div>
-                <div class="timeline-sub">${it.agency} ${it.external_id ? ' • ' + it.external_id : ''}</div>
+                <div class="timeline-desc">${it.agency} ${it.external_id ? ' • ' + it.external_id : ''}</div>
               </div>
             </div>
           `).join('') : '<div class="timeline-empty muted">No upcoming deadlines.</div>';
