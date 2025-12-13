@@ -30,8 +30,15 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
         </div>
       </div>
       <div class="wizard-actions">
-        <button class="btn-secondary" type="button" id="resumeLatest">Load last session</button>
-        <button class="btn-secondary" type="button" id="manualSave">Save now</button>
+        <button class="btn-sleek ghost" type="button" id="openSessionPickerTop">
+          &#128190; Saved drafts
+        </button>
+        <button class="btn-sleek" type="button" id="resumeLatest">
+          &#8635; Load last session
+        </button>
+        <button class="btn-sleek ghost" type="button" id="manualSave">
+          &#128427; Save now
+        </button>
       </div>
     </div>
 
@@ -164,6 +171,28 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
         </div>
       </div>
       <div class="step-content">
+        <div class="session-picker-bar">
+          <div class="session-info">
+            <span class="session-label">Current Draft:</span>
+            <span class="session-name" id="currentSessionName">Unsaved</span>
+            <span class="session-time" id="currentSessionTime"></span>
+          </div>
+          <div class="session-actions">
+            <button type="button" class="session-btn" id="openSessionPicker">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+              </svg>
+              Saved Drafts
+            </button>
+            <button type="button" class="session-btn secondary" id="newSessionBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              New Draft
+            </button>
+          </div>
+        </div>
         <div id="generateOptions" class="generate-options">
           <!-- Dynamically populated from extracted narrative sections -->
           <div class="loading-placeholder">Loading sections from extraction...</div>
@@ -288,6 +317,37 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
       </div>
       <div class="step-actions">
         <button class="btn-secondary" type="button" id="step4Back">&larr; Back to Edit</button>
+      </div>
+    </div>
+
+    <!-- Session Picker Modal -->
+    <div class="session-modal-overlay" id="sessionModalOverlay"></div>
+    <div class="session-modal" id="sessionModal">
+      <div class="session-modal-header">
+        <h3>Saved Drafts</h3>
+        <button type="button" class="session-modal-close" id="closeSessionModal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="session-modal-body">
+        <div class="session-list" id="sessionList">
+          <!-- Sessions will be populated by JavaScript -->
+          <div class="session-loading">Loading saved drafts...</div>
+        </div>
+      </div>
+      <div class="session-modal-footer">
+        <span class="session-count" id="sessionCount">0 saved drafts</span>
+        <div class="session-bulk-actions">
+          <div class="session-select-all">
+            <input type="checkbox" id="sessionSelectAll" aria-label="Select all saved drafts">
+            <label for="sessionSelectAll">Select all</label>
+          </div>
+          <span id="sessionSelectionCount">0 selected</span>
+          <button type="button" class="session-bulk-delete" id="bulkDeleteSessions" disabled>Delete selected</button>
+        </div>
       </div>
     </div>
   </div>

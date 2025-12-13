@@ -194,7 +194,7 @@ async def save_session(payload: Dict[str, Any], user=Depends(require_user_with_t
         if session_id:
             result = await conn.exec_driver_sql(
                 """
-                UPDATE ai_studio_sessions 
+                UPDATE ai_studio_sessions
                 SET state_json = :state,
                     name = COALESCE(:name, name),
                     sections_total = :total,
@@ -218,32 +218,31 @@ async def save_session(payload: Dict[str, Any], user=Depends(require_user_with_t
                     "team_id": user.get("team_id"),
                 },
             )
-            if result.rowcount == 0:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found or access denied")
-            return {"session_id": session_id, "status": "updated"}
-        else:
-            res = await conn.exec_driver_sql(
-                """
-                INSERT INTO ai_studio_sessions 
-                    (user_id, team_id, opportunity_id, name, state_json,
-                     sections_total, sections_completed, has_cover_letter, has_soq)
-                VALUES (:uid, :team_id, :oid, :name, :state, :total, :completed, :cover, :soq)
-                RETURNING id
-                """,
-                {
-                    "uid": user["id"],
-                    "team_id": user.get("team_id"),
-                    "oid": opportunity_id,
-                    "name": name,
-                    "state": state_json,
-                    "total": sections_total,
-                    "completed": sections_completed,
-                    "cover": has_cover,
-                    "soq": has_soq,
-                },
-            )
-            new_id = res.scalar_one()
-            return {"session_id": new_id, "status": "created"}
+            if result.rowcount > 0:
+                return {"session_id": session_id, "status": "updated"}
+            # If the session was not found (e.g., deleted in another tab), fall through to create a new one
+        res = await conn.exec_driver_sql(
+            """
+            INSERT INTO ai_studio_sessions
+                (user_id, team_id, opportunity_id, name, state_json,
+                 sections_total, sections_completed, has_cover_letter, has_soq)
+            VALUES (:uid, :team_id, :oid, :name, :state, :total, :completed, :cover, :soq)
+            RETURNING id
+            """,
+            {
+                "uid": user["id"],
+                "team_id": user.get("team_id"),
+                "oid": opportunity_id,
+                "name": name,
+                "state": state_json,
+                "total": sections_total,
+                "completed": sections_completed,
+                "cover": has_cover,
+                "soq": has_soq,
+            },
+        )
+        new_id = res.scalar_one()
+        return {"session_id": new_id, "status": "created"}
 
 
 @router.delete("/{session_id}")

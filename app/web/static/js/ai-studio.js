@@ -66,6 +66,19 @@
     toolbarBtns: document.querySelectorAll(".toolbar-btn"),
     optionCards: document.querySelectorAll(".generate-option"),
     docTabButtons: document.querySelectorAll(".doc-tab"),
+    sessionModalOverlay: document.getElementById("sessionModalOverlay"),
+    sessionModal: document.getElementById("sessionModal"),
+    sessionList: document.getElementById("sessionList"),
+    sessionCount: document.getElementById("sessionCount"),
+    sessionSelectionCount: document.getElementById("sessionSelectionCount"),
+    sessionSelectAll: document.getElementById("sessionSelectAll"),
+    bulkDeleteSessions: document.getElementById("bulkDeleteSessions"),
+    openSessionPicker: document.getElementById("openSessionPicker"),
+    closeSessionModal: document.getElementById("closeSessionModal"),
+    newSessionBtn: document.getElementById("newSessionBtn"),
+    currentSessionName: document.getElementById("currentSessionName"),
+    currentSessionTime: document.getElementById("currentSessionTime"),
+    openSessionPickerTop: document.getElementById("openSessionPickerTop"),
   };
 
   const steps = {
@@ -959,7 +972,7 @@
 
     (state.responseSections || []).forEach((section, index) => {
       if (!section) return;
-      const key = section.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const key = normalizeSectionKey(section);
       const isActive = state.currentDoc === key || (!state.currentDoc && index === 0);
       const tab = document.createElement("button");
       tab.className = "editor-tab" + (isActive ? " active" : "");
@@ -971,10 +984,33 @@
     });
 
     if (!state.currentDoc && state.responseSections?.length) {
-      state.currentDoc = state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      state.currentDoc = normalizeSectionKey(state.responseSections[0]);
     }
 
+    els.editorTabs = tabsContainer.querySelectorAll(".editor-tab");
     setTimeout(updateTabNavArrows, 100);
+  }
+
+  function normalizeSectionKey(section) {
+    return (section || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  }
+
+  function deriveSectionsFromDocuments(docs) {
+    if (!docs || typeof docs !== "object") return [];
+    const skipKeys = new Set(["cover", "responses", "soq", "cover_letter", "soq_body"]);
+    const keys = Object.keys(docs).filter((k) => !skipKeys.has(k));
+    if (!keys.length) return [];
+    return keys.map((k) => titleCaseFromKey(k));
+  }
+
+  function titleCaseFromKey(key) {
+    return (key || "")
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
+      .join(" ");
   }
 
   function updateTabNavArrows() {
@@ -1091,13 +1127,13 @@
 
       // Map API response sections by normalized key
       Object.entries(responseSections).forEach(([key, value]) => {
-        const normKey = key.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const normKey = normalizeSectionKey(key);
         state.documents[normKey] = typeof value === "string" ? value : formatSoqText(value);
       });
 
       // Also map using exact section names from extraction if available
       state.responseSections.forEach((sectionName) => {
-        const normKey = sectionName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const normKey = normalizeSectionKey(sectionName);
         if (!state.documents[normKey] && responseSections[sectionName]) {
           const value = responseSections[sectionName];
           state.documents[normKey] = typeof value === "string" ? value : formatSoqText(value);
@@ -1105,7 +1141,7 @@
       });
 
       state.currentDoc = state.responseSections.length
-        ? state.responseSections[0].toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")
+        ? normalizeSectionKey(state.responseSections[0])
         : null;
       renderDocumentTabs();
 
@@ -1173,6 +1209,16 @@
   }
 
   function buildSessionState() {
+    const sections =
+      (Array.isArray(state.responseSections) && state.responseSections.filter(Boolean)) ||
+      deriveSectionsFromDocuments(state.documents);
+    const latestSections = sections.map((sectionName) => {
+      const key = normalizeSectionKey(sectionName);
+      const html = (state.documents && state.documents[key]) || "";
+      return { section: sectionName, answer: stripHtml(html) };
+    });
+    const coverDraft = stripHtml(state.documents?.cover || "");
+    const soqDraft = stripHtml(state.documents?.responses || state.documents?.soq || "");
     return {
       opportunityId: state.opportunityId,
       opportunityLabel: state.opportunityLabel,
@@ -1180,11 +1226,16 @@
       extracted: state.extracted,
       documents: state.documents,
       currentDoc: state.currentDoc,
+      currentStep: state.currentStep,
       notes: els.customInstructions?.value || "",
+      sections,
+      latestSections,
+      coverDraft,
+      soqDraft,
     };
   }
 
-  async function saveSession(manual = false) {
+  async function saveSession(manual = false, allowRetry = true) {
     const payload = buildSessionState();
     if (!payload.opportunityId && !payload.documents.cover && !payload.documents.responses) {
       return;
@@ -1204,9 +1255,14 @@
           state: payload,
         }),
       });
+      if (res.status === 404 && allowRetry) {
+        state.sessionId = null;
+        return await saveSession(manual, false);
+      }
       if (!res.ok) throw new Error("Save failed");
       const data = await res.json();
       state.sessionId = data.session_id;
+      updateCurrentSessionDisplay();
       if (manual) {
         showSaveIndicator("Saved");
       } else {
@@ -1231,10 +1287,20 @@
       state.upload = st.upload || null;
       state.extracted = st.extracted || null;
       state.documents = st.documents || { cover: "", responses: "" };
+      state.responseSections =
+        (Array.isArray(st.sections) && st.sections.length && st.sections) ||
+        (Array.isArray(st.responseSections) && st.responseSections.length && st.responseSections) ||
+        deriveSectionsFromDocuments(state.documents) ||
+        state.responseSections ||
+        [];
+      if (!state.responseSections.length) {
+        state.responseSections = ["Project Response"];
+      }
       if (state.documents && !state.documents.responses && state.documents.soq) {
         state.documents.responses = state.documents.soq;
       }
-      state.currentDoc = st.currentDoc || "cover";
+      state.currentDoc = st.currentDoc || normalizeSectionKey(state.responseSections[0] || "cover");
+      state.currentStep = st.currentStep || state.currentStep || 1;
       if (els.customInstructions) {
         els.customInstructions.value = st.notes || "";
       }
@@ -1251,6 +1317,7 @@
         renderExtraction();
         els.extractResults?.classList.remove("hidden");
       }
+      renderDocumentTabs();
       if (state.documents) {
         renderDocuments();
       }
@@ -1258,10 +1325,12 @@
         (state.documents?.cover && state.documents.cover.trim()) ||
           (state.documents?.responses && state.documents.responses.trim())
       );
-      const targetStep = hasDocs ? 3 : state.extracted ? 2 : state.upload ? 1 : 1;
+      const computedStep = hasDocs ? 3 : state.extracted ? 2 : state.upload ? 1 : 1;
+      const targetStep = Math.min(4, Math.max(1, st.currentStep || computedStep));
       goToStep(targetStep);
       handleStepAvailability();
       showMessage("Session restored.", "success");
+      updateCurrentSessionDisplay();
     } catch (err) {
       showMessage(err.message || "Could not load session.", "error");
     }
@@ -1281,6 +1350,305 @@
     } catch (err) {
       showMessage(err.message || "Unable to load previous session.", "error");
     }
+  }
+
+  // ============================================
+  // SESSION PICKER FUNCTIONALITY
+  // ============================================
+
+  let selectedSessionIds = new Set();
+
+  function openSessionModal() {
+    selectedSessionIds = new Set();
+    updateSelectionDisplay();
+    els.sessionModalOverlay?.classList.add("active");
+    els.sessionModal?.classList.add("active");
+    fetchSavedSessions();
+  }
+
+  function closeSessionModal() {
+    els.sessionModalOverlay?.classList.remove("active");
+    els.sessionModal?.classList.remove("active");
+  }
+
+  async function fetchSavedSessions() {
+    if (!els.sessionList) return;
+
+    els.sessionList.innerHTML = '<div class="session-loading">Loading saved drafts...</div>';
+    selectedSessionIds = new Set();
+    updateSelectionDisplay();
+
+    try {
+      const res = await fetch("/api/ai-sessions/recent?limit=50", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!res.ok) throw new Error("Failed to load sessions");
+
+      const sessions = await res.json();
+      renderSessionList(sessions);
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
+      els.sessionList.innerHTML = '<div class="session-empty">Failed to load saved drafts</div>';
+    }
+  }
+
+  function renderSessionList(sessions) {
+    if (!els.sessionList) return;
+
+    const activeSessions = (sessions || []).filter(
+      (s) => !s.deleted_at && !s.is_deleted && s.status !== "deleted"
+    );
+
+    let filtered = activeSessions;
+    if (state.opportunityId) {
+      const currentOpp = String(state.opportunityId);
+      filtered = activeSessions.filter((s) => String(s.opportunity_id) === currentOpp);
+    }
+
+    if (!filtered.length) {
+      els.sessionList.innerHTML = `
+      <div class="session-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+        </svg>
+        <div>No saved drafts yet</div>
+        <div style="font-size: 12px; margin-top: 4px;">Your work will be auto-saved as you edit</div>
+      </div>
+    `;
+      updateSessionCount(0);
+      return;
+    }
+
+    const html = filtered
+      .map((session) => {
+        const isActive = String(state.sessionId) === String(session.id);
+        const progress = getSessionProgress(session);
+        const updatedAt = formatRelativeTime(session.updated_at);
+        const title = session.name || session.opportunity_title || "Untitled Draft";
+
+        return `
+      <div class="session-item ${isActive ? "active" : ""}" data-session-id="${session.id}">
+        <label class="session-select">
+          <input type="checkbox" class="session-checkbox" data-select-id="${session.id}" ${selectedSessionIds.has(String(session.id)) ? "checked" : ""} />
+        </label>
+        <div class="session-item-icon">📄</div>
+        <div class="session-item-content">
+          <div class="session-item-title">${escapeHtml(title)}</div>
+          <div class="session-item-meta">
+            <span>${updatedAt}</span>
+            <span>•</span>
+            <div class="session-item-progress">
+              <div class="session-progress-bar">
+                <div class="session-progress-fill" style="width: ${progress}%"></div>
+              </div>
+              <span>${progress}%</span>
+            </div>
+          </div>
+        </div>
+        <div class="session-item-actions">
+          <button type="button" class="session-action-btn load" data-load-id="${session.id}" title="Load draft">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16v12H5.17L4 17.17V4z"/>
+              <polyline points="8 8 12 12 16 8"/>
+            </svg>
+          </button>
+          <button type="button" class="session-action-btn delete" data-delete-id="${session.id}" title="Delete draft">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+      })
+      .join("");
+
+    els.sessionList.innerHTML = html;
+    updateSessionCount(filtered.length);
+
+    els.sessionList.querySelectorAll("[data-load-id]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const sessionId = btn.dataset.loadId;
+        if (sessionId) {
+          await loadSession(parseInt(sessionId, 10));
+          closeSessionModal();
+        }
+      });
+    });
+
+    els.sessionList.querySelectorAll(".session-checkbox").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const id = cb.dataset.selectId;
+        if (!id) return;
+        const strId = String(id);
+        if (cb.checked) {
+          selectedSessionIds.add(strId);
+        } else {
+          selectedSessionIds.delete(strId);
+        }
+        updateSelectionDisplay();
+        updateSelectAllState();
+      });
+    });
+
+    els.sessionList.querySelectorAll("[data-delete-id]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const sessionId = btn.dataset.deleteId;
+        if (confirm("Delete this draft? This cannot be undone.")) {
+          await deleteSession(parseInt(sessionId, 10));
+          fetchSavedSessions();
+        }
+      });
+    });
+  }
+
+  async function deleteSession(sessionId) {
+    try {
+      const res = await fetch(`/api/ai-sessions/${sessionId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "X-CSRF-Token": getCsrf(),
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to delete session");
+
+      if (state.sessionId === sessionId) {
+        state.sessionId = null;
+        updateCurrentSessionDisplay();
+      }
+
+      showSaveIndicator("Deleted");
+    } catch (err) {
+      console.error("Delete session error:", err);
+      alert("Failed to delete draft");
+    }
+  }
+
+  function startNewSession() {
+    if (Object.keys(state.documents).length > 0) {
+      if (!confirm("Start a new draft? Your current work is auto-saved.")) {
+        return;
+      }
+    }
+
+    state.sessionId = null;
+    state.documents = {};
+    state.responseSections = [];
+    state.currentDoc = "";
+
+    if (els.editableContent) {
+      els.editableContent.innerHTML = "";
+    }
+    if (els.previewContent) {
+      els.previewContent.innerHTML = "";
+    }
+
+    renderDocumentTabs();
+    handleStepAvailability();
+    updateCurrentSessionDisplay();
+    showSaveIndicator("New draft started");
+  }
+
+  function updateCurrentSessionDisplay() {
+    if (!els.currentSessionName) return;
+
+    if (state.sessionId) {
+      els.currentSessionName.textContent = state.opportunityLabel || "Saved Draft";
+      els.currentSessionTime.textContent = "• Auto-saved";
+    } else {
+      els.currentSessionName.textContent = "Unsaved Draft";
+      els.currentSessionTime.textContent = "";
+    }
+  }
+
+  function updateSessionCount(count) {
+    if (els.sessionCount) {
+      els.sessionCount.textContent = `${count} saved draft${count !== 1 ? "s" : ""}`;
+    }
+  }
+
+  function updateSelectionDisplay() {
+    const count = selectedSessionIds.size;
+    if (els.sessionSelectionCount) {
+      els.sessionSelectionCount.textContent = `${count} selected`;
+    }
+    if (els.bulkDeleteSessions) {
+      els.bulkDeleteSessions.disabled = count === 0;
+    }
+    updateSelectAllState();
+  }
+
+  function updateSelectAllState() {
+    if (!els.sessionSelectAll || !els.sessionList) return;
+    const checkboxes = els.sessionList.querySelectorAll(".session-checkbox");
+    if (!checkboxes.length) {
+      els.sessionSelectAll.checked = false;
+      els.sessionSelectAll.indeterminate = false;
+      return;
+    }
+    const total = checkboxes.length;
+    const selected = Array.from(checkboxes).filter((cb) => cb.checked).length;
+    els.sessionSelectAll.checked = selected > 0 && selected === total;
+    els.sessionSelectAll.indeterminate = selected > 0 && selected < total;
+  }
+
+  function formatRelativeTime(dateStr) {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString();
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function getSessionProgress(session) {
+    const total = Number(session.sections_total);
+    const completed = Number(session.sections_completed);
+    if (!Number.isNaN(total) && total > 0) {
+      const pct = Math.round((Math.max(0, Math.min(completed, total)) / total) * 100);
+      return Math.max(0, Math.min(100, pct));
+    }
+
+    const docs = session.state?.documents;
+    if (docs && typeof docs === "object") {
+      const keys = Object.keys(docs);
+      const filled = keys.filter((k) => {
+        const val = docs[k];
+        return typeof val === "string" && val.trim().length > 0;
+      });
+      if (keys.length > 0 && filled.length > 0) {
+        const pct = Math.round((filled.length / keys.length) * 100);
+        return Math.max(10, Math.min(100, pct));
+      }
+    }
+
+    if (session.has_cover_letter || session.has_soq) {
+      return 66;
+    }
+
+    return 0;
   }
 
   function stripHtml(html) {
@@ -1605,6 +1973,59 @@
     if (els.manualSaveInline) {
       els.manualSaveInline.addEventListener("click", () => saveSession(true));
     }
+
+    if (els.openSessionPicker) {
+      els.openSessionPicker.addEventListener("click", openSessionModal);
+    }
+    if (els.openSessionPickerTop) {
+      els.openSessionPickerTop.addEventListener("click", openSessionModal);
+    }
+    if (els.closeSessionModal) {
+      els.closeSessionModal.addEventListener("click", closeSessionModal);
+    }
+    if (els.sessionModalOverlay) {
+      els.sessionModalOverlay.addEventListener("click", closeSessionModal);
+    }
+    if (els.newSessionBtn) {
+      els.newSessionBtn.addEventListener("click", startNewSession);
+    }
+    if (els.sessionSelectAll) {
+      els.sessionSelectAll.addEventListener("change", () => {
+        const checkAll = els.sessionSelectAll.checked;
+        const checkboxes = els.sessionList?.querySelectorAll(".session-checkbox") || [];
+        checkboxes.forEach((cb) => {
+          cb.checked = checkAll;
+          const id = cb.dataset.selectId;
+          if (!id) return;
+          const strId = String(id);
+          if (checkAll) {
+            selectedSessionIds.add(strId);
+          } else {
+            selectedSessionIds.delete(strId);
+          }
+        });
+        updateSelectionDisplay();
+      });
+    }
+    if (els.bulkDeleteSessions) {
+      els.bulkDeleteSessions.addEventListener("click", async () => {
+        if (!selectedSessionIds.size) return;
+        if (!confirm(`Delete ${selectedSessionIds.size} draft${selectedSessionIds.size > 1 ? "s" : ""}? This cannot be undone.`)) {
+          return;
+        }
+        for (const id of Array.from(selectedSessionIds)) {
+          await deleteSession(Number(id));
+        }
+        selectedSessionIds = new Set();
+        fetchSavedSessions();
+      });
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && els.sessionModal?.classList.contains("active")) {
+        closeSessionModal();
+      }
+    });
   }
 
   async function init() {
@@ -1615,10 +2036,14 @@
     const params = new URLSearchParams(window.location.search);
     const sessionParam = params.get("session");
     if (sessionParam) {
-      await loadSession(sessionParam);
+      await loadSession(parseInt(sessionParam, 10));
+    } else {
+      // Optionally load latest session on page load
+      // await loadLatestSession();
     }
+    updateCurrentSessionDisplay();
     handleStepAvailability();
-    goToStep(1);
+    goToStep(state.currentStep || 1);
     setInterval(() => saveSession(false), 30000);
     window.addEventListener("beforeunload", () => {
       const payload = buildSessionState();
