@@ -893,6 +893,17 @@ async def save_company_profile(request: Request):
     if not user_id:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Load existing profile data to preserve fields not in current submission
+    existing_data = {}
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1"),
+            {"uid": user_id},
+        )
+        row = res.fetchone()
+        if row and row[0]:
+            existing_data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+
     content_type = request.headers.get("content-type", "").lower()
     payload = {}
     files_meta = {}
@@ -941,6 +952,18 @@ async def save_company_profile(request: Request):
             if isinstance(v, list):
                 payload[k] = ",".join(v)
 
+    # Merge with existing data, preserving file fields not in current submission
+    merged_data = existing_data.copy()
+    merged_data.update(payload)
+
+    # Preserve existing file fields if they weren't uploaded in current request
+    for field in FILE_FIELDS:
+        if field not in payload and field in existing_data:
+            merged_data[field] = existing_data[field]
+            # Also preserve the filename
+            if f"{field}_name" in existing_data:
+                merged_data[f"{field}_name"] = existing_data[f"{field}_name"]
+
     async with AsyncSessionLocal() as db:
         await db.execute(
             text(
@@ -952,7 +975,7 @@ async def save_company_profile(request: Request):
                   updated_at = CURRENT_TIMESTAMP
                 """
             ),
-            {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(payload or {})},
+            {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(merged_data or {})},
         )
         await db.commit()
     return {"ok": True, "files": files_meta}
