@@ -403,6 +403,39 @@
   color: var(--primary);
 }
 
+.file-card.selected {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.file-select {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.file-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.file-action-btn.delete-btn svg {
+  transition: transform var(--transition-fast);
+}
+
+.file-action-btn.delete-btn:hover svg {
+  transform: scale(1.1);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
 @media (max-width: 1024px) {
   .documents-toolbar {
     flex-direction: column;

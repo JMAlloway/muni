@@ -176,7 +176,14 @@ async def save_session(payload: Dict[str, Any], user=Depends(require_user_with_t
 
     opportunity_id = _validate_opportunity_id(payload.get("opportunity_id"))
     if opportunity_id:
-        await ensure_user_can_access_opportunity(user, opportunity_id)
+        try:
+            await ensure_user_can_access_opportunity(user, opportunity_id)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_403_FORBIDDEN:
+                # Autosaves may contain stale/untracked opportunities; drop the link instead of spamming logs
+                opportunity_id = None
+            else:
+                raise
 
     state = _validate_state_payload(payload.get("state"))
     name = _validate_name(payload.get("name"))

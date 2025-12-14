@@ -651,58 +651,6 @@ async def tracker_dashboard(request: Request) -> HTMLResponse:
         });
       })();
     </script>
-    <script>
-      (function(){
-        const overlay = document.getElementById('upload-overlay');
-        const drawer = document.getElementById('upload-drawer');
-        const form = document.getElementById('upload-form');
-        const oidField = document.getElementById('upload-oid');
-        const filesField = document.getElementById('upload-files');
-        const cancelBtn = document.getElementById('upload-cancel');
-        function getCSRF(){
-          try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1] || ""; } catch(_) { return ""; }
-        }
-        function closeUpload(){
-          if (overlay) overlay.setAttribute('aria-hidden','true');
-          if (drawer) drawer.setAttribute('aria-hidden','true');
-        }
-        window.openUploadDrawer = function(it){
-          if (!drawer || !overlay) return;
-          const oid = it && it.opportunity_id ? String(it.opportunity_id) : "";
-          oidField.value = oid;
-          if (overlay) overlay.setAttribute('aria-hidden','false');
-          if (drawer) drawer.setAttribute('aria-hidden','false');
-          if (filesField) filesField.value = "";
-        };
-        if (cancelBtn) cancelBtn.addEventListener('click', closeUpload);
-        if (overlay) overlay.addEventListener('click', closeUpload);
-        if (form) {
-          form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const oid = oidField.value || "";
-            const files = filesField.files || [];
-            if (!oid || files.length === 0) { alert("Select a file to upload."); return; }
-            const fd = new FormData();
-            fd.append("opportunity_id", oid);
-            Array.from(files).forEach(f => fd.append("files", f, f.name));
-            try {
-              const res = await fetch("/uploads/add", {
-                method: "POST",
-                credentials: "include",
-                headers: { "X-CSRF-Token": getCSRF() },
-                body: fd
-              });
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              alert("Upload complete.");
-              closeUpload();
-            } catch(err) {
-              console.error(err);
-              alert("Upload failed. Please try again.");
-            }
-          });
-        }
-      })();
-    </script>
     <script src="/static/js/tracker_dashboard.js"></script>
     <script>
       (function(){

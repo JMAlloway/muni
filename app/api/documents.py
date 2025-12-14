@@ -105,7 +105,16 @@ async def documents_page(request: Request):
   <div class="files-section fade-in stagger-3">
     <div class="section-header">
       <h3 class="section-label">Recent Documents</h3>
-      <span class="file-count">Loading...</span>
+      <div class="bulk-actions" id="bulkActions" style="display:none;">
+        <label class="select-all">
+          <input type="checkbox" id="selectAllFiles"> Select all
+        </label>
+        <span class="selected-count" id="selectedCount">0 selected</span>
+        <button class="bulk-delete-btn" id="bulkDeleteBtn" disabled title="Delete selected files">
+          Delete selected
+        </button>
+      </div>
+      <span class="file-count" id="fileCount">Loading...</span>
     </div>
     <div class="files-grid grid-view" id="filesGrid"></div>
   </div>
@@ -113,7 +122,7 @@ async def documents_page(request: Request):
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const state = { filter: 'all', folder: null, search: '', view: 'grid' };
+  const state = { filter: 'all', folder: null, search: '', view: 'grid', isUploading: false, selectedFileIds: new Set() };
   const filterBtns = document.querySelectorAll('.filter-btn');
   const viewBtns = document.querySelectorAll('.view-btn');
   const searchInput = document.getElementById('searchInput');
@@ -123,11 +132,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const newFolderBtn = document.getElementById('newFolderBtn');
   const foldersGrid = document.getElementById('foldersGrid');
   const filesGrid = document.getElementById('filesGrid');
-  const fileCountEl = document.querySelector('.file-count');
+  const fileCountEl = document.getElementById('fileCount');
   const subfolderGrid = document.getElementById('subfolderGrid');
+  const selectAllFiles = document.getElementById('selectAllFiles');
+  const selectedCountEl = document.getElementById('selectedCount');
+  const bulkActions = document.getElementById('bulkActions');
+  const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
   let allFiles = [];
   let foldersData = [];
   let oppSelectOptions = [];
+
+  function getCsrf() {
+    const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match && match[1] ? match[1] : '';
+  }
 
   init();
 
@@ -177,6 +195,18 @@ document.addEventListener('DOMContentLoaded', () => {
       newFolderBtn.addEventListener('click', () => {
         alert('Folders are created from opportunities you track. Go to your opportunities dashboard and add/track an opportunity to create a folder here.');
         window.location.href = '/opportunities';
+      });
+    }
+
+    if (selectAllFiles) {
+      selectAllFiles.addEventListener('change', () => {
+        selectAllVisible(selectAllFiles.checked);
+      });
+    }
+
+    if (bulkDeleteBtn) {
+      bulkDeleteBtn.addEventListener('click', () => {
+        handleBulkDelete();
       });
     }
   }
@@ -245,6 +275,26 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSubfolders(null);
   }
 
+  function updateBulkUI() {
+    const count = state.selectedFileIds.size;
+    if (bulkActions) {
+      bulkActions.style.display = count > 0 ? 'flex' : 'none';
+    }
+    if (selectedCountEl) {
+      selectedCountEl.textContent = `${count} selected`;
+    }
+    if (bulkDeleteBtn) {
+      bulkDeleteBtn.disabled = count === 0;
+    }
+    if (selectAllFiles) {
+      const visibleCards = Array.from(document.querySelectorAll('.file-card')).filter(card => card.style.display !== 'none');
+      const visibleIds = visibleCards.map(card => card.dataset.id);
+      const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => state.selectedFileIds.has(id));
+      selectAllFiles.checked = allVisibleSelected;
+      selectAllFiles.indeterminate = count > 0 && !allVisibleSelected;
+    }
+  }
+
   function renderSubfolders(folderId) {
     subfolderGrid.innerHTML = '';
     let subset = [];
@@ -286,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const ext = ((file.filename || '').split('.').pop() || '').toUpperCase() || 'FILE';
       const cls = pickPreviewClass(file.mime);
       card.className = 'file-card';
+      card.dataset.id = file.id;
       card.dataset.category = cat;
       card.dataset.opportunity = file.opportunity_id || '';
       card.dataset.folder = file.folder || '';
@@ -305,11 +356,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="file-name">${file.filename || 'Untitled'}</div>
           <div class="file-meta">
             <span>${file.size_label || ''}</span>
-            <span class="meta-dot">·</span>
+            <span class="meta-dot">&bull;</span>
             <span>${file.modified_label || ''}</span>
           </div>
         </div>
         <div class="file-actions">
+          <label class="file-select">
+            <input type="checkbox" class="file-checkbox" data-file-id="${file.id}">
+          </label>
           ${file.download_url ? `
             <a class="file-action-btn" title="Download" href="${file.download_url}" target="_blank" rel="noopener">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -318,12 +372,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
             </a>
-          ` : '<span class="file-action-btn" title="No download" style="opacity:0.5; cursor:not-allowed;">—</span>'}
+          ` : '<span class="file-action-btn" title="No download" style="opacity:0.5; cursor:not-allowed;">&mdash;</span>'}
+          <button class="file-action-btn delete-btn" title="Delete" data-file-id="${file.id}" data-filename="${file.filename}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+          </button>
         </div>
       `;
       filesGrid.appendChild(card);
+
+      const deleteBtn = card.querySelector('.delete-btn');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleDelete(file.id, file.filename);
+        });
+      }
+      const checkbox = card.querySelector('.file-checkbox');
+      if (checkbox) {
+        checkbox.checked = state.selectedFileIds.has(String(file.id));
+        checkbox.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+        checkbox.addEventListener('change', (e) => {
+          const id = String(file.id);
+          if (checkbox.checked) {
+            state.selectedFileIds.add(id);
+            card.classList.add('selected');
+          } else {
+            state.selectedFileIds.delete(id);
+            card.classList.remove('selected');
+          }
+          updateBulkUI();
+        });
+      }
     });
     applyFilters();
+    updateBulkUI();
   }
 
   function categoryFor(file) {
@@ -356,6 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (show) visible += 1;
     });
     if (fileCountEl) fileCountEl.textContent = `Showing ${visible} files`;
+    updateBulkUI();
   }
 
   function updateCountManual() {
@@ -366,10 +456,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fileCountEl) fileCountEl.textContent = `Showing ${visible} files`;
   }
 
+  function selectAllVisible(checked) {
+    document.querySelectorAll('.file-card').forEach(card => {
+      if (card.style.display === 'none') return;
+      const id = card.dataset.id;
+      const box = card.querySelector('.file-checkbox');
+      if (!id || !box) return;
+      box.checked = checked;
+      if (checked) {
+        state.selectedFileIds.add(id);
+        card.classList.add('selected');
+      } else {
+        state.selectedFileIds.delete(id);
+        card.classList.remove('selected');
+      }
+    });
+    updateBulkUI();
+  }
+
   async function handleUpload() {
     const oppId = uploadSelect.value;
     if (!oppId) { alert('Select a folder (opportunity) first.'); return; }
     if (!this.files || !this.files.length) return;
+
+    if (state.isUploading) {
+      console.log('Upload already in progress, ignoring duplicate request');
+      return;
+    }
+
+    state.isUploading = true;
+    const trigger = uploadTrigger;
+    let originalHtml = '';
+    if (trigger) {
+      trigger.disabled = true;
+      originalHtml = trigger.innerHTML;
+      trigger.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+          <circle cx="12" cy="12" r="10"></circle>
+        </svg>
+        Uploading...
+      `;
+    }
+
     const formData = new FormData();
     formData.append('opportunity_id', oppId);
     Array.from(this.files).forEach(f => formData.append('files', f));
@@ -377,14 +505,70 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/uploads/add', {
         method: 'POST',
         body: formData,
-        credentials: 'include'
+        credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrf() }
       });
       if (!res.ok) throw new Error('Upload failed');
       await refreshFiles();
       this.value = '';
     } catch(err) {
       alert('Upload failed. Please try again.');
+      console.error(err);
+    } finally {
+      state.isUploading = false;
+      if (trigger) {
+        trigger.disabled = false;
+        trigger.innerHTML = originalHtml || 'Upload';
+      }
     }
+  }
+  async function handleDelete(fileId, filename) {
+    if (!confirm(`Delete "${filename}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/uploads/${fileId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrf() }
+      });
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Delete failed');
+      }
+      await refreshFiles();
+    } catch(err) {
+      alert(`Failed to delete file: ${err.message}`);
+      console.error(err);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(state.selectedFileIds || []);
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} file(s)? This action cannot be undone.`)) {
+      return;
+    }
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/uploads/${id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': getCsrf() }
+        });
+        if (!res.ok) {
+          const error = await res.text();
+          throw new Error(error || 'Delete failed');
+        }
+      } catch(err) {
+        alert(`Failed to delete file ${id}: ${err.message}`);
+        console.error(err);
+        break;
+      }
+    }
+    state.selectedFileIds.clear();
+    await refreshFiles();
+    updateBulkUI();
   }
 });
 </script>
@@ -492,3 +676,9 @@ async def documents_data(request: Request):
     ]
 
     return {"files": files, "opportunities": opps, "folders": folders}
+
+
+
+
+
+

@@ -1479,6 +1479,7 @@ body {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   padding: 28px;
+  margin-top: 50px;
 }
 
 .activity-header {
