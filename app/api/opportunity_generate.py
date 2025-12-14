@@ -15,7 +15,7 @@ from app.core.db_core import engine
 from app.services.document_processor import DocumentProcessor
 from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
-from app.storage import read_storage_bytes
+from app.storage import read_storage_bytes, create_presigned_get
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team
 from app.services.response_library import ResponseLibrary
 
@@ -42,7 +42,15 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
             row = res.first()
             if row and row[0]:
                 data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                return merge_company_profile_defaults(data)
+                merged = merge_company_profile_defaults(data)
+
+                # Create presigned URLs for file fields so they can be used in generated documents
+                if merged.get("signature_image"):
+                    merged["signature_image_url"] = create_presigned_get(merged["signature_image"])
+                if merged.get("digital_signature"):
+                    merged["digital_signature_url"] = create_presigned_get(merged["digital_signature"])
+
+                return merged
     except Exception as exc:
         logging.warning("Failed to load company profile: %s", exc)
     return merge_company_profile_defaults({})
@@ -254,9 +262,18 @@ REQUIREMENTS:
    - Include concrete examples of relevant past projects
    - Reference specific certifications, years of experience, team members
 
-4. Submission checklist must include ALL narrative/form items required for submission
-5. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
-6. If USER CONTEXT is provided for a section, incorporate that specific information prominently
+4. SIGNATURE: If signature_image_url is provided in the company profile, include it in transmittal letters:
+   - Add after "Sincerely," and before the signatory's name
+   - Format: <img src="SIGNATURE_URL_HERE" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;">
+   - Example:
+     Sincerely,<br><br>
+     <img src="{{signature_image_url}}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;"><br>
+     <strong>John Doe</strong><br>
+     Company Name
+
+5. Submission checklist must include ALL narrative/form items required for submission
+6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
+7. If USER CONTEXT is provided for a section, incorporate that specific information prominently
 """.strip(),
         },
     ]
