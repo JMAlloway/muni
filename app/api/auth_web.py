@@ -52,6 +52,12 @@ FILE_FIELDS = {
     "org_chart",
     "digital_signature",
     "signature_image",
+    # NEW FIELDS TO ADD:
+    "financial_statements",      # Common in RFPs
+    "debarment_certification",   # Federal requirement
+    "labor_compliance_cert",     # Prevailing wage compliance
+    "conflict_of_interest",      # Ethics certification
+    "references_combined",       # Combined references document
 }
 
 from app.api._layout import auth_shell, page_shell

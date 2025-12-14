@@ -2325,6 +2325,20 @@
   margin-bottom: 6px;
 }
 
+/* Typography consistency fixes */
+.company-profile-section {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.company-profile-section label,
+.company-profile-section .form-input,
+.company-profile-section .form-select,
+.company-profile-section .upload-text,
+.company-profile-section .upload-hint,
+.company-profile-section .panel-save-actions {
+  font-family: inherit;
+}
+
 .company-profile-section .settings-form {
   display: flex;
   flex-direction: column;
@@ -2337,6 +2351,175 @@
 
 .company-profile-section .form-group {
   margin-bottom: 0;
+}
+
+/* ===== IMPROVED FILE UPLOAD UI ===== */
+
+.file-upload-container {
+  position: relative;
+}
+
+/* Existing file display */
+.file-existing {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1.5px solid #86efac;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.file-existing:hover {
+  border-color: #4ade80;
+  box-shadow: 0 2px 8px rgba(74, 222, 128, 0.15);
+}
+
+.file-existing-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-existing-info svg {
+  flex-shrink: 0;
+  color: #16a34a;
+}
+
+.file-existing-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-existing-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #166534;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-existing-meta {
+  font-size: 12px;
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.file-existing-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.file-existing-download,
+.file-existing-replace {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #86efac;
+  background: white;
+  color: #16a34a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.file-existing-download:hover,
+.file-existing-replace:hover {
+  background: #16a34a;
+  color: white;
+  border-color: #16a34a;
+  transform: translateY(-1px);
+}
+
+/* Upload area improvements */
+.company-profile-section .file-upload-area {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.company-profile-section .file-upload-area:hover {
+  border-color: #126a45;
+  background: #f0fdf4;
+}
+
+.company-profile-section .file-upload-label svg {
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.company-profile-section .file-upload-area:hover .file-upload-label svg {
+  color: #126a45;
+  transform: translateY(-2px);
+}
+
+.company-profile-section .upload-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  transition: color 0.2s ease;
+}
+
+.company-profile-section .file-upload-area:hover .upload-text {
+  color: #126a45;
+}
+
+.company-profile-section .upload-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  font-family: inherit; /* Fix font inconsistency */
+}
+
+/* File link styling (currently missing) */
+.file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  color: #16a34a;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.file-link:hover {
+  background: #16a34a;
+  color: white;
+  transform: translateX(2px);
+}
+
+.file-link::before {
+  content: "\01F4CE";
+  font-size: 14px;
+}
+
+/* Panel save time styling */
+[data-panel-save] {
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* Fix font */
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums; /* Align numbers */
 }
 
 @media (max-width: 768px) {

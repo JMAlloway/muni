@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1277,6 +1277,37 @@
                   </div>
                   <div class="panel-content">
                     <div class="settings-form">
+                    <!-- Add to Certifications & Compliance section -->
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Financial Statements (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="financial_statements" id="upload-financial_statements" 
+                                 class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-financial_statements" class="file-upload-label">
+                            <span class="upload-icon">&#128196;</span>
+                            <span class="upload-text">Upload financial statements</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
+                          </label>
+                        </div>
+                        <div class="file-status" data-file-status="financial_statements"></div>
+                        <a class="file-link" data-file-link="financial_statements" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                      <div class="form-group">
+                        <label>Debarment Certification (optional)</label>
+                        <div class="file-upload-area">
+                          <input type="file" name="debarment_certification" id="upload-debarment_certification" 
+                                 class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                          <label for="upload-debarment_certification" class="file-upload-label">
+                            <span class="upload-icon">&#128196;</span>
+                            <span class="upload-text">Upload debarment cert</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
+                          </label>
+                        </div>
+                        <div class="file-status" data-file-status="debarment_certification"></div>
+                        <a class="file-link" data-file-link="debarment_certification" href="#" target="_blank" rel="noopener" style="display:none;"></a>
+                      </div>
+                    </div>
                     <div class="form-row three-col">
                       <div class="form-group">
                         <label>Upload - W-9 Form</label>
@@ -1384,27 +1415,96 @@
                     <div class="form-row">
                       <div class="form-group">
                         <label>Digital Signature File (optional)</label>
-                        <div class="file-upload-area">
-                          <input type="file" name="digital_signature" id="upload-digital_signature" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
-                          <label for="upload-digital_signature" class="file-upload-label">
-                            <span class="upload-icon">^</span>
-                            <span class="upload-text">Upload digital signature</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
-                          </label>
+                        <div class="file-upload-container">
+                          <div class="file-existing" data-file-existing="digital_signature" style="display:none;">
+                            <div class="file-existing-info">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                              </svg>
+                              <div class="file-existing-details">
+                                <span class="file-existing-name" data-file-name="digital_signature">—</span>
+                                <span class="file-existing-meta">Uploaded previously</span>
+                              </div>
+                            </div>
+                            <div class="file-existing-actions">
+                              <a class="file-existing-download" data-file-download="digital_signature" href="#" target="_blank" rel="noopener" title="Download">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                  <polyline points="7 10 12 15 17 10"></polyline>
+                                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                              </a>
+                              <button type="button" class="file-existing-replace" data-file-replace="digital_signature" title="Replace">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="1 4 1 10 7 10"></polyline>
+                                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div class="file-upload-area" data-file-upload="digital_signature">
+                            <input type="file" name="digital_signature" id="upload-digital_signature" 
+                                   class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                            <label for="upload-digital_signature" class="file-upload-label">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                              </svg>
+                              <span class="upload-text">Upload digital signature</span>
+                              <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
+                            </label>
+                          </div>
                         </div>
-                        <a class="file-link" data-file-link="digital_signature" href="#" target="_blank" rel="noopener" style="display:none;"></a>
                       </div>
+
                       <div class="form-group">
                         <label>Upload - Signature Image (optional)</label>
-                        <div class="file-upload-area">
-                          <input type="file" name="signature_image" id="upload-signature_image" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
-                          <label for="upload-signature_image" class="file-upload-label">
-                            <span class="upload-icon">^</span>
-                            <span class="upload-text">Upload signature image</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
-                          </label>
+                        <div class="file-upload-container">
+                          <div class="file-existing" data-file-existing="signature_image" style="display:none;">
+                            <div class="file-existing-info">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                              </svg>
+                              <div class="file-existing-details">
+                                <span class="file-existing-name" data-file-name="signature_image">—</span>
+                                <span class="file-existing-meta">Uploaded previously</span>
+                              </div>
+                            </div>
+                            <div class="file-existing-actions">
+                              <a class="file-existing-download" data-file-download="signature_image" href="#" target="_blank" rel="noopener" title="Download">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                  <polyline points="7 10 12 15 17 10"></polyline>
+                                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                              </a>
+                              <button type="button" class="file-existing-replace" data-file-replace="signature_image" title="Replace">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="1 4 1 10 7 10"></polyline>
+                                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div class="file-upload-area" data-file-upload="signature_image">
+                            <input type="file" name="signature_image" id="upload-signature_image" 
+                                   class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                            <label for="upload-signature_image" class="file-upload-label">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                              </svg>
+                              <span class="upload-text">Upload signature image</span>
+                              <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
+                            </label>
+                          </div>
                         </div>
-                        <a class="file-link" data-file-link="signature_image" href="#" target="_blank" rel="noopener" style="display:none;"></a>
                       </div>
                     </div>
                   </div>
@@ -1768,12 +1868,14 @@
       const scrollProgress = document.getElementById('scrollProgress');
       const content = document.querySelector('.content');
       
-      content.addEventListener('scroll', () => {
-        const scrollTop = content.scrollTop;
-        const scrollHeight = content.scrollHeight - content.clientHeight;
-        const progress = (scrollTop / scrollHeight) * 100;
-        scrollProgress.style.width = progress + '%';
-      });
+      if (content && scrollProgress) {
+        content.addEventListener('scroll', () => {
+          const scrollTop = content.scrollTop;
+          const scrollHeight = content.scrollHeight - content.clientHeight;
+          const progress = (scrollTop / scrollHeight) * 100;
+          scrollProgress.style.width = progress + '%';
+        });
+      }
 
       const tabs = document.querySelectorAll('.account-tab');
       const tabContents = document.querySelectorAll('.tab-content');
@@ -1910,6 +2012,12 @@
         'org_chart',
         'digital_signature',
         'signature_image',
+        // NEW FIELDS:
+        'financial_statements',
+        'debarment_certification',
+        'labor_compliance_cert',
+        'conflict_of_interest',
+        'references_combined',
       ];
       const panelSaveStoreKey = 'company_profile_panel_saves';
       const personalDraftKey = 'account_personal_info_draft';
@@ -1984,36 +2092,151 @@
         } catch (_) { /* ignore */ }
       }
 
-      function markFileSelection(input, displayName) {
-        if (!input) return;
-        const label = input.closest('.file-upload-area')?.querySelector('.file-upload-label');
-        const text = label?.querySelector('.upload-text');
-        const hint = label?.querySelector('.upload-hint');
-        if (text && displayName) {
-          text.textContent = displayName;
-          text.style.color = '#126a45';
-        }
-        if (hint) {
-          hint.textContent = 'Ready to upload';
-        }
+      function ensureFileContainer(field) {
+        const input = document.querySelector(`input[name="${field}"]`);
+        if (!input) return null;
+        const uploadArea = input.closest('.file-upload-area') || input.closest('.file-upload-area.small') || input.parentElement;
+        if (!uploadArea) return null;
+        const existingWrap = uploadArea.closest('.file-upload-container');
+        if (existingWrap) return existingWrap.querySelector('[data-file-existing]');
+        const group = uploadArea.closest('.form-group') || uploadArea.parentElement;
+        if (!group) return null;
+        const container = document.createElement('div');
+        container.className = 'file-upload-container';
+        const existingDiv = createExistingTemplate(field);
+        uploadArea.dataset.fileUpload = field;
+        container.appendChild(existingDiv);
+        container.appendChild(uploadArea);
+        const legacyLink = group.querySelector(`[data-file-link="${field}"]`);
+        if (legacyLink) legacyLink.remove();
+        const status = group.querySelector(`[data-file-status="${field}"]`);
+        if (status) status.remove();
+        group.appendChild(container);
+        return existingDiv;
       }
 
       function showExistingFile(field, name, url) {
-        const link = document.querySelector(`[data-file-link="${field}"]`);
-        if (link && name) {
-          link.textContent = name;
-          link.style.display = 'inline-flex';
-          if (url) {
-            link.href = url;
-          } else {
-            link.removeAttribute('href');
+        const existingDiv = document.querySelector(`[data-file-existing="${field}"]`) || ensureFileContainer(field);
+        const uploadDiv = document.querySelector(`[data-file-upload="${field}"]`) || ensureFileContainer(field);
+        const nameEl = document.querySelector(`[data-file-name="${field}"]`);
+        const downloadLink = document.querySelector(`[data-file-download="${field}"]`);
+      
+        if (!existingDiv || !uploadDiv) return;
+      
+        if (name && name.trim()) {
+          existingDiv.style.display = 'flex';
+          uploadDiv.style.display = 'none';
+          
+          if (nameEl) nameEl.textContent = name;
+          if (downloadLink && url) {
+            downloadLink.href = url;
+            downloadLink.style.display = 'flex';
+          } else if (downloadLink) {
+            downloadLink.style.display = 'none';
           }
-        }
-        const input = document.querySelector(`input[name="${field}"]`);
-        if (input && name) {
-          markFileSelection(input, name);
+        } else {
+          existingDiv.style.display = 'none';
+          uploadDiv.style.display = 'block';
         }
         updatePanelStatuses();
+        bindFileReplaceButtons();
+      }
+
+      function markFileSelection(input, displayName) {
+        if (!input) return;
+        const field = input.getAttribute('name');
+        const uploadDiv = input.closest('[data-file-upload]');
+        const existingDiv = document.querySelector(`[data-file-existing="${field}"]`);
+        const label = input.closest('.file-upload-area')?.querySelector('.file-upload-label');
+        const text = label?.querySelector('.upload-text');
+        const hint = label?.querySelector('.upload-hint');
+        
+        if (displayName && text) {
+          text.textContent = `Uploaded: ${displayName}`;
+          text.style.color = '#126a45';
+          text.style.fontWeight = '600';
+        }
+        if (hint) {
+          hint.textContent = 'Ready to save';
+          hint.style.color = '#126a45';
+        }
+        if (existingDiv && uploadDiv) {
+          existingDiv.style.display = 'none';
+          uploadDiv.style.display = 'block';
+        }
+      }
+
+      function createExistingTemplate(field) {
+        const existingDiv = document.createElement('div');
+        existingDiv.className = 'file-existing';
+        existingDiv.dataset.fileExisting = field;
+        existingDiv.style.display = 'none';
+        existingDiv.innerHTML = `
+          <div class="file-existing-info">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <div class="file-existing-details">
+              <span class="file-existing-name" data-file-name="${field}">—</span>
+              <span class="file-existing-meta">Uploaded previously</span>
+            </div>
+          </div>
+          <div class="file-existing-actions">
+            <a class="file-existing-download" data-file-download="${field}" href="#" target="_blank" rel="noopener" title="Download" style="display:none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </a>
+            <button type="button" class="file-existing-replace" data-file-replace="${field}" title="Replace">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+          </div>
+        `;
+        return existingDiv;
+      }
+
+      function upgradeFileInputs() {
+        document.querySelectorAll('input[type="file"][name]').forEach((input) => {
+          const field = input.getAttribute('name');
+          if (!field) return;
+          const uploadArea = input.closest('.file-upload-area') || input.closest('.file-upload-area.small') || input.parentElement;
+          if (!uploadArea || uploadArea.closest('.file-upload-container')) return;
+          uploadArea.dataset.fileUpload = field;
+          const group = uploadArea.closest('.form-group') || uploadArea.parentElement;
+          if (!group) return;
+          const container = document.createElement('div');
+          container.className = 'file-upload-container';
+          const existingDiv = createExistingTemplate(field);
+          container.appendChild(existingDiv);
+          container.appendChild(uploadArea);
+          const legacyLink = group.querySelector(`[data-file-link="${field}"]`);
+          if (legacyLink) legacyLink.remove();
+          const status = group.querySelector(`[data-file-status="${field}"]`);
+          if (status) status.remove();
+          group.appendChild(container);
+        });
+      }
+
+      function bindFileReplaceButtons() {
+        document.querySelectorAll('[data-file-replace]').forEach((btn) => {
+          if (btn.dataset.boundReplace === '1') return;
+          btn.dataset.boundReplace = '1';
+          btn.addEventListener('click', () => {
+            const field = btn.dataset.fileReplace;
+            const existingDiv = document.querySelector(`[data-file-existing="${field}"]`);
+            const uploadDiv = document.querySelector(`[data-file-upload="${field}"]`);
+            const input = document.querySelector(`input[name="${field}"]`);
+            if (existingDiv) existingDiv.style.display = 'none';
+            if (uploadDiv) uploadDiv.style.display = 'block';
+            if (input) input.click();
+          });
+        });
       }
 
       function loadPanelSaveTimes() {
@@ -2035,7 +2258,24 @@
         if (!ts) return '';
         const d = new Date(ts);
         if (isNaN(d.getTime())) return '';
-        return d.toLocaleString();
+        
+        // Use consistent, readable format instead of toLocaleString()
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        // For older dates, use readable format
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
       }
 
       function updatePanelSaveMeta(panelKey, ts) {
@@ -2077,7 +2317,10 @@
         let filled = 0;
         inputs.forEach((el) => {
           if (el.type === 'file') {
-            const hasFile = (el.files && el.files.length) || !!panel.querySelector(`[data-file-link="${el.name}"]:not([style*="display:none"])`);
+            const field = el.name;
+            const existingEl = panel.querySelector(`[data-file-existing="${field}"]`);
+            const hasExisting = existingEl && existingEl.style.display !== 'none';
+            const hasFile = (el.files && el.files.length) || hasExisting;
             if (hasFile) filled += 1;
             return;
           }
@@ -2501,9 +2744,9 @@
           if (status) status.textContent = '';
           const res = await fetch('/api/company-profile', { credentials: 'include' });
           if (!res.ok) return;
-          const data = await res.json();
-          const payload = data.data || {};
-          const files = data.files || {};
+          const resp = await res.json();
+          const payload = resp.data || {};
+          const files = resp.files || {};
           const form = document.getElementById('companyProfileForm');
           if (!form) return;
           Array.from(form.querySelectorAll('[name]')).forEach((el) => {
@@ -2528,33 +2771,24 @@
 
           // show file links
           Object.entries(files).forEach(([field, meta]) => {
-            const link = document.querySelector(`[data-file-link="${field}"]`);
-            if (link && meta?.url) {
-              link.href = meta.url;
-              link.textContent = meta.name || 'Download';
-              link.style.display = 'inline-flex';
-            }
-            const input = document.querySelector(`input[name="${field}"]`);
-            if (input && meta?.name) {
-              markFileSelection(input, meta.name);
-            }
+            showExistingFile(field, meta?.name || meta?.key || '', meta?.url);
           });
           // Also reflect stored filenames even if no URL available
-          Object.keys(data || {}).forEach((key) => {
+          Object.keys(payload || {}).forEach((key) => {
             if (!key.endsWith('_name')) return;
             const field = key.replace(/_name$/, '');
-            const existingName = data[key];
+            const existingName = payload[key];
             if (existingName) {
               const meta = files[field] || {};
               showExistingFile(field, existingName, meta.url);
             }
           });
           // Fallback: if we have a stored key but no name, still show something
-          Object.keys(data || {}).forEach((key) => {
+          Object.keys(payload || {}).forEach((key) => {
             if (key.endsWith('_name')) return;
             if (!fileFields.includes(key)) return;
             const meta = files[key] || {};
-            const displayName = meta.name || data[`${key}_name`] || data[key] || 'Uploaded file';
+            const displayName = meta.name || payload[`${key}_name`] || payload[key] || 'Uploaded file';
             showExistingFile(key, displayName, meta.url);
           });
           updatePanelStatuses();
@@ -2617,6 +2851,8 @@
           } else {
             recordAllPanelSaves();
           }
+          // Reload profile to reflect uploaded files and statuses
+          await loadCompanyProfile();
         } catch (_) {
           if (status) status.textContent = 'Could not save company profile.';
         } finally {
@@ -2629,6 +2865,8 @@
 
       function bindFilePreviews() {
         document.querySelectorAll('.company-profile-section input[type="file"]').forEach((input) => {
+          if (input.dataset.boundChange === '1') return;
+          input.dataset.boundChange = '1';
           input.addEventListener('change', () => {
             const file = input.files?.[0];
             if (file) {
@@ -2753,15 +2991,10 @@
           el.addEventListener('input', updatePanelStatuses);
           el.addEventListener('change', updatePanelStatuses);
         });
-        entry.querySelectorAll('input[type="file"]').forEach((input) => {
-          input.addEventListener('change', () => {
-            const file = input.files?.[0];
-            if (file) {
-              markFileSelection(input, file.name);
-            }
-          });
-        });
         container.appendChild(entry);
+        upgradeFileInputs();
+        bindFilePreviews();
+        bindFileReplaceButtons();
         updatePanelStatuses();
       }
 
@@ -2801,6 +3034,9 @@
         subCount = n;
         const card = createSubcontractorCard(n);
         container.appendChild(card);
+        upgradeFileInputs();
+        bindFilePreviews();
+        bindFileReplaceButtons();
         updatePanelStatuses();
       }
 
@@ -2872,14 +3108,6 @@
         wrapper.querySelectorAll('input, textarea, select').forEach((el) => {
           el.addEventListener('input', updatePanelStatuses);
           el.addEventListener('change', updatePanelStatuses);
-        });
-        wrapper.querySelectorAll('input[type="file"]').forEach((input) => {
-          input.addEventListener('change', () => {
-            const file = input.files?.[0];
-            if (file) {
-              markFileSelection(input, file.name);
-            }
-          });
         });
         return wrapper;
       }
@@ -3122,6 +3350,8 @@
       document.querySelectorAll('#profileFirstName, #profileLastName, #profileEmail, #profilePhone, #profileJobTitle').forEach((el) => {
         el.addEventListener('input', () => savePersonalDraft(personalFormValues()));
       });
+      upgradeFileInputs();
+      bindFileReplaceButtons();
       bindFilePreviews();
       addPanelSaveButtons();
       document.querySelectorAll('.company-profile-section input, .company-profile-section textarea, .company-profile-section select').forEach((el) => {
@@ -3188,3 +3418,9 @@
   <script src="/static/js/notifications.js"></script>
 </body>
 </html>
+
+
+
+
+
+

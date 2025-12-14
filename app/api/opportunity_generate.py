@@ -15,7 +15,7 @@ from app.core.db_core import engine
 from app.services.document_processor import DocumentProcessor
 from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
-from app.storage import read_storage_bytes
+from app.storage import read_storage_bytes, create_presigned_get
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team
 from app.services.response_library import ResponseLibrary
 
@@ -42,6 +42,55 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
             row = res.first()
             if row and row[0]:
                 data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                file_fields = [
+                    # Commonly used signature and compliance files
+                    "signature_image",
+                    "digital_signature",
+                    "capability_statement",
+                    "insurance_certificate",
+                    "bonding_letter",
+                    "w9_upload",
+                    "business_license",
+                    # Additional uploads supported by the account page
+                    "ohio_certificate",
+                    "cert_upload",
+                    "product_catalogs",
+                    "ref1_letter",
+                    "ref2_letter",
+                    "ref3_letter",
+                    "ref4_letter",
+                    "ref5_letter",
+                    "sub1_certificate",
+                    "sub2_certificate",
+                    "sub3_certificate",
+                    "sub4_certificate",
+                    "sub5_certificate",
+                    "price_list_upload",
+                    "safety_sheets",
+                    "warranty_info",
+                    "previous_contracts",
+                    "org_chart",
+                    "financial_statements",
+                    "debarment_certification",
+                    "labor_compliance_cert",
+                    "conflict_of_interest",
+                    "references_combined",
+                ]
+
+                for field in file_fields:
+                    storage_key = data.get(field)
+                    if not storage_key or not isinstance(storage_key, str):
+                        continue
+                    url = None
+                    try:
+                        url = create_presigned_get(storage_key)
+                    except Exception:
+                        logging.warning("Could not create presigned URL for %s", field)
+                    if url:
+                        data[f"{field}_url"] = url
+                    filename = data.get(f"{field}_name", "")
+                    if filename:
+                        data[f"{field}_filename"] = filename
                 return merge_company_profile_defaults(data)
     except Exception as exc:
         logging.warning("Failed to load company profile: %s", exc)
@@ -192,6 +241,29 @@ def _build_doc_prompt(
 
     extracted_json = _truncate_json_for_prompt(extracted, MAX_PROMPT_JSON_CHARS)
     company_json = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
+    signature_url = (
+        company.get("signature_image_url")
+        or company.get("digital_signature_url")
+        or ""
+    )
+    signatory = company.get("authorized_signatory") or {}
+    primary_contact = company.get("primary_contact") or {}
+    signature_name = signatory.get("name") or primary_contact.get("name") or ""
+    signature_title = signatory.get("title") or primary_contact.get("title") or ""
+    if isinstance(signature_name, str):
+        signature_name = signature_name.strip()
+    if isinstance(signature_title, str):
+        signature_title = signature_title.strip()
+    signature_block = (
+        f"""
+SIGNATURE AVAILABLE:
+- Image URL: {signature_url}
+- Signatory Name: {signature_name}
+- Title: {signature_title}
+""".strip()
+        if signature_url
+        else "SIGNATURE AVAILABLE: None provided."
+    )
 
     return [
         {
@@ -199,7 +271,8 @@ def _build_doc_prompt(
             "content": """You are an expert government proposal writer with 20+ years of experience winning contracts. 
 Generate professional, compliant, and compelling proposal content.
 Write substantive content - never use placeholders or generic filler.
-Tailor every section to the specific RFP requirements and company qualifications.""",
+Tailor every section to the specific RFP requirements and company qualifications.
+When a signature asset is available, incorporate it into cover letters using the provided HTML block.""",
         },
         {
             "role": "user",
@@ -209,6 +282,9 @@ RFP REQUIREMENTS:
 
 COMPANY PROFILE:
 {company_json}
+
+SIGNATURE DETAILS:
+{signature_block}
 
 SUBMISSION INSTRUCTIONS:
 {instr[:6000]}
@@ -247,16 +323,28 @@ REQUIREMENTS:
    - 2-3 supporting paragraphs with specific details
    - Bullet list of key qualifications or deliverables where appropriate
    - Closing paragraph with commitment statement
+   - FOR COVER LETTERS: include the signature block at the bottom when a signature is available
 
-3. CONTENT:
+3. SIGNATURES (when available):
+   Use this HTML structure at the end of cover letters:
+   
+   <div style="margin-top: 40px;">
+     <p>Sincerely,</p>
+     <img src="{signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;">
+     <p><strong>{signature_name}</strong><br>
+     {signature_title}<br>
+     {company.get('legal_name', '')}</p>
+   </div>
+
+4. CONTENT:
    - Use specific details from the company profile (names, experience, certifications)
    - Match the RFP's tone and address stated requirements
    - Include concrete examples of relevant past projects
    - Reference specific certifications, years of experience, team members
 
-4. Submission checklist must include ALL narrative/form items required for submission
-5. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
-6. If USER CONTEXT is provided for a section, incorporate that specific information prominently
+5. Submission checklist must include ALL narrative/form items required for submission
+6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
+7. If USER CONTEXT is provided for a section, incorporate that specific information prominently
 """.strip(),
         },
     ]
@@ -345,7 +433,12 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
         logging.error("LLM generation failed", exc_info=exc)
         raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
 
-    return {"opportunity_id": opportunity_id, "documents": data}
+    return {
+        "opportunity_id": opportunity_id,
+        "documents": data,
+        "signature_url": company_profile.get("signature_image_url"),
+        "company_profile": company_profile,
+    }
 
 
 class RefineRequest(BaseModel):
