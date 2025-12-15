@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import secrets
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy import text
-from typing import Optional
+from typing import Optional, Any
 import logging
 import json
 import datetime as dt
@@ -68,6 +68,16 @@ from app.services import record_milestone, set_primary_interest
 router = APIRouter(tags=["auth"])
 
 # --- helpers ---------------------------------------------------------
+
+def _valid_storage_key(val: Any) -> bool:
+    if not isinstance(val, str):
+        return False
+    if not val.strip():
+        return False
+    # Ignore stringified UploadFile objects or obvious placeholders
+    if val.startswith("UploadFile(") or "Headers(" in val:
+        return False
+    return True
 
 async def _load_user_by_email(email: str):
     async with AsyncSessionLocal() as session:
@@ -881,7 +891,9 @@ async def get_company_profile(request: Request):
         files = {}
         for field in FILE_FIELDS:
             key = data.get(field)
-            if not key:
+            if not _valid_storage_key(key):
+                data.pop(field, None)
+                data.pop(f"{field}_name", None)
                 continue
             files[field] = {
                 "key": key,
@@ -889,6 +901,51 @@ async def get_company_profile(request: Request):
                 "url": create_presigned_get(key),
             }
         return {"data": data, "files": files}
+
+
+@router.get("/api/company-profile/debug", response_class=JSONResponse)
+async def debug_company_profile(request: Request):
+    """Debug endpoint to see raw profile data and file URL generation."""
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+    user_id = await _get_user_id(user_email)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1"),
+            {"uid": user_id},
+        )
+        row = res.fetchone()
+        raw_data = row[0] if row else None
+
+    if isinstance(raw_data, str):
+        try:
+            raw_data = json.loads(raw_data)
+        except Exception:
+            pass
+
+    debug_info = {
+        "user_id": user_id,
+        "raw_data_type": str(type(raw_data)),
+        "has_signature_image": bool(raw_data and raw_data.get("signature_image")),
+        "signature_image_key": raw_data.get("signature_image") if raw_data else None,
+        "signature_image_name": raw_data.get("signature_image_name") if raw_data else None,
+        "use_s3": USE_S3,
+    }
+
+    if raw_data and raw_data.get("signature_image"):
+        try:
+            url = create_presigned_get(raw_data["signature_image"])
+            debug_info["signature_url_generated"] = url
+            debug_info["signature_url_error"] = None
+        except Exception as e:
+            debug_info["signature_url_generated"] = None
+            debug_info["signature_url_error"] = str(e)
+
+    return debug_info
 
 
 @router.post("/api/company-profile", response_class=JSONResponse)
@@ -948,6 +1005,9 @@ async def save_company_profile(request: Request):
                     "url": create_presigned_get(storage_key),
                 }
             else:
+                # Ignore non-file values for file fields to avoid storing stringified UploadFile objects
+                if key in FILE_FIELDS:
+                    continue
                 # Handle repeated keys by joining into comma-separated string
                 if key in payload:
                     if isinstance(payload[key], list):
@@ -988,6 +1048,11 @@ async def save_company_profile(request: Request):
         elif f"{field}_name" in existing_data:
             merged_data[f"{field}_name"] = existing_data[f"{field}_name"]
 
+        # Drop invalid storage keys that may have been stringified UploadFile objects
+        if field in merged_data and not _valid_storage_key(merged_data.get(field)):
+            merged_data.pop(field, None)
+            merged_data.pop(f"{field}_name", None)
+
     async with AsyncSessionLocal() as db:
         await db.execute(
             text(
@@ -1002,7 +1067,7 @@ async def save_company_profile(request: Request):
             {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(merged_data)},
         )
         await db.commit()
-    file_keys = [k for k in merged_data if k in FILE_FIELDS and merged_data.get(k)]
+    file_keys = [k for k in merged_data if k in FILE_FIELDS and _valid_storage_key(merged_data.get(k))]
     try:
         saved_files = {
             field: {

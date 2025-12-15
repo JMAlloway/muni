@@ -112,6 +112,19 @@ def store_profile_file(user_id: int, field: str, data: bytes, original_name: str
     fname = _safe_filename(original_name or field)
     mime = content_type or mimetypes.guess_type(fname)[0] or "application/octet-stream"
 
+    # Ensure filename has an extension based on MIME type if missing
+    if "." not in fname:
+        ext_map = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+            "application/pdf": ".pdf",
+        }
+        ext = ext_map.get(mime, "")
+        if ext:
+            fname = fname + ext
+
     if USE_S3:
         key = f"company_profiles/{user_id}/{fname}"
         _s3.put_object(Bucket=BUCKET, Key=key, Body=data, ContentType=mime)

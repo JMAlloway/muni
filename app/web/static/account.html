@@ -2126,7 +2126,11 @@
 
       function isImageUrl(url) {
         if (!url) return false;
-        return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+        const urlWithoutQuery = String(url).split('?')[0];
+        return (
+          /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(urlWithoutQuery) ||
+          /[?&](content-type|type)=image/i.test(String(url))
+        );
       }
 
       function extractFilename(str) {
@@ -2164,7 +2168,17 @@
           }
           if (previewEl) {
             if (url && isImageUrl(url)) {
-              previewEl.innerHTML = `<img src="${url}" alt="${name}" loading="lazy">`;
+              const img = document.createElement('img');
+              img.src = url;
+              img.alt = name || 'Preview';
+              img.loading = 'lazy';
+              img.onerror = function() {
+                const ext = (displayName.split('.').pop() || '').toUpperCase();
+                previewEl.innerHTML = `<div class="file-preview-icon">${ext || 'FILE'}</div>`;
+                previewEl.style.display = 'flex';
+              };
+              previewEl.innerHTML = '';
+              previewEl.appendChild(img);
               previewEl.style.display = 'block';
             } else {
               const ext = (displayName.split('.').pop() || '').toUpperCase();

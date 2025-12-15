@@ -83,6 +83,11 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
                     storage_key = merged.get(field)
                     if not storage_key or not isinstance(storage_key, str):
                         continue
+                    # Skip obviously invalid/stringified uploads
+                    if storage_key.startswith("UploadFile(") or "Headers(" in storage_key:
+                        merged.pop(field, None)
+                        merged.pop(f"{field}_name", None)
+                        continue
                     url = None
                     try:
                         url = create_presigned_get(storage_key)
@@ -249,6 +254,17 @@ def _build_doc_prompt(
         or company.get("digital_signature_url")
         or ""
     )
+    if company.get("signature_image"):
+        try:
+            logging.info(
+                "Signature image present: key=%s url=%s",
+                company.get("signature_image"),
+                signature_url[:80] if signature_url else "NO URL GENERATED",
+            )
+        except Exception:
+            pass
+    else:
+        logging.info("No signature_image field in company profile")
     signatory = company.get("authorized_signatory") or {}
     primary_contact = company.get("primary_contact") or {}
     signature_name = signatory.get("name") or primary_contact.get("name") or ""

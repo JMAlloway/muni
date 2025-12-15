@@ -1377,25 +1377,41 @@
       });
 
       if (data.signature_url && state.documents) {
-        const coverKey = Object.keys(state.documents).find(
-          (k) => k && (k.includes("cover") || k.includes("transmittal"))
-        );
+        const coverKey = Object.keys(state.documents).find((k) => {
+          if (!k) return false;
+          const lower = k.toLowerCase();
+          return (
+            lower.includes("cover") ||
+            lower.includes("transmittal") ||
+            lower.includes("letter") ||
+            lower === "cover_letter"
+          );
+        });
+
+        console.log("Signature URL available:", data.signature_url);
+        console.log("Looking for cover letter, found key:", coverKey);
+
         if (coverKey && state.documents[coverKey]) {
+          const content = state.documents[coverKey];
           const hasSignature =
-            state.documents[coverKey].includes("<img") && state.documents[coverKey].toLowerCase().includes("signature");
+            /<img[^>]+src=[\"'][^\"']*[\"'][^>]*>/i.test(content) && /signature/i.test(content);
+
           if (!hasSignature) {
             const signatory = data.company_profile?.authorized_signatory || {};
             const primary = data.company_profile?.primary_contact || {};
             const sigName = signatory.name || primary.name || "";
             const sigTitle = signatory.title || primary.title || "";
             const companyName = data.company_profile?.legal_name || "";
+
             const sigBlock = `<br><br>Sincerely,<br><br>
-        <img src="${data.signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;"><br>
-        <strong>${escapeHtml(sigName || "")}</strong><br>
-        ${sigTitle ? `${escapeHtml(sigTitle)}<br>` : ""}
-        ${escapeHtml(companyName)}`;
-            if (!state.documents[coverKey].includes("Sincerely")) {
+<img src="${data.signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;" onerror="this.style.display='none'"><br>
+<strong>${escapeHtml(sigName || "")}</strong><br>
+${sigTitle ? `${escapeHtml(sigTitle)}<br>` : ""}
+${escapeHtml(companyName)}`;
+
+            if (!/sincerely|regards|respectfully/i.test(content.slice(-500))) {
               state.documents[coverKey] += sigBlock;
+              console.log("Added signature block to", coverKey);
             }
           }
         }
