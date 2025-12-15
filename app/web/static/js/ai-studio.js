@@ -109,8 +109,9 @@
   let saveInFlight = false;
   let saveQueued = false;
   let queuedManualSave = false;
+  let previewPageIndex = 0;
   const MAX_UPLOAD_MB = 25;
-  const allowedTypes = [".pdf", ".doc", ".docx", ".txt"];
+  const allowedTypes = [".pdf", ".doc", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
   function sanitizeHtml(html) {
     if (!html) return "";
@@ -239,9 +240,8 @@
       els.generateBtn.disabled = !state.extracted;
     }
     if (els.step3Next) {
-      const hasContent = Boolean(
-        (state.documents.cover && state.documents.cover.trim()) ||
-          (state.documents.responses && state.documents.responses.trim())
+      const hasContent = Object.values(state.documents || {}).some(
+        (content) => typeof content === "string" && content.trim().length > 0
       );
       els.step3Next.disabled = !hasContent;
     }
@@ -904,7 +904,7 @@
           <div class="section-support" data-section="project_response">
             <div class="support-actions">
               <button type="button" class="support-attach-btn" data-section="project_response">&#128228; Attach docs</button>
-              <input type="file" class="support-file-input" data-section="project_response" hidden multiple accept=".pdf,.docx,.doc,.txt" />
+              <input type="file" class="support-file-input" data-section="project_response" hidden multiple accept=".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png,.gif,.webp" />
             </div>
             <div class="support-chips" data-section="project_response"></div>
           </div>
@@ -948,7 +948,7 @@
           <div class="section-support" data-section="${sectionKey}">
             <div class="support-actions">
               <button type="button" class="support-attach-btn" data-section="${sectionKey}">&#128228; Attach docs</button>
-              <input type="file" class="support-file-input" data-section="${sectionKey}" hidden multiple accept=".pdf,.docx,.doc,.txt" />
+              <input type="file" class="support-file-input" data-section="${sectionKey}" hidden multiple accept=".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png,.gif,.webp" />
             </div>
             <div class="support-chips" data-section="${sectionKey}"></div>
           </div>
@@ -1375,6 +1375,31 @@
           state.documents[normKey] = typeof value === "string" ? value : formatSoqText(value);
         }
       });
+
+      if (data.signature_url && state.documents) {
+        const coverKey = Object.keys(state.documents).find(
+          (k) => k && (k.includes("cover") || k.includes("transmittal"))
+        );
+        if (coverKey && state.documents[coverKey]) {
+          const hasSignature =
+            state.documents[coverKey].includes("<img") && state.documents[coverKey].toLowerCase().includes("signature");
+          if (!hasSignature) {
+            const signatory = data.company_profile?.authorized_signatory || {};
+            const primary = data.company_profile?.primary_contact || {};
+            const sigName = signatory.name || primary.name || "";
+            const sigTitle = signatory.title || primary.title || "";
+            const companyName = data.company_profile?.legal_name || "";
+            const sigBlock = `<br><br>Sincerely,<br><br>
+        <img src="${data.signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;"><br>
+        <strong>${escapeHtml(sigName || "")}</strong><br>
+        ${sigTitle ? `${escapeHtml(sigTitle)}<br>` : ""}
+        ${escapeHtml(companyName)}`;
+            if (!state.documents[coverKey].includes("Sincerely")) {
+              state.documents[coverKey] += sigBlock;
+            }
+          }
+        }
+      }
 
       state.currentDoc = state.responseSections.length
         ? normalizeSectionKey(state.responseSections[0])
@@ -1955,6 +1980,119 @@
     }
   }
 
+  function setPreviewPage(index) {
+    const sections = document.querySelectorAll(".preview-section");
+    const total = Math.max(sections.length, 1);
+    previewPageIndex = Math.max(0, Math.min(index, total - 1));
+    const currentEl = document.getElementById("currentPage");
+    const totalEl = document.getElementById("totalPages");
+    const prevBtn = document.getElementById("prevPage");
+    const nextBtn = document.getElementById("nextPage");
+
+    if (totalEl) totalEl.textContent = total;
+    if (currentEl) currentEl.textContent = sections.length ? previewPageIndex + 1 : 1;
+    if (prevBtn) prevBtn.disabled = sections.length === 0 || previewPageIndex === 0;
+    if (nextBtn) nextBtn.disabled = sections.length === 0 || previewPageIndex >= total - 1;
+
+    const target = sections[previewPageIndex];
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function renderStep4Preview() {
+    const previewContent = document.getElementById("previewPageContent");
+    const sectionReviewList = document.getElementById("sectionReviewList");
+    if (!previewContent || !sectionReviewList) return;
+
+    const sections = state.responseSections || [];
+    previewPageIndex = 0;
+    let html = "";
+
+    sections.forEach((sectionName, idx) => {
+      const key = normalizeSectionKey(sectionName);
+      const content = state.documents[key] || "";
+      if (content.trim()) {
+        html += `<div class="preview-section" data-section="${idx}">
+          <h2 style="margin-top: ${idx > 0 ? "24pt" : "0"};">${escapeHtml(sectionName)}</h2>
+          ${content}
+        </div>`;
+      }
+    });
+
+    previewContent.innerHTML = html || "<p>No content generated yet.</p>";
+
+    sectionReviewList.innerHTML = sections
+      .map((name, idx) => {
+        const key = normalizeSectionKey(name);
+        const hasContent = typeof state.documents[key] === "string" && state.documents[key].trim().length > 0;
+        return `<div class="review-item">
+          <span>${hasContent ? "&#10003;" : "&#9744;"}</span>
+          <div><strong>${escapeHtml(name)}</strong><span>${hasContent ? "Generated" : "Not generated"}</span></div>
+        </div>`;
+      })
+      .join("");
+
+    setPreviewPage(0);
+  }
+
+  async function saveToRfpFolder() {
+    if (!state.opportunityId) {
+      showMessage("No opportunity selected", "error");
+      return;
+    }
+
+    const statusEl = document.getElementById("saveFolderStatus");
+    const btn = document.getElementById("saveToFolder");
+    setButtonLoading(btn, "Saving...");
+
+    try {
+      const sections = state.responseSections || [];
+      const combinedHtml = sections
+        .map((name) => {
+          const key = normalizeSectionKey(name);
+          return state.documents[key] || "";
+        })
+        .join("\n\n");
+
+      const filenameBase = state.opportunityLabel
+        ? state.opportunityLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+        : "proposal";
+      const filename = `${filenameBase || "proposal"}-${Date.now()}.html`;
+
+      const res = await fetch(`/api/opportunities/${encodeURIComponent(state.opportunityId)}/save-package`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCsrf(),
+        },
+        body: JSON.stringify({
+          content: combinedHtml,
+          filename,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Save failed");
+      }
+
+      if (statusEl) {
+        statusEl.textContent = "Saved to RFP folder!";
+        statusEl.style.color = "#16a34a";
+      }
+      showMessage("Package saved to documents folder", "success");
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = err.message || "Save failed";
+        statusEl.style.color = "#dc2626";
+      }
+    } finally {
+      setButtonLoading(btn, null);
+    }
+  }
+
   function bindEvents() {
     if (els.genOpportunity) {
       els.genOpportunity.addEventListener("change", (e) => {
@@ -2050,6 +2188,7 @@
           const txt = idx >= 0 ? els.genOpportunity.options[idx].text : "";
           els.reviewOpportunity.textContent = txt || state.opportunityLabel || "--";
         }
+        renderStep4Preview();
         goToStep(4);
       });
     }
@@ -2222,6 +2361,20 @@
     }
     if (els.manualSaveInline) {
       els.manualSaveInline.addEventListener("click", () => saveSession(true));
+    }
+
+    const saveToFolderBtn = document.getElementById("saveToFolder");
+    if (saveToFolderBtn) {
+      saveToFolderBtn.addEventListener("click", saveToRfpFolder);
+    }
+
+    const prevPageBtn = document.getElementById("prevPage");
+    if (prevPageBtn) {
+      prevPageBtn.addEventListener("click", () => setPreviewPage(previewPageIndex - 1));
+    }
+    const nextPageBtn = document.getElementById("nextPage");
+    if (nextPageBtn) {
+      nextPageBtn.addEventListener("click", () => setPreviewPage(previewPageIndex + 1));
     }
 
     if (els.openSessionPicker) {

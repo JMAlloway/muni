@@ -282,23 +282,33 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
         </div>
       </div>
       <div class="step-content">
-        <div class="review-summary">
+        <!-- Document Preview with 8.5x11 formatting -->
+        <div class="document-package-preview">
+          <div class="preview-toolbar">
+            <button type="button" class="preview-nav-btn" id="prevPage" disabled>&larr; Previous</button>
+            <span class="page-indicator">Section <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
+            <button type="button" class="preview-nav-btn" id="nextPage">&rarr; Next</button>
+          </div>
+          <div class="paper-preview" id="paperPreview">
+            <div class="paper-page" style="width: 8.5in; min-height: 11in; padding: 1in; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin: 20px auto;">
+              <div id="previewPageContent"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="review-summary" id="reviewSummary">
           <div class="review-item">
             <span>&#10003;</span>
             <div><strong>Opportunity</strong><span id="reviewOpportunity">&mdash;</span></div>
           </div>
-          <div class="review-item">
-            <span>&#10003;</span>
-            <div><strong>Cover Letter</strong><span>Generated and edited</span></div>
-          </div>
-          <div class="review-item">
-            <span>&#10003;</span>
-            <div><strong>Statement of Qualifications</strong><span>Generated and edited</span></div>
+          <div id="sectionReviewList">
+            <!-- Dynamically populated -->
           </div>
         </div>
+
         <div class="export-section">
           <h3>Download Your Package</h3>
-          <p>Choose your preferred format</p>
+          <p>Export all sections as a single document</p>
           <div class="export-buttons">
             <button id="exportWord" class="btn-export" type="button">
               &#128196; <div><strong>Word Document</strong><span>.docx format</span></div>
@@ -308,6 +318,16 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
             </button>
           </div>
         </div>
+
+        <div class="save-to-folder-section">
+          <h3>Save to Documents</h3>
+          <p>Save this package to your RFP folder for this opportunity</p>
+          <button id="saveToFolder" class="btn-save-folder" type="button">
+            &#128193; Save to RFP Folder
+          </button>
+          <span id="saveFolderStatus" class="save-status"></span>
+        </div>
+
         <div id="completionMessage" class="completion-message hidden">
           <div class="completion-icon">&#10003;</div>
           <h3>Response Package Complete!</h3>

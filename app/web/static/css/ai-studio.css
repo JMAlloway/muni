@@ -2274,3 +2274,74 @@
 .ai-tools-page .session-bulk-delete:not(:disabled):hover {
   background: #ffe4e6;
 }
+
+/* Step 4 preview */
+.document-package-preview {
+  margin-bottom: 24px;
+}
+
+.preview-toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: #f3f4f6;
+  border-radius: 8px 8px 0 0;
+}
+
+.preview-nav-btn {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.preview-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.paper-preview {
+  background: #e5e7eb;
+  padding: 24px;
+  max-height: 600px;
+  overflow-y: auto;
+  border-radius: 0 0 8px 8px;
+}
+
+.paper-page {
+  width: 8.5in;
+  min-height: 11in;
+  padding: 1in;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin: 0 auto;
+  font-family: "Times New Roman", serif;
+  font-size: 12pt;
+  line-height: 1.5;
+}
+
+.save-to-folder-section {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+
+.btn-save-folder {
+  padding: 12px 24px;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.save-status {
+  margin-left: 12px;
+  font-size: 14px;
+}

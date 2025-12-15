@@ -15,7 +15,7 @@ from app.core.db_core import engine
 from app.services.document_processor import DocumentProcessor
 from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
-from app.storage import read_storage_bytes, create_presigned_get
+from app.storage import read_storage_bytes, create_presigned_get, store_bytes
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team
 from app.services.response_library import ResponseLibrary
 
@@ -90,6 +90,7 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
                         logging.warning("Could not create presigned URL for %s", field)
                     if url:
                         merged[f"{field}_url"] = url
+                        logging.info("Created presigned URL for %s: %s...", field, url[:50])
                     filename = merged.get(f"{field}_name", "")
                     if filename:
                         merged[f"{field}_filename"] = filename
@@ -501,6 +502,53 @@ Keep a professional tone. Return ONLY the expanded text, no explanations.""",
     except Exception as exc:
         logging.error("Refine error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/{opportunity_id}/save-package")
+async def save_package_to_folder(
+    opportunity_id: str,
+    payload: dict | None = None,
+    user=Depends(require_user_with_team),
+):
+    """Save the generated package as a document to the opportunity folder."""
+    await ensure_user_can_access_opportunity(user, opportunity_id)
+
+    content = (payload or {}).get("content", "")
+    filename = (payload or {}).get("filename", f"proposal-{opportunity_id}.html")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="No content to save")
+
+    data = content.encode("utf-8")
+    try:
+        storage_key, size, mime = store_bytes(
+            user["id"],
+            opportunity_id,
+            data,
+            filename,
+            "text/html",
+        )
+    except Exception as exc:
+        logging.error("Failed to store generated package: %s", exc)
+        raise HTTPException(status_code=500, detail="Could not save package")
+
+    async with engine.begin() as conn:
+        await conn.exec_driver_sql(
+            """
+            INSERT INTO user_uploads (user_id, opportunity_id, filename, mime, size, storage_key, source_note)
+            VALUES (:uid, :oid, :fn, :mime, :size, :key, 'ai-studio-generated')
+            """,
+            {
+                "uid": user["id"],
+                "oid": opportunity_id,
+                "fn": filename,
+                "mime": mime,
+                "size": size,
+                "key": storage_key,
+            },
+        )
+
+    return {"ok": True, "filename": filename, "size": size}
 
 
 @router.get("/{opportunity_id}/extracted")

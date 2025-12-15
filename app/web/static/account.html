@@ -58,6 +58,12 @@
           </svg>
           <span class="nav-text">Documents</span>
         </a>
+        <a href="/ai-tools" class="nav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 3l2.09 6.26H20l-5.17 3.76L16.18 19 12 15.9 7.82 19l1.35-6L4 9.26h5.91L12 3z"/>
+          </svg>
+          <span class="nav-text">AI Studio</span>
+        </a>
         <a href="/calendar" class="nav-link">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -1417,6 +1423,7 @@
                         <label>Digital Signature File (optional)</label>
                         <div class="file-upload-container">
                           <div class="file-existing" data-file-existing="digital_signature" style="display:none;">
+                            <div class="file-existing-preview" data-file-preview="digital_signature" style="display:none;"></div>
                             <div class="file-existing-info">
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -1464,6 +1471,7 @@
                         <label>Upload - Signature Image (optional)</label>
                         <div class="file-upload-container">
                           <div class="file-existing" data-file-existing="signature_image" style="display:none;">
+                            <div class="file-existing-preview" data-file-preview="signature_image" style="display:none;"></div>
                             <div class="file-existing-info">
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -1549,6 +1557,7 @@
                 </div>
                 <div class="billing-plan-actions">
                   <a class="btn-primary" id="billingUpgradeBtn" href="/billing">Compare Plans</a>
+                  <button class="btn-secondary" type="button" id="billingManageBtn">Manage / cancel subscription</button>
                 </div>
               </div>
             </div>
@@ -2115,28 +2124,58 @@
         return existingDiv;
       }
 
+      function isImageUrl(url) {
+        if (!url) return false;
+        return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+      }
+
+      function extractFilename(str) {
+        if (!str) return '';
+        const legacyMatch = String(str).match(/filename=['"]?([^'")]+)['"]?/i);
+        if (legacyMatch && legacyMatch[1]) return legacyMatch[1];
+        const parts = String(str).split(/[\\/]/);
+        return parts.pop() || '';
+      }
+
       function showExistingFile(field, name, url) {
         const existingDiv = document.querySelector(`[data-file-existing="${field}"]`) || ensureFileContainer(field);
         const uploadDiv = document.querySelector(`[data-file-upload="${field}"]`) || ensureFileContainer(field);
         const nameEl = document.querySelector(`[data-file-name="${field}"]`);
         const downloadLink = document.querySelector(`[data-file-download="${field}"]`);
+        const previewEl = document.querySelector(`[data-file-preview="${field}"]`);
       
         if (!existingDiv || !uploadDiv) return;
-      
-        if (name && name.trim()) {
+
+        let displayName = (name || '').trim();
+        if (!displayName) displayName = extractFilename(url) || extractFilename(name);
+        if (!displayName && url) displayName = 'Uploaded file';
+        const hasSomething = Boolean(displayName || url);
+
+        if (hasSomething) {
           existingDiv.style.display = 'flex';
           uploadDiv.style.display = 'none';
           
-          if (nameEl) nameEl.textContent = name;
+          if (nameEl) nameEl.textContent = displayName || 'Uploaded file';
           if (downloadLink && url) {
             downloadLink.href = url;
             downloadLink.style.display = 'flex';
           } else if (downloadLink) {
             downloadLink.style.display = 'none';
           }
+          if (previewEl) {
+            if (url && isImageUrl(url)) {
+              previewEl.innerHTML = `<img src="${url}" alt="${name}" loading="lazy">`;
+              previewEl.style.display = 'block';
+            } else {
+              const ext = (displayName.split('.').pop() || '').toUpperCase();
+              previewEl.innerHTML = `<div class="file-preview-icon">${ext || 'FILE'}</div>`;
+              previewEl.style.display = 'flex';
+            }
+          }
         } else {
           existingDiv.style.display = 'none';
           uploadDiv.style.display = 'block';
+          if (previewEl) previewEl.style.display = 'none';
         }
         updatePanelStatuses();
         bindFileReplaceButtons();
@@ -2172,6 +2211,7 @@
         existingDiv.dataset.fileExisting = field;
         existingDiv.style.display = 'none';
         existingDiv.innerHTML = `
+          <div class="file-existing-preview" data-file-preview="${field}" style="display:none;"></div>
           <div class="file-existing-info">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -3203,6 +3243,16 @@
         if (planPrice) planPrice.textContent = price;
         if (planPeriod) planPeriod.textContent = '/month';
       };
+      const openBillingPortal = async () => {
+        try {
+          const res = await fetch('/billing/portal', { credentials: 'include' });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          if (data?.url) window.open(data.url, '_blank', 'noopener');
+        } catch (_) {
+          alert('Could not open subscription management right now.');
+        }
+      };
       const renderPaymentMethod = (pmInfo) => {
         const container = document.getElementById('billingPaymentMethods');
         if (!container) return;
@@ -3235,18 +3285,8 @@
             Manage Payment Methods
           </button>
         `;
-        const openPortal = async () => {
-          try {
-            const res = await fetch('/billing/portal', { credentials: 'include' });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-            if (data?.url) window.open(data.url, '_blank', 'noopener');
-          } catch (_) {
-            alert('Could not open subscription management right now.');
-          }
-        };
-        document.getElementById('billingPortalBtn')?.addEventListener('click', openPortal);
-        document.getElementById('billingPortalAddBtn')?.addEventListener('click', openPortal);
+        document.getElementById('billingPortalBtn')?.addEventListener('click', openBillingPortal);
+        document.getElementById('billingPortalAddBtn')?.addEventListener('click', openBillingPortal);
       };
       const renderInvoices = (invoices) => {
         const body = document.getElementById('billingHistoryRows');
@@ -3305,6 +3345,7 @@
       });
       // Also load eagerly for logged-in users
       loadBillingSummary();
+      document.getElementById('billingManageBtn')?.addEventListener('click', openBillingPortal);
 
       // Help dropdown toggle (match shared layout)
       (function(){
@@ -3418,9 +3459,3 @@
   <script src="/static/js/notifications.js"></script>
 </body>
 </html>
-
-
-
-
-
-
