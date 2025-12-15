@@ -975,6 +975,12 @@ async def save_company_profile(request: Request):
         incoming_val = payload.get(field)
         incoming_name = payload.get(f"{field}_name")
 
+        # Filter out invalid values (e.g., stringified UploadFile objects from bad form data)
+        if incoming_val and isinstance(incoming_val, str):
+            if incoming_val.startswith("UploadFile(") or incoming_val.startswith("<starlette"):
+                logging.warning(f"Filtering invalid storage key for {field}: {incoming_val[:50]}...")
+                incoming_val = None
+
         has_incoming_val = incoming_val not in (None, "", "null", "undefined")
         has_incoming_name = incoming_name not in (None, "", "null", "undefined")
 

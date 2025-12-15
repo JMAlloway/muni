@@ -83,6 +83,10 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
                     storage_key = merged.get(field)
                     if not storage_key or not isinstance(storage_key, str):
                         continue
+                    # Skip invalid storage keys (e.g., stringified UploadFile objects)
+                    if storage_key.startswith("UploadFile(") or storage_key.startswith("<"):
+                        logging.warning("Invalid storage key for %s: %s", field, storage_key[:50])
+                        continue
                     url = None
                     try:
                         url = create_presigned_get(storage_key)
