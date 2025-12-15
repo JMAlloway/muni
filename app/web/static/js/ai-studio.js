@@ -106,6 +106,9 @@
 
   let saveTimer = null;
   let augmentingExtraction = false;
+  let saveInFlight = false;
+  let saveQueued = false;
+  let queuedManualSave = false;
   const MAX_UPLOAD_MB = 25;
   const allowedTypes = [".pdf", ".doc", ".docx", ".txt"];
 
@@ -1474,6 +1477,12 @@
     if (!payload.opportunityId && !payload.documents.cover && !payload.documents.responses) {
       return;
     }
+    if (saveInFlight) {
+      saveQueued = true;
+      queuedManualSave = queuedManualSave || manual;
+      return;
+    }
+    saveInFlight = true;
     try {
       const res = await fetch("/api/ai-sessions/save", {
         method: "POST",
@@ -1491,19 +1500,24 @@
       });
       if (res.status === 404 && allowRetry) {
         state.sessionId = null;
+        saveInFlight = false;
         return await saveSession(manual, false);
       }
       if (!res.ok) throw new Error("Save failed");
       const data = await res.json();
       state.sessionId = data.session_id;
       updateCurrentSessionDisplay();
-      if (manual) {
-        showSaveIndicator("Saved");
-      } else {
-        showSaveIndicator("Autosaved");
-      }
+      showSaveIndicator(manual ? "Saved" : "Autosaved");
     } catch (err) {
       showSaveIndicator(err.message || "Save failed", true);
+    } finally {
+      saveInFlight = false;
+      if (saveQueued) {
+        const manualNext = queuedManualSave;
+        saveQueued = false;
+        queuedManualSave = false;
+        await saveSession(manualNext);
+      }
     }
   }
 

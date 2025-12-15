@@ -5,6 +5,7 @@ import secrets
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy import text
 from typing import Optional
+import logging
 import json
 import datetime as dt
 from pathlib import Path
@@ -903,6 +904,20 @@ async def save_company_profile(request: Request):
     payload = {}
     files_meta = {}
 
+    # Load existing profile so we can preserve stored file keys on partial updates
+    async with AsyncSessionLocal() as db:
+        existing_res = await db.execute(
+            text("SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1"),
+            {"uid": user_id},
+        )
+        existing_row = existing_res.fetchone()
+        existing_data = {}
+        if existing_row and existing_row[0]:
+            try:
+                existing_data = existing_row[0] if isinstance(existing_row[0], dict) else json.loads(existing_row[0])
+            except Exception:
+                existing_data = {}
+
     if content_type.startswith("application/json"):
         # Fallback for older clients
         payload = await request.json()
@@ -947,6 +962,32 @@ async def save_company_profile(request: Request):
             if isinstance(v, list):
                 payload[k] = ",".join(v)
 
+    merged_data = existing_data.copy()
+
+    # Apply non-file fields from the incoming payload
+    for key, value in payload.items():
+        if key in FILE_FIELDS or (key.endswith("_name") and key[:-5] in FILE_FIELDS):
+            continue
+        merged_data[key] = value
+
+    # Handle file fields: prefer new upload/value; otherwise keep existing keys/names
+    for field in FILE_FIELDS:
+        incoming_val = payload.get(field)
+        incoming_name = payload.get(f"{field}_name")
+
+        has_incoming_val = incoming_val not in (None, "", "null", "undefined")
+        has_incoming_name = incoming_name not in (None, "", "null", "undefined")
+
+        if has_incoming_val:
+            merged_data[field] = incoming_val
+        elif field in existing_data:
+            merged_data[field] = existing_data[field]
+
+        if has_incoming_name:
+            merged_data[f"{field}_name"] = incoming_name
+        elif f"{field}_name" in existing_data:
+            merged_data[f"{field}_name"] = existing_data[f"{field}_name"]
+
     async with AsyncSessionLocal() as db:
         await db.execute(
             text(
@@ -958,10 +999,27 @@ async def save_company_profile(request: Request):
                   updated_at = CURRENT_TIMESTAMP
                 """
             ),
-            {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(payload or {})},
+            {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(merged_data)},
         )
         await db.commit()
-    return {"ok": True, "files": files_meta}
+    file_keys = [k for k in merged_data if k in FILE_FIELDS and merged_data.get(k)]
+    try:
+        saved_files = {
+            field: {
+                "key": merged_data.get(field),
+                "name": merged_data.get(f"{field}_name", ""),
+                "url": create_presigned_get(merged_data.get(field)) if merged_data.get(field) else None,
+            }
+            for field in file_keys
+        }
+    except Exception:
+        saved_files = files_meta
+    logging.info(
+        f"Saved company profile for user {user_id}: "
+        f"{len(merged_data)} fields, "
+        f"{len(file_keys)} files"
+    )
+    return {"ok": True, "files": saved_files or files_meta}
 
 
 # --- minimal /account (optional) ------------------------------------

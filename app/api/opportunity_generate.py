@@ -41,7 +41,9 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
             )
             row = res.first()
             if row and row[0]:
-                data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                raw = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                merged = merge_company_profile_defaults(raw)
+
                 file_fields = [
                     # Commonly used signature and compliance files
                     "signature_image",
@@ -78,7 +80,7 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
                 ]
 
                 for field in file_fields:
-                    storage_key = data.get(field)
+                    storage_key = merged.get(field)
                     if not storage_key or not isinstance(storage_key, str):
                         continue
                     url = None
@@ -87,11 +89,11 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
                     except Exception:
                         logging.warning("Could not create presigned URL for %s", field)
                     if url:
-                        data[f"{field}_url"] = url
-                    filename = data.get(f"{field}_name", "")
+                        merged[f"{field}_url"] = url
+                    filename = merged.get(f"{field}_name", "")
                     if filename:
-                        data[f"{field}_filename"] = filename
-                return merge_company_profile_defaults(data)
+                        merged[f"{field}_filename"] = filename
+                return merged
     except Exception as exc:
         logging.warning("Failed to load company profile: %s", exc)
     return merge_company_profile_defaults({})
@@ -325,16 +327,14 @@ REQUIREMENTS:
    - Closing paragraph with commitment statement
    - FOR COVER LETTERS: include the signature block at the bottom when a signature is available
 
-3. SIGNATURES (when available):
-   Use this HTML structure at the end of cover letters:
-   
-   <div style="margin-top: 40px;">
-     <p>Sincerely,</p>
-     <img src="{signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;">
-     <p><strong>{signature_name}</strong><br>
-     {signature_title}<br>
-     {company.get('legal_name', '')}</p>
-   </div>
+3. SIGNATURE: If signature_image_url is provided in the company profile, include it in transmittal/cover letters:
+   - Add after "Sincerely," and before the signatory's name
+   - Format: <img src="{signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;">
+   - Example:
+     Sincerely,<br><br>
+     <img src="{signature_url}" alt="Signature" style="max-width: 200px; height: auto; margin: 10px 0;"><br>
+     <strong>{signature_name}</strong><br>
+     {company.get('legal_name', '')}
 
 4. CONTENT:
    - Use specific details from the company profile (names, experience, certifications)
