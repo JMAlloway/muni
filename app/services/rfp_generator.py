@@ -1,9 +1,14 @@
 import json
 import re
 import textwrap
+import logging
 from typing import Any, Dict, List, Sequence
 
+from app.services.response_cache import ResponseCache
+
 from app.ai.client import get_llm_client
+
+logger = logging.getLogger("rfp_generator")
 
 
 def _extract_keywords(question: str, min_len: int = 4) -> List[str]:
@@ -119,8 +124,21 @@ def build_prompt(question_text: str, context: Dict[str, Any], max_words: int | N
     ).strip()
 
 
-def generate_section_answer(question: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+response_cache = ResponseCache()
+
+
+async def generate_section_answer(question: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate an answer for a single RFP section with caching."""
     q_text = question.get("question") or question.get("text") or ""
+    q_id = question.get("id", "")
+
+    # Check cache first
+    cached = await response_cache.get(q_text, context)
+    if cached:
+        cached["id"] = q_id
+        cached["cached"] = True
+        return cached
+
     knowledge_docs = context.get("knowledge_docs") or []
     instruction_docs = context.get("instruction_docs") or []
     # Score combined docs so instructions and knowledge both influence relevance
@@ -159,13 +177,21 @@ def generate_section_answer(question: Dict[str, Any], context: Dict[str, Any]) -
         )
 
     answer = response_text.strip()
-    return {
+    result = {
+        "id": q_id,
+        "question": q_text,
         "answer": answer,
         "sources": [doc.get("id") for doc in selected_docs if doc.get("id") is not None],
         "win_themes_used": [wt.get("id") for wt in (context.get("win_themes") or []) if wt.get("id")],
         "confidence": _calculate_confidence(answer, question),
         "word_count": len(answer.split()),
+        "cached": False,
     }
+
+    # Cache the result
+    await response_cache.set(q_text, context, result)
+
+    return result
 
 
 def _build_batch_prompt(questions: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
@@ -208,65 +234,53 @@ def _build_batch_prompt(questions: List[Dict[str, Any]], context: Dict[str, Any]
     ).strip()
 
 
-def generate_batch_answers(
+async def generate_batch_answers(
     questions: List[Dict[str, Any]],
     context: Dict[str, Any],
     batch_size: int = 4,
 ) -> List[Dict[str, Any]]:
-    """
-    Generate answers for multiple questions in fewer LLM calls. Falls back to per-question on errors.
-    """
+    """Generate answers in batches with smart fallback."""
     llm = get_llm_client()
     if not llm:
-        # Fall back to single generation for each question
-        return [generate_section_answer(q, context) for q in questions]
+        return [await generate_section_answer(q, context) for q in questions]
 
     results: List[Dict[str, Any]] = []
+
     for i in range(0, len(questions), batch_size):
         batch = questions[i : i + batch_size]
-        # For batch, we still score docs per question to keep relevance
-        enriched_batch = []
-        for q in batch:
-            q_text = q.get("question") or q.get("text") or ""
-            combined_docs = [{**d, "kind": "instruction"} for d in (context.get("instruction_docs") or [])] + (
-                context.get("knowledge_docs") or []
-            )
-            selected_docs = _score_docs(q_text, combined_docs, limit=6)
-            enriched_batch.append({**q, "_docs": selected_docs})
 
-        prompt = _build_batch_prompt(enriched_batch, {**context, "knowledge_docs": []})
+        # Try batch generation
         try:
-            resp = llm.chat(
-                [
-                    {"role": "system", "content": "Answer each question. Return JSON array."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.6,
-            )
-            parsed = json.loads(resp)
-            if not isinstance(parsed, list):
-                raise ValueError("Batch response not a list")
-        except Exception:
-            # On failure, fall back to individual generation for this batch
-            for qb in enriched_batch:
-                results.append(generate_section_answer({k: v for k, v in qb.items() if not k.startswith("_")}, context))
-            continue
+            batch_result = _generate_batch(llm, batch, context)
+            if batch_result:
+                results.extend(batch_result)
+                continue
+        except Exception as e:
+            logger.warning(f"Batch generation failed: {e}")
 
-        for idx, item in enumerate(parsed):
-            q_orig = enriched_batch[idx] if idx < len(enriched_batch) else batch[idx]
-            answer_text = item.get("answer") if isinstance(item, dict) else ""
-            question_id = item.get("question_id") if isinstance(item, dict) else q_orig.get("id")
-            wc = len((answer_text or "").split())
-            selected_docs = q_orig.get("_docs") or []
-            results.append(
-                {
-                    "id": question_id or q_orig.get("id"),
-                    "question": q_orig.get("question") or q_orig.get("text"),
-                    "answer": answer_text or "",
-                    "sources": [d.get("id") for d in selected_docs if d.get("id") is not None],
-                    "win_themes_used": [wt.get("id") for wt in (context.get("win_themes") or []) if wt.get("id")],
-                    "confidence": _calculate_confidence(answer_text or "", q_orig),
-                    "word_count": item.get("word_count") or wc,
-                }
-            )
+        # Smart fallback: retry batch ONCE before individual
+        try:
+            logger.info("Retrying batch generation...")
+            batch_result = _generate_batch(llm, batch, context)
+            if batch_result:
+                results.extend(batch_result)
+                continue
+        except Exception:
+            pass
+
+        # Final fallback: individual generation for THIS batch only
+        logger.warning(f"Falling back to individual generation for {len(batch)} sections")
+        for section in batch:
+            try:
+                result = await generate_section_answer(section, context)
+                results.append(result)
+            except Exception as e:
+                results.append(
+                    {
+                        "id": section.get("id"),
+                        "answer": "",
+                        "error": str(e),
+                    }
+                )
+
     return results

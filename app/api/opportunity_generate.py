@@ -16,7 +16,7 @@ from app.services.document_processor import DocumentProcessor
 from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
 from app.storage import read_storage_bytes, create_presigned_get, store_bytes
-from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team
+from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team, get_company_profile_cached
 from app.services.response_library import ResponseLibrary
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-generate"])
@@ -35,19 +35,12 @@ DEFAULT_TEMPERATURE = 0.4
 async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
     try:
         async with engine.begin() as conn:
-            res = await conn.exec_driver_sql(
-                "SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1",
-                {"uid": user_id},
-            )
-            row = res.first()
-            if row and row[0]:
-                raw = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                merged = merge_company_profile_defaults(raw)
+            merged = await get_company_profile_cached(conn, user_id)
 
-                file_fields = [
-                    # Commonly used signature and compliance files
-                    "signature_image",
-                    "digital_signature",
+            file_fields = [
+                # Commonly used signature and compliance files
+                "signature_image",
+                "digital_signature",
                     "capability_statement",
                     "insurance_certificate",
                     "bonding_letter",
@@ -79,27 +72,27 @@ async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
                     "references_combined",
                 ]
 
-                for field in file_fields:
-                    storage_key = merged.get(field)
-                    if not storage_key or not isinstance(storage_key, str):
-                        continue
-                    # Skip obviously invalid/stringified uploads
-                    if storage_key.startswith("UploadFile(") or "Headers(" in storage_key:
-                        merged.pop(field, None)
-                        merged.pop(f"{field}_name", None)
-                        continue
-                    url = None
-                    try:
-                        url = create_presigned_get(storage_key)
-                    except Exception:
-                        logging.warning("Could not create presigned URL for %s", field)
-                    if url:
-                        merged[f"{field}_url"] = url
-                        logging.info("Created presigned URL for %s: %s...", field, url[:50])
-                    filename = merged.get(f"{field}_name", "")
-                    if filename:
-                        merged[f"{field}_filename"] = filename
-                return merged
+            for field in file_fields:
+                storage_key = merged.get(field)
+                if not storage_key or not isinstance(storage_key, str):
+                    continue
+                # Skip obviously invalid/stringified uploads
+                if storage_key.startswith("UploadFile(") or "Headers(" in storage_key:
+                    merged.pop(field, None)
+                    merged.pop(f"{field}_name", None)
+                    continue
+                url = None
+                try:
+                    url = create_presigned_get(storage_key)
+                except Exception:
+                    logging.warning("Could not create presigned URL for %s", field)
+                if url:
+                    merged[f"{field}_url"] = url
+                    logging.info("Created presigned URL for %s: %s...", field, url[:50])
+                filename = merged.get(f"{field}_name", "")
+                if filename:
+                    merged[f"{field}_filename"] = filename
+            return merged
     except Exception as exc:
         logging.warning("Failed to load company profile: %s", exc)
     return merge_company_profile_defaults({})

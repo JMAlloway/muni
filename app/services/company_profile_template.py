@@ -16,9 +16,20 @@ _MAX_STRING_LENGTH = 10_000
 # Keep defaults as a module-level constant so we can cheaply clone it.
 _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
     "legal_name": "",
+    "dba": "",
     "entity_type": "",
+    "state_of_incorporation": "",
+    "year_established": "",
+    "years_experience": "",
     "hq_address": "",
+    "business_address": {"street": "", "city": "", "state": "", "zip": ""},
+    "phone": "",
+    "email": "",
     "website": "",
+    "service_area": "",
+    "service_area_list": [],
+    "service_categories": [],
+    "company_overview": "",
     "primary_contact": {
         "name": "",
         "title": "",
@@ -38,18 +49,49 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
         "EDGE": False,
         "WBE": False,
         "details": "",
+        "certifications": [],
+        "certification_files": [],
     },
     "contractor_licenses": [
         {
             "state": "",
+            "type": "",
             "number": "",
+            "issuing_authority": "",
             "expiry": "",
         }
     ],
     "insurance": {
         "workers_comp_certificate": {"id": "", "expiry": ""},
-        "liability_insurance": {"carrier": "", "policy_number": "", "limits": "", "expiry": ""},
+        "general_liability": {
+            "carrier": "",
+            "policy_number": "",
+            "per_occurrence_limit": "",
+            "aggregate_limit": "",
+            "effective": "",
+            "expiry": "",
+        },
+        "auto_liability": {
+            "carrier": "",
+            "policy_number": "",
+            "limit": "",
+            "effective": "",
+            "expiry": "",
+        },
+        "umbrella_excess": {
+            "carrier": "",
+            "policy_number": "",
+            "limit": "",
+            "effective": "",
+            "expiry": "",
+        },
         "can_add_additional_insured": True,
+    },
+    "bonding": {
+        "single_project_limit": "",
+        "aggregate_limit": "",
+        "surety_company": "",
+        "surety_contact": "",
     },
     "criminal_history_check_policy": "",
     "recordkeeping_controls": "",
@@ -66,9 +108,15 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
     ],
     "recent_projects": [
         {
+            "project_name": "",
             "client_name": "",
+            "owner_contact": "",
+            "architect_engineer": "",
             "address": "",
             "phone": "",
+            "location": "",
+            "contract_value": "",
+            "completion_date": "",
             "description": "",
             "dates": "",
         }
@@ -77,9 +125,31 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
         {"program": "", "agency": "", "dates": "", "scope": ""}
     ],
     "avg_work_order_turnaround_days": "",
+    "years_in_business": "",
+    "avg_annual_revenue": "",
+    "full_time_employees": "",
+    "safety_program_description": "",
+    "emr": "",
+    "naics_codes": [],
     "can_meet_timeframe": "",
     "residential_energy_program_experience": "",
-    "service_area": "",
+    "compliance": {
+        "non_collusion_certified": False,
+        "prevailing_wage_compliant": False,
+        "addenda_acknowledged": [],
+        "contract_terms_agreed": False,
+    },
+    "subcontractors": [
+        {
+            "company_name": "",
+            "trade": "",
+            "address": "",
+            "contact_name": "",
+            "phone": "",
+            "email": "",
+            "license_number": "",
+        }
+    ],
     "attachments": {
         "cover_letter_template": "",
         "soq_sections": "",

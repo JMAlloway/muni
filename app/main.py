@@ -85,6 +85,7 @@ from app.core.db_migrations import (
     ensure_extraction_cache_schema,
     ensure_ai_sessions_schema,
     ensure_ai_chat_schema,
+    ensure_response_cache_schema,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -334,6 +335,7 @@ async def on_startup():
         await ensure_extraction_cache_schema(engine)
         await ensure_ai_sessions_schema(engine)
         await ensure_ai_chat_schema(engine)
+        await ensure_response_cache_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 

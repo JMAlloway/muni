@@ -522,3 +522,23 @@ async def ensure_ai_chat_schema(engine) -> None:
             )
     except Exception:
         return
+
+
+async def ensure_response_cache_schema(engine) -> None:
+    """Create response_cache table for generated answer caching."""
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS response_cache (
+                    hash TEXT PRIMARY KEY,
+                    result JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS idx_response_cache_date ON response_cache(created_at)"
+            )
+    except Exception:
+        return

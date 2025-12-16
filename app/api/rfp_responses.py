@@ -7,11 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 import logging
 from app.auth.session import get_current_user_email
 from app.core.db_core import engine
-from app.api.auth_helpers import ensure_user_can_access_opportunity
+from app.api.auth_helpers import ensure_user_can_access_opportunity, get_company_profile_cached
 from app.services.document_processor import DocumentProcessor
 from app.services.response_validator import run_basic_checks
 from app.services.rfp_generator import generate_section_answer, generate_batch_answers
-from app.services.company_profile_template import merge_company_profile_defaults
 from app.services.response_library import ResponseLibrary
 from app.storage import read_storage_bytes
 
@@ -33,23 +32,6 @@ async def _require_user(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
     m = row._mapping
     return {"id": m["id"], "email": m["email"], "team_id": m.get("team_id")}
-
-
-async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
-    try:
-        async with engine.begin() as conn:
-            res = await conn.exec_driver_sql(
-                "SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1",
-                {"uid": user_id},
-            )
-            row = res.first()
-            if row and row[0]:
-                data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                return merge_company_profile_defaults(data)
-    except Exception as exc:
-        logging.warning("Failed to load company profile: %s", exc)
-        pass
-    return merge_company_profile_defaults({})
 
 
 async def _get_win_themes(user: dict, theme_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
@@ -172,7 +154,8 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
     custom_instructions = payload.get("custom_instructions") or ""
     instruction_upload_ids = payload.get("instruction_upload_ids") or []
 
-    company_profile = await _get_company_profile(user["id"])
+    async with engine.begin() as conn:
+        company_profile = await get_company_profile_cached(conn, user["id"])
     win_themes = await _get_win_themes(user, win_theme_ids)
     knowledge_docs = await _get_knowledge_docs(user, knowledge_doc_ids)
     instruction_docs = await _get_instruction_docs(user, instruction_upload_ids)
@@ -187,7 +170,7 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
 
     results = []
     issues = []
-    batch_generated = generate_batch_answers(sections, ctx, batch_size=4)
+    batch_generated = await generate_batch_answers(sections, ctx, batch_size=4)
     for generated in batch_generated:
         section = next((s for s in sections if str(s.get("id")) == str(generated.get("id"))), generated)
         compliance = run_basic_checks(generated.get("answer", ""), section)

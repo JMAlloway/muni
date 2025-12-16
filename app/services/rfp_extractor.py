@@ -11,8 +11,8 @@ logger = logging.getLogger("rfp_extractor")
 
 # Tunable constants
 MAX_WORDS_PER_CHUNK = 3500  # heuristic for token limits
-MAX_PROMPT_CHARS = 12000
-MAX_CHUNKS = 12  # limit LLM calls on very large docs
+MAX_PROMPT_CHARS = 60000  # Use more of the context window per call
+MAX_CHUNKS = 3  # Process only first 3 chunks, not 12
 MAX_TOTAL_CHARS = 400000  # early truncation guard (~60-70k words)
 
 def _has_useful_content(payload: Dict[str, Any]) -> bool:
@@ -506,16 +506,29 @@ class RfpExtractor:
     def extract_all(self, text: str) -> Dict[str, Any]:
         trimmed, truncated = _trim_text(text)
         cleaned = _clean_text(trimmed)
-        # Pass 1: main combined extraction
+
+        # Single pass extraction with improved prompt
         combined = self._extract_combined(cleaned, truncated_input=truncated)
         extracted = combined.get("extracted") or {}
 
-        # Pass 2: if narratives missing, run focused extraction
-        if not extracted.get("narrative_sections"):
-            narratives = self._extract_narratives(cleaned)
-            if narratives:
-                extracted["narrative_sections"] = narratives
-                combined["extracted"] = extracted
+        # Only run narrative extraction if TRULY empty AND document is substantial
+        # Skip for small docs or if we got any narratives
+        narratives = extracted.get("narrative_sections", [])
+        if not narratives and len(cleaned) > 5000:
+            # Check if extraction looks incomplete
+            has_some_content = bool(
+                extracted.get("summary")
+                or extracted.get("scope_of_work")
+                or extracted.get("attachments_forms")
+            )
+
+            # Only retry if we got some content but missed narratives
+            if has_some_content:
+                logger.info("Narratives missing, running focused extraction")
+                narratives = self._extract_narratives(cleaned)
+                if narratives:
+                    extracted["narrative_sections"] = narratives
+                    combined["extracted"] = extracted
 
         return combined
 

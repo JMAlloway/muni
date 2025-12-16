@@ -1,20 +1,24 @@
+import asyncio
 import json
 import logging
+import re
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.api.auth_helpers import require_user_with_team
+from app.api.auth_helpers import get_company_profile_cached, require_user_with_team
 from app.core.db_core import engine
 from app.ai.client import get_llm_client
-from app.services.company_profile_template import merge_company_profile_defaults
+from app.services.document_processor import DocumentProcessor
+from app.storage import read_storage_bytes
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
 # Token/character limits
-MAX_CONTEXT_CHARS = 100000  # ~25k tokens worth of document text
+# Keep under provider TPM limits (~30k tokens ≈ 120k chars) to avoid rate_limit_exceeded
+MAX_CONTEXT_CHARS = 120000
 MAX_HISTORY_MESSAGES = 10
 
 
@@ -91,18 +95,20 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
 
         # 4. Get document context - prioritize raw_text, fall back to extracted
         extracted_state = state.get("extracted", {}) if isinstance(state, dict) else {}
-        raw_text, extracted_data = _resolve_extracted_state(extracted_state)
+        raw_text_state, extracted_data = _resolve_extracted_state(extracted_state)
+        document_text = await _get_document_text(conn, state if isinstance(state, dict) else {}, row.opportunity_id, user["id"])
+        fallback_context = _build_fallback_context(extracted_state)
 
-        # Build context from raw text (primary) + extracted metadata (secondary)
-        if raw_text and len(raw_text) > MAX_CONTEXT_CHARS:
-            # Large document - find relevant chunks
-            relevant_text = _find_relevant_chunks(raw_text, req.message)
-            document_context = _build_document_context(relevant_text, extracted_data)
+        if document_text == fallback_context:
+            # No raw text available; fallback already formatted
+            document_context = fallback_context
         else:
-            document_context = _build_document_context(raw_text, extracted_data)
+            raw_text = document_text or raw_text_state
+            prepared_text = _prepare_context(raw_text or "", req.message)
+            document_context = _build_document_context(prepared_text, extracted_data)
 
         # 5. Load company profile context
-        company_profile = await _get_company_profile(conn, user["id"])
+        company_profile = await get_company_profile_cached(conn, user["id"])
         company_context = _format_company_profile(company_profile)
 
         # 6. Call LLM
@@ -220,21 +226,138 @@ def _build_document_context(raw_text: str, extracted: Dict[str, Any]) -> str:
     return "\n\n".join(parts)
 
 
-async def _get_company_profile(conn, user_id: str) -> Dict[str, Any]:
-    """Fetch the user's company profile from the database."""
-    try:
-        res = await conn.exec_driver_sql(
-            "SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1",
-            {"uid": user_id},
-        )
-        row = res.first()
-        if row and row[0]:
-            data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-            return merge_company_profile_defaults(data)
-    except Exception as exc:
-        logger.warning(f"Failed to load company profile: {exc}")
-    return merge_company_profile_defaults({})
+def _prepare_context(document_text: str, question: str) -> str:
+    """
+    Prepare document context with improved section detection.
+    Preserves document structure while prioritizing relevant sections.
+    """
+    if not document_text:
+        return ""
 
+    # If document fits, use it all
+    if len(document_text) <= MAX_CONTEXT_CHARS:
+        return document_text
+
+    # Split by section headers (common RFP patterns)
+    section_pattern = r"\n(?=[A-Z][A-Z\s]{0,30}:|\d+\.\s+[A-Z]|SECTION\s+\d|ARTICLE\s+\d|PART\s+\d)"
+    sections = re.split(section_pattern, document_text)
+
+    # If no sections found, fall back to chunk-based approach
+    if len(sections) <= 1:
+        return _chunk_based_context(document_text, question)
+
+    # Score sections by relevance
+    question_lower = question.lower()
+    keywords = [w for w in question_lower.split() if len(w) > 3]
+
+    # Add domain-specific keywords based on question type
+    if any(w in question_lower for w in ["insurance", "liability", "coverage"]):
+        keywords.extend(["insurance", "liability", "coverage", "certificate", "indemnification"])
+    if any(w in question_lower for w in ["deadline", "due", "submit", "when"]):
+        keywords.extend(["deadline", "due", "submission", "date", "calendar"])
+    if any(w in question_lower for w in ["qualify", "requirement", "eligible"]):
+        keywords.extend(["requirement", "qualification", "mandatory", "must", "shall"])
+    if any(w in question_lower for w in ["experience", "past", "reference"]):
+        keywords.extend(["experience", "reference", "project", "performance", "similar"])
+
+    scored_sections = []
+    for i, section in enumerate(sections):
+        section_lower = section.lower()
+        score = sum(section_lower.count(kw) for kw in keywords)
+
+        # Boost first section (usually contains overview)
+        if i == 0:
+            score += 5
+
+        # Boost sections with headers matching keywords
+        first_line = section.split("\n")[0][:100].lower()
+        header_boost = sum(2 for kw in keywords if kw in first_line)
+        score += header_boost
+
+        scored_sections.append((score, i, section))
+
+    # Sort by score, keep top sections
+    scored_sections.sort(reverse=True, key=lambda x: x[0])
+
+    # Always include first section + top relevant sections
+    selected = []
+    selected_indices = set()
+    chars_used = 0
+
+    # Add first section (overview)
+    if sections[0]:
+        selected.append((0, sections[0]))
+        selected_indices.add(0)
+        chars_used += len(sections[0])
+
+    # Add high-scoring sections
+    for score, idx, section in scored_sections:
+        if idx in selected_indices:
+            continue
+        if chars_used + len(section) > MAX_CONTEXT_CHARS:
+            break
+        selected.append((idx, section))
+        selected_indices.add(idx)
+        chars_used += len(section)
+
+    # Sort by original order to maintain document flow
+    selected.sort(key=lambda x: x[0])
+
+    # Combine with markers
+    result_parts = []
+    prev_idx = -1
+    for idx, section in selected:
+        if prev_idx >= 0 and idx > prev_idx + 1:
+            result_parts.append("\n\n[...section omitted...]\n\n")
+        result_parts.append(section)
+        prev_idx = idx
+
+    return "".join(result_parts)
+
+
+def _chunk_based_context(document_text: str, question: str) -> str:
+    """Fallback chunk-based context for documents without clear sections."""
+    chunk_size = 4000
+    overlap = 500
+    chunks = []
+
+    for i in range(0, len(document_text), chunk_size - overlap):
+        chunk = document_text[i : i + chunk_size]
+        chunks.append((i, chunk))
+
+    question_lower = question.lower()
+    keywords = [w for w in question_lower.split() if len(w) > 3]
+
+    scored = []
+    for pos, chunk in chunks:
+        chunk_lower = chunk.lower()
+        score = sum(chunk_lower.count(kw) for kw in keywords)
+        if pos < 10000:
+            score += 2  # Boost beginning
+        scored.append((score, pos, chunk))
+
+    scored.sort(reverse=True)
+
+    # Build context
+    selected = [(0, document_text[:8000])]  # Always include beginning
+    chars_used = 8000
+
+    for score, pos, chunk in scored:
+        if chars_used >= MAX_CONTEXT_CHARS:
+            break
+        if pos >= 8000:
+            selected.append((pos, chunk))
+            chars_used += len(chunk)
+
+    selected.sort(key=lambda x: x[0])
+
+    result_parts = []
+    for i, (pos, chunk) in enumerate(selected):
+        if i > 0:
+            result_parts.append("\n[...]\n")
+        result_parts.append(chunk)
+
+    return "".join(result_parts)
 
 def _resolve_extracted_state(extracted_state: Any) -> tuple[str, Dict[str, Any]]:
     """
@@ -259,6 +382,88 @@ def _resolve_extracted_state(extracted_state: Any) -> tuple[str, Dict[str, Any]]
     return raw_text, extracted_data
 
 
+def _build_fallback_context(extracted_state: Dict[str, Any]) -> str:
+    """Build a minimal context from extracted metadata when raw text is unavailable."""
+    _, extracted_data = _resolve_extracted_state(extracted_state)
+    return _build_document_context("", extracted_data)
+
+
+async def _get_document_text(conn, state: Dict[str, Any], opportunity_id: str, user_id: str) -> str:
+    """
+    Get the full document text for the RFP.
+    Priority:
+    1. raw_text stored in session state (fast - no I/O)
+    2. Re-extract from uploaded file (slow - only if raw_text missing)
+    """
+
+    extracted = state.get("extracted", {}) if isinstance(state, dict) else {}
+
+    # 1. FIRST: Check session state for cached raw_text
+    if isinstance(extracted, dict):
+        raw_text = extracted.get("raw_text", "")
+        if raw_text and len(raw_text) > 500:
+            logger.info(f"Using cached raw_text from session state, len={len(raw_text)}")
+            return raw_text
+
+    # 2. SECOND: Check nested structure (some sessions have double nesting)
+    nested_extracted = extracted.get("extracted", {}) if isinstance(extracted, dict) else {}
+    if isinstance(nested_extracted, dict):
+        raw_text = nested_extracted.get("raw_text", "")
+        if raw_text and len(raw_text) > 500:
+            logger.info(f"Using cached raw_text from nested state, len={len(raw_text)}")
+            return raw_text
+
+    # 3. FALLBACK: Re-extract from storage (expensive - avoid if possible)
+    logger.warning("No cached raw_text found, falling back to storage extraction")
+
+    upload = state.get("upload", {}) if isinstance(state, dict) else {}
+    storage_key = upload.get("storage_key") if isinstance(upload, dict) else None
+    mime = upload.get("mime") if isinstance(upload, dict) else None
+    filename = upload.get("filename") if isinstance(upload, dict) else "document"
+
+    # Try to get from user_uploads if not in state
+    if not storage_key and opportunity_id:
+        res = await conn.exec_driver_sql(
+            """
+            SELECT storage_key, mime, filename
+            FROM user_uploads
+            WHERE opportunity_id = :oid AND user_id = :uid
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            {"oid": opportunity_id, "uid": user_id},
+        )
+        row = res.first()
+        if row:
+            mapping = row._mapping if hasattr(row, "_mapping") else {}
+            storage_key = mapping.get("storage_key") or getattr(row, "storage_key", None)
+            mime = mapping.get("mime") or getattr(row, "mime", None)
+            filename = mapping.get("filename") or getattr(row, "filename", filename)
+
+    if not storage_key:
+        logger.warning(f"No storage_key found for opportunity={opportunity_id}")
+        return _build_fallback_context(extracted)
+
+    # Read and extract from storage
+    try:
+        logger.info(f"Re-extracting document from storage_key={storage_key}")
+        file_bytes = await asyncio.to_thread(read_storage_bytes, storage_key)
+        if not file_bytes:
+            return _build_fallback_context(extracted)
+
+        processor = DocumentProcessor()
+        result = processor.extract_text(file_bytes, mime, filename)
+        text = result.get("text", "")
+
+        if text and len(text) > 100:
+            logger.info(f"Extracted document text from storage, len={len(text)}")
+            return text
+
+    except Exception as e:
+        logger.error(f"Failed to extract document: {e}")
+
+    return _build_fallback_context(extracted)
+
+
 def _format_company_profile(profile: Dict[str, Any]) -> str:
     """Format company profile into readable context for the LLM."""
     parts = []
@@ -266,14 +471,40 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
     # Basic company info
     if profile.get("legal_name"):
         parts.append(f"Company Name: {profile['legal_name']}")
+    if profile.get("dba"):
+        parts.append(f"DBA: {profile['dba']}")
     if profile.get("entity_type"):
         parts.append(f"Entity Type: {profile['entity_type']}")
+    if profile.get("state_of_incorporation"):
+        parts.append(f"State of Incorporation: {profile['state_of_incorporation']}")
+    if profile.get("year_established"):
+        parts.append(f"Year Established: {profile['year_established']}")
+    if profile.get("years_experience"):
+        parts.append(f"Years of Experience: {profile['years_experience']}")
+    if profile.get("years_in_business"):
+        parts.append(f"Years in Business: {profile['years_in_business']}")
     if profile.get("hq_address"):
         parts.append(f"Address: {profile['hq_address']}")
+    if profile.get("business_address"):
+        addr = profile["business_address"]
+        addr_parts = [addr.get("street", ""), addr.get("city", ""), addr.get("state", ""), addr.get("zip", "")]
+        addr_line = ", ".join([p for p in addr_parts if p])
+        if addr_line:
+            parts.append(f"Business Address: {addr_line}")
+    if profile.get("phone"):
+        parts.append(f"Phone: {profile['phone']}")
+    if profile.get("email"):
+        parts.append(f"Email: {profile['email']}")
     if profile.get("website"):
         parts.append(f"Website: {profile['website']}")
     if profile.get("service_area"):
         parts.append(f"Service Area: {profile['service_area']}")
+    if profile.get("service_area_list"):
+        parts.append(f"Service Areas: {', '.join([s for s in profile.get('service_area_list', []) if s])}")
+    if profile.get("service_categories"):
+        parts.append(f"Service Categories: {', '.join([c for c in profile.get('service_categories', []) if c])}")
+    if profile.get("company_overview"):
+        parts.append(f"Overview: {profile['company_overview']}")
 
     # Primary contact
     contact = profile.get("primary_contact", {})
@@ -285,6 +516,18 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
             contact_info += f" ({contact['email']})"
         parts.append(contact_info)
 
+    # Authorized signatory
+    signer = profile.get("authorized_signatory", {})
+    if signer.get("name"):
+        signer_info = f"Authorized Signatory: {signer['name']}"
+        if signer.get("title"):
+            signer_info += f", {signer['title']}"
+        if signer.get("email"):
+            signer_info += f" ({signer['email']})"
+        if signer.get("phone"):
+            signer_info += f" [{signer['phone']}]"
+        parts.append(signer_info)
+
     # Certifications (MBE, SBE, WBE, EDGE)
     certs = profile.get("certifications_status", {})
     active_certs = [c for c in ["MBE", "SBE", "EDGE", "WBE"] if certs.get(c)]
@@ -292,6 +535,8 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
         parts.append(f"Certifications: {', '.join(active_certs)}")
     if certs.get("details"):
         parts.append(f"Certification Details: {certs['details']}")
+    if certs.get("certifications"):
+        parts.append("Other Certifications: " + ", ".join([c for c in certs.get("certifications", []) if c]))
 
     # Contractor licenses
     licenses = profile.get("contractor_licenses", [])
@@ -300,6 +545,10 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
         lic_strs = []
         for lic in valid_licenses:
             lic_str = f"{lic.get('state', 'State')} #{lic.get('number', '')}"
+            if lic.get("type"):
+                lic_str = f"{lic.get('type')} - " + lic_str
+            if lic.get("issuing_authority"):
+                lic_str += f" ({lic.get('issuing_authority')})"
             if lic.get("expiry"):
                 lic_str += f" (exp: {lic['expiry']})"
             lic_strs.append(lic_str)
@@ -308,13 +557,49 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
     # Insurance
     insurance = profile.get("insurance", {})
     ins_parts = []
-    if insurance.get("liability_insurance", {}).get("carrier"):
-        liability = insurance["liability_insurance"]
-        ins_parts.append(f"Liability: {liability['carrier']}, Limits: {liability.get('limits', 'N/A')}")
+    gl = insurance.get("general_liability", {})
+    if gl.get("carrier") or gl.get("policy_number"):
+        gl_limits = []
+        if gl.get("per_occurrence_limit"):
+            gl_limits.append(f"Per Occurrence: {gl['per_occurrence_limit']}")
+        if gl.get("aggregate_limit"):
+            gl_limits.append(f"Aggregate: {gl['aggregate_limit']}")
+        limit_str = "; ".join(gl_limits) if gl_limits else gl.get("limit", "N/A")
+        ins_parts.append(f"General Liability: {gl.get('carrier', '')} #{gl.get('policy_number', '')} ({limit_str})")
+        if gl.get("effective") or gl.get("expiry"):
+            ins_parts.append(f"GL Dates: {gl.get('effective', '')} - {gl.get('expiry', '')}")
+    auto = insurance.get("auto_liability", {})
+    if auto.get("carrier") or auto.get("policy_number"):
+        ins_parts.append(
+            f"Auto Liability: {auto.get('carrier', '')} #{auto.get('policy_number', '')} (Limit: {auto.get('limit', '')})"
+        )
+        if auto.get("effective") or auto.get("expiry"):
+            ins_parts.append(f"Auto Dates: {auto.get('effective', '')} - {auto.get('expiry', '')}")
+    umb = insurance.get("umbrella_excess", {})
+    if umb.get("carrier") or umb.get("policy_number"):
+        ins_parts.append(
+            f"Umbrella/Excess: {umb.get('carrier', '')} #{umb.get('policy_number', '')} (Limit: {umb.get('limit', '')})"
+        )
+        if umb.get("effective") or umb.get("expiry"):
+            ins_parts.append(f"Umbrella Dates: {umb.get('effective', '')} - {umb.get('expiry', '')}")
     if insurance.get("workers_comp_certificate", {}).get("id"):
         ins_parts.append("Workers Comp: Active")
     if ins_parts:
         parts.append(f"Insurance: {'; '.join(ins_parts)}")
+
+    # Bonding
+    bonding = profile.get("bonding", {})
+    if bonding.get("single_project_limit") or bonding.get("aggregate_limit") or bonding.get("surety_company"):
+        b_parts = []
+        if bonding.get("single_project_limit"):
+            b_parts.append(f"Single: {bonding['single_project_limit']}")
+        if bonding.get("aggregate_limit"):
+            b_parts.append(f"Aggregate: {bonding['aggregate_limit']}")
+        if bonding.get("surety_company"):
+            b_parts.append(f"Surety: {bonding['surety_company']}")
+        if bonding.get("surety_contact"):
+            b_parts.append(f"Surety Contact: {bonding['surety_contact']}")
+        parts.append("Bonding: " + "; ".join(b_parts))
 
     # Key personnel
     personnel = profile.get("key_personnel", [])
@@ -370,6 +655,53 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
         parts.append(f"\nResidential Energy Experience: {profile['residential_energy_program_experience']}")
     if profile.get("avg_work_order_turnaround_days"):
         parts.append(f"Average Turnaround: {profile['avg_work_order_turnaround_days']} days")
+    if profile.get("avg_annual_revenue"):
+        parts.append(f"Avg Annual Revenue: {profile['avg_annual_revenue']}")
+    if profile.get("full_time_employees"):
+        parts.append(f"Full-Time Employees: {profile['full_time_employees']}")
+    if profile.get("safety_program_description"):
+        parts.append(f"\nSafety Program: {profile['safety_program_description']}")
+    if profile.get("emr"):
+        parts.append(f"EMR: {profile['emr']}")
+    if profile.get("naics_codes"):
+        parts.append(f"NAICS Codes: {', '.join([c for c in profile.get('naics_codes', []) if c])}")
+
+    # Subcontractors
+    subs = profile.get("subcontractors", [])
+    valid_subs = [s for s in subs if s.get("company_name")]
+    if valid_subs:
+        parts.append("\nSubcontractors:")
+        for sub in valid_subs[:10]:
+            sub_line = f"  - {sub['company_name']}"
+            if sub.get("trade"):
+                sub_line += f" ({sub['trade']})"
+            contact_bits = []
+            if sub.get("contact_name"):
+                contact_bits.append(sub["contact_name"])
+            if sub.get("phone"):
+                contact_bits.append(sub["phone"])
+            if sub.get("email"):
+                contact_bits.append(sub["email"])
+            if contact_bits:
+                sub_line += f" | " + ", ".join(contact_bits)
+            if sub.get("license_number"):
+                sub_line += f" | License: {sub['license_number']}"
+            parts.append(sub_line)
+
+    # Compliance & declarations
+    compliance = profile.get("compliance", {})
+    comp_flags = []
+    if compliance.get("non_collusion_certified"):
+        comp_flags.append("Non-collusion certified")
+    if compliance.get("prevailing_wage_compliant"):
+        comp_flags.append("Prevailing wage compliant")
+    if compliance.get("contract_terms_agreed"):
+        comp_flags.append("Contract terms agreed")
+    addenda = compliance.get("addenda_acknowledged")
+    if addenda:
+        comp_flags.append(f"Addenda acknowledged: {', '.join([str(a) for a in addenda if a])}")
+    if comp_flags:
+        parts.append("Compliance: " + "; ".join(comp_flags))
 
     if not parts:
         return "No company profile information available. User should complete their company profile for better assistance."
