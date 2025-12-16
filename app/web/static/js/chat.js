@@ -48,15 +48,7 @@
       chatEls.messages.innerHTML = '<div class="chat-empty">Ask a question about the RFP...</div>';
       return;
     }
-    chatEls.messages.innerHTML = chatHistory
-      .map(
-        (msg) => `
-      <div class="chat-message ${msg.role}">
-        <div class="chat-bubble">${escapeHtml(msg.content)}</div>
-      </div>
-    `
-      )
-      .join("");
+    chatEls.messages.innerHTML = chatHistory.map(renderMessage).join("");
     chatEls.messages.scrollTop = chatEls.messages.scrollHeight;
   }
 
@@ -66,19 +58,123 @@
     return div.innerHTML;
   }
 
+  function formatMessageContent(text) {
+    const escaped = escapeHtml(text || "");
+    const lines = escaped.split(/\n/);
+    const html = [];
+    let buffer = [];
+    let inList = false;
+
+    const flushParagraph = () => {
+      if (buffer.length) {
+        html.push(`<p>${buffer.join("<br>")}</p>`);
+        buffer = [];
+      }
+    };
+
+    const closeList = () => {
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+
+      // Blank line -> paragraph break
+      if (!line) {
+        closeList();
+        flushParagraph();
+        continue;
+      }
+
+      // Bullet list detection
+      if (/^[-*•]\s+/.test(line)) {
+        flushParagraph();
+        if (!inList) {
+          html.push('<ul class="chat-list">');
+          inList = true;
+        }
+        html.push(`<li>${line.replace(/^[-*•]\s+/, "")}</li>`);
+        continue;
+      }
+
+      // Regular text
+      closeList();
+      buffer.push(line);
+    }
+
+    closeList();
+    flushParagraph();
+
+    return html.join("") || escaped;
+  }
+
+  function initialsFor(name) {
+    return (
+      name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((n) => n[0].toUpperCase())
+        .join("") || "AI"
+    );
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function renderMessage(msg) {
+    const isUser = msg.role === "user";
+    const author = isUser ? "You" : "AI Assistant";
+    const avatarClass = isUser ? "blue" : "purple";
+    const time = formatTimestamp(msg.created_at);
+    const content = formatMessageContent(msg.content);
+
+    return `
+      <div class="drawer-message chat-thread ${isUser ? "own" : "assistant"}">
+        <div class="drawer-msg-avatar ${avatarClass}">${initialsFor(author)}</div>
+        <div class="drawer-msg-content">
+          <div class="drawer-msg-header">
+            <span class="drawer-msg-author">${author}</span>
+            ${time ? `<span class="drawer-msg-time">${time}</span>` : ""}
+          </div>
+          <div class="drawer-msg-text">${content}</div>
+        </div>
+      </div>
+    `;
+  }
+
   async function sendMessage() {
     const sessionId = getSessionId();
     const message = chatEls.input?.value.trim();
     if (!sessionId || !message) return;
 
-    chatHistory.push({ role: "user", content: message });
+    const now = new Date().toISOString();
+    chatHistory.push({ role: "user", content: message, created_at: now });
     renderMessages();
     if (chatEls.input) chatEls.input.value = "";
     if (chatEls.sendBtn) chatEls.sendBtn.disabled = true;
 
     const typingEl = document.createElement("div");
-    typingEl.className = "chat-message assistant typing";
-    typingEl.innerHTML = '<div class="chat-bubble">Thinking...</div>';
+    typingEl.className = "drawer-message chat-thread assistant typing";
+    typingEl.innerHTML = `
+      <div class="drawer-msg-avatar purple">AI</div>
+      <div class="drawer-msg-content">
+        <div class="drawer-msg-header">
+          <span class="drawer-msg-author">AI Assistant</span>
+          <span class="drawer-msg-time">...</span>
+        </div>
+        <div class="drawer-msg-text">
+          <div class="drawer-typing-dots"><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    `;
     chatEls.messages?.appendChild(typingEl);
     if (chatEls.messages) chatEls.messages.scrollTop = chatEls.messages.scrollHeight;
 
@@ -97,7 +193,7 @@
 
       if (res.ok) {
         const data = await res.json();
-        chatHistory.push({ role: "assistant", content: data.content });
+        chatHistory.push({ role: "assistant", content: data.content, created_at: data.created_at });
         renderMessages();
       } else {
         let detail = "Failed to get response";
