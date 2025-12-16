@@ -1,6 +1,7 @@
 """
 Chat API for AI Studio - allows users to ask questions about uploaded RFP documents.
 Each chat is scoped to a session (one RFP = one chat history).
+Includes company profile context for personalized answers.
 """
 import json
 import asyncio
@@ -14,6 +15,7 @@ from app.api.auth_helpers import require_user_with_team
 from app.core.db_core import engine
 from app.ai.client import get_llm_client
 from app.services.document_processor import DocumentProcessor
+from app.services.company_profile_template import merge_company_profile_defaults
 from app.storage import read_storage_bytes
 
 logger = logging.getLogger("chat")
@@ -58,7 +60,7 @@ async def get_chat_messages(session_id: int, user=Depends(require_user_with_team
 
 @router.post("/message")
 async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_team)) -> Dict[str, Any]:
-    """Send a message and get AI response based on full RFP document content."""
+    """Send a message and get AI response based on full RFP document content and company profile."""
 
     async with engine.begin() as conn:
         # 1. Get session with opportunity_id
@@ -86,7 +88,11 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
                 detail="No document found. Please upload and extract an RFP first."
             )
 
-        # 3. Save user message
+        # 3. Get company profile for context
+        company_profile = await _get_company_profile(conn, user["id"])
+        company_context = _format_company_profile(company_profile)
+
+        # 4. Save user message
         await conn.exec_driver_sql(
             """
             INSERT INTO ai_chat_messages (session_id, user_id, role, content)
@@ -95,7 +101,7 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
             {"session_id": req.session_id, "user_id": user["id"], "content": req.message}
         )
 
-        # 4. Get chat history
+        # 5. Get chat history
         history = await conn.exec_driver_sql(
             """
             SELECT role, content FROM ai_chat_messages
@@ -106,38 +112,46 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
         )
         chat_history = [dict(r._mapping) for r in history.fetchall()][::-1]
 
-        # 5. Build context with full document text
+        # 6. Build context with full document text
         context = _prepare_context(document_text, req.message)
 
-        # 6. Call LLM
+        # 7. Call LLM
         llm = get_llm_client()
         if not llm:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="AI service unavailable")
 
-        system_prompt = f"""You are an expert assistant helping users understand an RFP (Request for Proposal) document.
+        system_prompt = f"""You are an expert assistant helping a company respond to an RFP (Request for Proposal).
 
-You have access to the FULL TEXT of the RFP document below. Use this to answer the user's questions accurately.
+You have access to:
+1. The FULL TEXT of the RFP document
+2. The user's COMPANY PROFILE with their qualifications, experience, and capabilities
+
+=== COMPANY PROFILE START ===
+{company_context}
+=== COMPANY PROFILE END ===
 
 === RFP DOCUMENT START ===
 {context}
 === RFP DOCUMENT END ===
 
 INSTRUCTIONS:
-1. Answer questions by finding and quoting relevant sections from the document above
-2. Be specific - mention section numbers, page references, or quote exact text when possible
-3. If the user asks about requirements, deadlines, or qualifications, find the exact language
-4. If something truly isn't in the document, say so, but first search thoroughly
-5. For questions like "what are the important things to consider" - analyze the full document for key requirements, deadlines, evaluation criteria, and compliance items
-6. Be helpful and thorough - these are important business documents"""
+1. Answer questions by finding relevant information from BOTH the RFP and the company profile
+2. When asked about requirements, check if the company meets them based on their profile
+3. When asked about qualifications or experience, reference the company's past projects, certifications, and key personnel
+4. For questions like "do we qualify?" or "can we meet this requirement?" - compare RFP requirements against company capabilities
+5. Be specific - quote exact RFP language and reference specific company qualifications
+6. If the company profile doesn't have relevant info, mention what information might be needed
+7. For strategic questions like "what should we highlight?" - identify the company's strengths that align with RFP evaluation criteria
+8. Be helpful and thorough - these are important business documents"""
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(chat_history)
 
-        logger.info(f"Chat request session={req.session_id} context_len={len(context)} question={req.message[:100]}")
+        logger.info(f"Chat request session={req.session_id} context_len={len(context)} company_len={len(company_context)} question={req.message[:100]}")
 
         response = llm.chat(messages, temperature=0.2)
 
-        # 7. Save assistant response
+        # 8. Save assistant response
         res = await conn.exec_driver_sql(
             """
             INSERT INTO ai_chat_messages (session_id, user_id, role, content)
@@ -154,6 +168,147 @@ INSTRUCTIONS:
             "content": response,
             "created_at": str(new_row.created_at)
         }
+
+
+async def _get_company_profile(conn, user_id: str) -> Dict[str, Any]:
+    """Fetch the user's company profile from the database."""
+    try:
+        res = await conn.exec_driver_sql(
+            "SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1",
+            {"uid": user_id}
+        )
+        row = res.first()
+        if row and row[0]:
+            data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            return merge_company_profile_defaults(data)
+    except Exception as exc:
+        logger.warning(f"Failed to load company profile: {exc}")
+    return merge_company_profile_defaults({})
+
+
+def _format_company_profile(profile: Dict[str, Any]) -> str:
+    """Format company profile into readable context for the LLM."""
+    parts = []
+
+    # Basic company info
+    if profile.get("legal_name"):
+        parts.append(f"Company Name: {profile['legal_name']}")
+    if profile.get("entity_type"):
+        parts.append(f"Entity Type: {profile['entity_type']}")
+    if profile.get("hq_address"):
+        parts.append(f"Address: {profile['hq_address']}")
+    if profile.get("website"):
+        parts.append(f"Website: {profile['website']}")
+    if profile.get("service_area"):
+        parts.append(f"Service Area: {profile['service_area']}")
+
+    # Primary contact
+    contact = profile.get("primary_contact", {})
+    if contact.get("name"):
+        contact_info = f"Primary Contact: {contact['name']}"
+        if contact.get("title"):
+            contact_info += f", {contact['title']}"
+        if contact.get("email"):
+            contact_info += f" ({contact['email']})"
+        parts.append(contact_info)
+
+    # Certifications
+    certs = profile.get("certifications_status", {})
+    active_certs = []
+    for cert_type in ["MBE", "SBE", "EDGE", "WBE"]:
+        if certs.get(cert_type):
+            active_certs.append(cert_type)
+    if active_certs:
+        parts.append(f"Certifications: {', '.join(active_certs)}")
+    if certs.get("details"):
+        parts.append(f"Certification Details: {certs['details']}")
+
+    # Licenses
+    licenses = profile.get("contractor_licenses", [])
+    valid_licenses = [lic for lic in licenses if lic.get("number")]
+    if valid_licenses:
+        lic_strs = []
+        for lic in valid_licenses:
+            lic_str = f"{lic.get('state', 'State')} #{lic.get('number', '')}"
+            if lic.get("expiry"):
+                lic_str += f" (exp: {lic['expiry']})"
+            lic_strs.append(lic_str)
+        parts.append(f"Contractor Licenses: {'; '.join(lic_strs)}")
+
+    # Insurance
+    insurance = profile.get("insurance", {})
+    ins_parts = []
+    if insurance.get("liability_insurance", {}).get("carrier"):
+        liability = insurance["liability_insurance"]
+        ins_parts.append(f"Liability: {liability['carrier']}, Limits: {liability.get('limits', 'N/A')}")
+    if insurance.get("workers_comp_certificate", {}).get("id"):
+        ins_parts.append("Workers Comp: Active")
+    if ins_parts:
+        parts.append(f"Insurance: {'; '.join(ins_parts)}")
+
+    # Key personnel
+    personnel = profile.get("key_personnel", [])
+    valid_personnel = [p for p in personnel if p.get("name")]
+    if valid_personnel:
+        parts.append("\nKey Personnel:")
+        for person in valid_personnel[:10]:  # Limit to 10
+            person_str = f"  - {person['name']}"
+            if person.get("role"):
+                person_str += f" ({person['role']})"
+            if person.get("bio"):
+                person_str += f": {person['bio'][:200]}"
+            parts.append(person_str)
+
+    # Past projects / experience
+    projects = profile.get("recent_projects", [])
+    valid_projects = [p for p in projects if p.get("client_name") or p.get("description")]
+    if valid_projects:
+        parts.append("\nPast Projects/Experience:")
+        for proj in valid_projects[:10]:  # Limit to 10
+            proj_str = f"  - {proj.get('client_name', 'Project')}"
+            if proj.get("description"):
+                proj_str += f": {proj['description'][:300]}"
+            if proj.get("dates"):
+                proj_str += f" ({proj['dates']})"
+            parts.append(proj_str)
+
+    # Training and certifications
+    training = profile.get("training_and_certifications", [])
+    valid_training = [t for t in training if t.get("person") and (t.get("certifications") or t.get("trainings_completed"))]
+    if valid_training:
+        parts.append("\nTraining & Certifications:")
+        for t in valid_training[:5]:
+            certs_list = t.get("certifications", [])
+            trainings_list = t.get("trainings_completed", [])
+            all_quals = certs_list + trainings_list
+            if all_quals:
+                parts.append(f"  - {t['person']}: {', '.join(all_quals[:10])}")
+
+    # Low income program experience
+    programs = profile.get("low_income_programs_supported", [])
+    valid_programs = [p for p in programs if p.get("program")]
+    if valid_programs:
+        parts.append("\nLow-Income Program Experience:")
+        for prog in valid_programs[:5]:
+            prog_str = f"  - {prog['program']}"
+            if prog.get("agency"):
+                prog_str += f" ({prog['agency']})"
+            if prog.get("scope"):
+                prog_str += f": {prog['scope'][:200]}"
+            parts.append(prog_str)
+
+    # Additional capabilities
+    if profile.get("residential_energy_program_experience"):
+        parts.append(f"\nResidential Energy Program Experience: {profile['residential_energy_program_experience']}")
+    if profile.get("avg_work_order_turnaround_days"):
+        parts.append(f"Average Turnaround: {profile['avg_work_order_turnaround_days']} days")
+    if profile.get("criminal_history_check_policy"):
+        parts.append(f"Background Check Policy: {profile['criminal_history_check_policy']}")
+
+    if not parts:
+        return "No company profile information available. User should complete their company profile for better assistance."
+
+    return "\n".join(parts)
 
 
 async def _get_document_text(conn, state: Dict[str, Any], opportunity_id: str, user_id: str) -> str:
