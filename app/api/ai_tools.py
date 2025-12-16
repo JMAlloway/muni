@@ -372,9 +372,36 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
     </div>
   </div>
   <div id="saveIndicator" class="save-indicator hidden">Saved</div>
+
+  <!-- Chat Sidebar -->
+  <aside class="chat-sidebar" id="chatSidebar">
+    <div class="chat-header">
+      <h3>Ask about this RFP</h3>
+      <button type="button" id="toggleChat" class="chat-toggle" title="Toggle chat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-empty">Ask a question about the RFP...</div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question..." disabled>
+      <button type="button" id="chatSend" class="chat-send" disabled>Send</button>
+    </div>
+  </aside>
+
+  <!-- Floating Chat Button (when sidebar is closed) -->
+  <button type="button" id="openChatBtn" class="chat-fab" title="Ask about RFP">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    </svg>
+  </button>
 </main>
 <input type="hidden" id="csrfTokenField" value="{csrf_token}">
 <script src="/static/js/ai-studio.js?v={STATIC_VER}"></script>
+<script src="/static/js/chat.js?v={STATIC_VER}"></script>
     """
     csp = (
         "default-src 'self'; "

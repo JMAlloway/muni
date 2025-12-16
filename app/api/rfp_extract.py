@@ -168,6 +168,7 @@ async def extract_from_upload(upload_id: int, user=Depends(require_user_with_tea
         "version": ts,
         "discovery": extracted_all.get("discovery") or {},
         "extracted": extracted_all.get("extracted") or {},
+        "raw_text": text[:200000],  # Store up to ~200k chars of raw text for chat
     }
     warning = None
     if not _has_useful_content(payload):

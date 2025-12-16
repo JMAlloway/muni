@@ -103,6 +103,7 @@
     allowAugment: false,
     isExtracting: false,
   };
+  window.aiStudioState = state;
 
   let saveTimer = null;
   let augmentingExtraction = false;
@@ -660,7 +661,7 @@
     setButtonLoading(els.extractBtn, "Analyzing RFP...");
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
+      const timeout = setTimeout(() => controller.abort(), 180000);
       const res = await fetch(`/api/rfp-extract/${uploadId}`, {
         method: "POST",
         credentials: "include",
@@ -757,22 +758,35 @@
     if (els.checklistItems) {
       els.checklistItems.innerHTML = "";
 
+      const normalize = (s) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
       const narratives = extracted.narrative_sections || [];
-      const narrativeNames = narratives
-        .map((n) => (typeof n === "string" ? n : n.name))
-        .filter(Boolean);
+      const narrativeNames = narratives.map((n) => (typeof n === "string" ? n : n.name)).filter(Boolean);
+      const seenNarratives = new Set();
+      const uniqueNarratives = narrativeNames.filter((name) => {
+        const key = normalize(name);
+        if (seenNarratives.has(key)) return false;
+        seenNarratives.add(key);
+        return true;
+      });
 
       const forms = extracted.attachments_forms || [];
       const otherForms = extracted.required_forms || [];
-      const allForms = [...new Set([...forms, ...otherForms])];
+      const seenForms = new Set();
+      const allForms = [...forms, ...otherForms].filter((name) => {
+        const key = normalize(name);
+        if (seenForms.has(key)) return false;
+        seenForms.add(key);
+        return true;
+      });
 
-      if (narrativeNames.length) {
+      if (uniqueNarratives.length) {
         const aiHeader = document.createElement("li");
         aiHeader.className = "checklist-header";
         aiHeader.innerHTML = "<strong>📝 AI Will Generate:</strong>";
         els.checklistItems.appendChild(aiHeader);
 
-        narrativeNames.forEach((item) => {
+        uniqueNarratives.forEach((item) => {
           const li = document.createElement("li");
           li.className = "checklist-narrative";
           li.textContent = item;
@@ -794,7 +808,7 @@
         });
       }
 
-      if (!narrativeNames.length && !allForms.length) {
+      if (!uniqueNarratives.length && !allForms.length) {
         els.checklistItems.innerHTML = `<li>No checklist items detected yet.</li>`;
       }
     }
@@ -869,6 +883,9 @@
     }
     renderGenerateOptions(extracted);
     handleStepAvailability();
+    if (state.sessionId && window.aiChat) {
+      window.aiChat.enable(true);
+    }
     return hasContent;
   }
 
@@ -1549,6 +1566,10 @@ ${escapeHtml(companyName)}`;
       state.sessionId = data.session_id;
       updateCurrentSessionDisplay();
       showSaveIndicator(manual ? "Saved" : "Autosaved");
+      if (window.aiChat && state.sessionId) {
+        window.aiChat.enable(true);
+        window.aiChat.loadHistory(state.sessionId);
+      }
     } catch (err) {
       showSaveIndicator(err.message || "Save failed", true);
     } finally {
@@ -1621,6 +1642,10 @@ ${escapeHtml(companyName)}`;
       handleStepAvailability();
       showMessage("Session restored.", "success");
       updateCurrentSessionDisplay();
+      if (window.aiChat && state.sessionId) {
+        window.aiChat.enable(true);
+        window.aiChat.loadHistory(state.sessionId);
+      }
     } catch (err) {
       showMessage(err.message || "Could not load session.", "error");
     }
@@ -1832,6 +1857,10 @@ ${escapeHtml(companyName)}`;
     state.documents = {};
     state.responseSections = [];
     state.currentDoc = "";
+    if (window.aiChat) {
+      window.aiChat.clear();
+      window.aiChat.enable(false);
+    }
 
     if (els.editableContent) {
       els.editableContent.innerHTML = "";

@@ -286,6 +286,32 @@ def _build_combined_prompt(text: str) -> List[Dict[str, str]]:
     ]
 
 
+def _normalize_string(s: str) -> str:
+    """Normalize a string for deduplication comparison."""
+    return re.sub(r"\s+", " ", s.strip().lower())
+
+
+def _is_duplicate_item(new_item: Any, existing_items: List[Any]) -> bool:
+    """Check if an item already exists in the list (handles both strings and dicts)."""
+    if isinstance(new_item, str):
+        normalized_new = _normalize_string(new_item)
+        for existing in existing_items:
+            if isinstance(existing, str) and _normalize_string(existing) == normalized_new:
+                return True
+        return False
+    elif isinstance(new_item, dict):
+        new_name = new_item.get("name") or new_item.get("title") or new_item.get("event") or ""
+        if new_name:
+            normalized_new = _normalize_string(str(new_name))
+            for existing in existing_items:
+                if isinstance(existing, dict):
+                    existing_name = existing.get("name") or existing.get("title") or existing.get("event") or ""
+                    if existing_name and _normalize_string(str(existing_name)) == normalized_new:
+                        return True
+        return False
+    return new_item in existing_items
+
+
 def _merge_json(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "title": "",
@@ -315,7 +341,9 @@ def _merge_json(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             val = res.get(key)
             if isinstance(out[key], list):
                 if isinstance(val, list):
-                    out[key].extend([v for v in val if v not in out[key]])
+                    for v in val:
+                        if v and not _is_duplicate_item(v, out[key]):
+                            out[key].append(v)
             else:
                 if val and isinstance(val, str) and len(val) > len(out[key]):
                     out[key] = val

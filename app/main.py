@@ -84,6 +84,7 @@ from app.core.db_migrations import (
     ensure_response_library_schema,
     ensure_extraction_cache_schema,
     ensure_ai_sessions_schema,
+    ensure_ai_chat_schema,
 )
 from app.api import dashboard_order as dashboard_order
 
@@ -255,6 +256,7 @@ from app.api import (
     response_library_api,
     collaboration,
     ai_sessions,
+    chat,
 )
 from app.api.bid_tracker import router as tracker_router
 from app.api.uploads import router as uploads_router
@@ -295,6 +297,7 @@ app.include_router(opportunity_questions.router)
 app.include_router(response_library_api.router)
 app.include_router(collaboration.router)
 app.include_router(ai_sessions.router)
+app.include_router(chat.router)
 app.include_router(tracked_opps.router)
 
 # -------------------------------------------------------------------
@@ -330,6 +333,7 @@ async def on_startup():
         await ensure_response_library_schema(engine)
         await ensure_extraction_cache_schema(engine)
         await ensure_ai_sessions_schema(engine)
+        await ensure_ai_chat_schema(engine)
     if settings.START_SCHEDULER_WEB:
         start_scheduler()
 

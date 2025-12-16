@@ -3,6 +3,17 @@
   "message": "Success",
   "payload": {
     "projects": {
+      "213276": {
+        "ProjectID": "213276",
+        "PrivateProjectID": "98133c24597cfb6e877f9312227173df",
+        "ReferenceID": "2026-202",
+        "ProjectStatusID": "2",
+        "ProjectSubStatusID": "1",
+        "ProjectVisibilityID": "1",
+        "ProjectName": "2026 Tree Pruning",
+        "DateClose": "2026-01-08 20:00:00",
+        "DepartmentID": "627"
+      },
       "212288": {
         "ProjectID": "212288",
         "PrivateProjectID": "6ddd77c1b897cebaed7361ca206d1f5e",
@@ -12,6 +23,17 @@
         "ProjectVisibilityID": "1",
         "ProjectName": "Everal Barn Alterations",
         "DateClose": "2026-01-08 21:00:00",
+        "DepartmentID": "627"
+      },
+      "212782": {
+        "ProjectID": "212782",
+        "PrivateProjectID": "832c139d921a92be2891d27e75ae6845",
+        "ReferenceID": "2026-002",
+        "ProjectStatusID": "2",
+        "ProjectSubStatusID": "1",
+        "ProjectVisibilityID": "1",
+        "ProjectName": "2026 Street Rehabilitation, Contract B",
+        "DateClose": "2026-01-21 20:00:00",
         "DepartmentID": "627"
       }
     },
