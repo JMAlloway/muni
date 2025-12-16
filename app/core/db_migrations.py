@@ -498,3 +498,26 @@ async def ensure_ai_sessions_schema(engine) -> None:
             )
     except Exception:
         return
+
+
+async def ensure_ai_chat_schema(engine) -> None:
+    """Create ai_chat_messages table for session-scoped Q&A."""
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS ai_chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NOT NULL,
+                    user_id TEXT NOT NULL,
+                    role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            await conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS idx_chat_session ON ai_chat_messages(session_id, created_at)"
+            )
+    except Exception:
+        return
