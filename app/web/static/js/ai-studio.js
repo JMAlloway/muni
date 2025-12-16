@@ -757,22 +757,41 @@
     if (els.checklistItems) {
       els.checklistItems.innerHTML = "";
 
+      // Helper to normalize strings for deduplication
+      const normalize = (s) => (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
       const narratives = extracted.narrative_sections || [];
       const narrativeNames = narratives
         .map((n) => (typeof n === "string" ? n : n.name))
         .filter(Boolean);
 
+      // Deduplicate narrative names (case-insensitive, whitespace-normalized)
+      const seenNarratives = new Set();
+      const uniqueNarratives = narrativeNames.filter((name) => {
+        const key = normalize(name);
+        if (seenNarratives.has(key)) return false;
+        seenNarratives.add(key);
+        return true;
+      });
+
       const forms = extracted.attachments_forms || [];
       const otherForms = extracted.required_forms || [];
-      const allForms = [...new Set([...forms, ...otherForms])];
+      // Deduplicate forms (case-insensitive, whitespace-normalized)
+      const seenForms = new Set();
+      const allForms = [...forms, ...otherForms].filter((name) => {
+        const key = normalize(name);
+        if (seenForms.has(key)) return false;
+        seenForms.add(key);
+        return true;
+      });
 
-      if (narrativeNames.length) {
+      if (uniqueNarratives.length) {
         const aiHeader = document.createElement("li");
         aiHeader.className = "checklist-header";
         aiHeader.innerHTML = "<strong>📝 AI Will Generate:</strong>";
         els.checklistItems.appendChild(aiHeader);
 
-        narrativeNames.forEach((item) => {
+        uniqueNarratives.forEach((item) => {
           const li = document.createElement("li");
           li.className = "checklist-narrative";
           li.textContent = item;
@@ -794,7 +813,7 @@
         });
       }
 
-      if (!narrativeNames.length && !allForms.length) {
+      if (!uniqueNarratives.length && !allForms.length) {
         els.checklistItems.innerHTML = `<li>No checklist items detected yet.</li>`;
       }
     }
