@@ -612,15 +612,48 @@
                       </div>
                       <div class="form-group">
                         <label>Upload - Ohio Certificate of Good Standing</label>
-                        <div class="file-upload-area">
-                          <input type="file" name="ohio_certificate" id="upload-ohio_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required hidden>
-                          <label for="upload-ohio_certificate" class="file-upload-label">
-                            <span class="upload-icon">^</span>
-                            <span class="upload-text">Click to upload or drag and drop</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
-                          </label>
+                        <div class="file-upload-container">
+                          <div class="file-existing" data-file-existing="ohio_certificate" style="display:none;">
+                            <div class="file-existing-preview" data-file-preview="ohio_certificate" style="display:none;"></div>
+                            <div class="file-existing-info">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                              </svg>
+                              <div class="file-existing-details">
+                                <span class="file-existing-name" data-file-name="ohio_certificate">—</span>
+                                <span class="file-existing-meta">Uploaded previously</span>
+                              </div>
+                            </div>
+                            <div class="file-existing-actions">
+                              <a class="file-existing-download" data-file-download="ohio_certificate" href="#" target="_blank" rel="noopener" title="Download" style="display:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                  <polyline points="7 10 12 15 17 10"></polyline>
+                                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                              </a>
+                              <button type="button" class="file-existing-replace" data-file-replace="ohio_certificate" title="Replace">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="1 4 1 10 7 10"></polyline>
+                                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div class="file-upload-area" data-file-upload="ohio_certificate">
+                            <input type="file" name="ohio_certificate" id="upload-ohio_certificate" class="form-input file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
+                            <label for="upload-ohio_certificate" class="file-upload-label">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                              </svg>
+                              <span class="upload-text">Upload certificate</span>
+                              <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
+                            </label>
+                          </div>
                         </div>
-                        <a class="file-link" data-file-link="ohio_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
                       </div>
                     </div>
                   </div>
@@ -701,7 +734,7 @@
                         <label for="upload-cert_upload" class="file-upload-label">
                           <span class="upload-icon">^</span>
                           <span class="upload-text">Upload certification documents</span>
-                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                         </label>
                       </div>
                       <a class="file-link" data-file-link="cert_upload" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -937,7 +970,7 @@
                         <label for="upload-capability_statement" class="file-upload-label">
                           <span class="upload-icon">^</span>
                           <span class="upload-text">Upload capability statement</span>
-                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                         </label>
                       </div>
                       <a class="file-link" data-file-link="capability_statement" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -949,7 +982,7 @@
                         <label for="upload-product_catalogs" class="file-upload-label">
                           <span class="upload-icon">^</span>
                           <span class="upload-text">Upload product catalogs</span>
-                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                         </label>
                       </div>
                       <a class="file-link" data-file-link="product_catalogs" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1088,7 +1121,7 @@
                               <label for="upload-sub1_certificate" class="file-upload-label">
                                 <span class="upload-icon">^</span>
                                 <span class="upload-text">Upload compliance certificate</span>
-                                <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                                <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                               </label>
                             </div>
                             <a class="file-link" data-file-link="sub1_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1152,7 +1185,7 @@
                           <label for="upload-insurance_certificate" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload certificate of insurance</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="insurance_certificate" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1165,7 +1198,7 @@
                         <label for="upload-bonding_letter" class="file-upload-label">
                           <span class="upload-icon">^</span>
                           <span class="upload-text">Upload bonding letter</span>
-                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                         </label>
                       </div>
                       <a class="file-link" data-file-link="bonding_letter" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1258,7 +1291,7 @@
                         <label for="upload-price_list_upload" class="file-upload-label">
                           <span class="upload-icon">^</span>
                           <span class="upload-text">Upload price list or catalog</span>
-                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                          <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                         </label>
                       </div>
                       <a class="file-link" data-file-link="price_list_upload" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1316,7 +1349,7 @@
                           <label for="upload-w9_upload" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload W-9</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="w9_upload" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1328,7 +1361,7 @@
                           <label for="upload-business_license" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload business license</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="business_license" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1340,7 +1373,7 @@
                           <label for="upload-safety_sheets" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload safety sheets</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="safety_sheets" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1354,7 +1387,7 @@
                           <label for="upload-warranty_info" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload warranty info</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="warranty_info" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1366,7 +1399,7 @@
                           <label for="upload-previous_contracts" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload previous contracts</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="previous_contracts" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -1378,7 +1411,7 @@
                           <label for="upload-org_chart" class="file-upload-label">
                             <span class="upload-icon">^</span>
                             <span class="upload-text">Upload org chart</span>
-                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                            <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                           </label>
                         </div>
                         <a class="file-link" data-file-link="org_chart" href="#" target="_blank" rel="noopener" style="display:none;"></a>
@@ -2136,35 +2169,55 @@
       }
 
       function showExistingFile(field, name, url) {
-        const existingDiv = document.querySelector(`[data-file-existing="${field}"]`) || ensureFileContainer(field);
-        const uploadDiv = document.querySelector(`[data-file-upload="${field}"]`) || ensureFileContainer(field);
+        // Ensure container exists
+        let existingDiv = document.querySelector(`[data-file-existing="${field}"]`);
+        let uploadDiv = document.querySelector(`[data-file-upload="${field}"]`);
+        
+        // If elements don't exist, create them
+        if (!existingDiv || !uploadDiv) {
+          const created = ensureFileContainer(field);
+          if (!created) return; // No input found for this field
+          existingDiv = document.querySelector(`[data-file-existing="${field}"]`);
+          uploadDiv = document.querySelector(`[data-file-upload="${field}"]`);
+        }
+        
+        if (!existingDiv || !uploadDiv) return;
+
         const nameEl = document.querySelector(`[data-file-name="${field}"]`);
         const downloadLink = document.querySelector(`[data-file-download="${field}"]`);
         const previewEl = document.querySelector(`[data-file-preview="${field}"]`);
-      
-        if (!existingDiv || !uploadDiv) return;
 
+        // Determine display name
         let displayName = (name || '').trim();
         if (!displayName) displayName = extractFilename(url) || extractFilename(name);
         if (!displayName && url) displayName = 'Uploaded file';
+        
         const hasSomething = Boolean(displayName || url);
 
         if (hasSomething) {
+          // Show existing file, hide upload area
           existingDiv.style.display = 'flex';
           uploadDiv.style.display = 'none';
           
+          // Update filename
           if (nameEl) nameEl.textContent = displayName || 'Uploaded file';
-          if (downloadLink && url) {
-            downloadLink.href = url;
-            downloadLink.style.display = 'flex';
-          } else if (downloadLink) {
-            downloadLink.style.display = 'none';
+          
+          // Update download link
+          if (downloadLink) {
+            if (url) {
+              downloadLink.href = url;
+              downloadLink.style.display = 'flex';
+            } else {
+              downloadLink.style.display = 'none';
+            }
           }
+          
+          // Update preview
           if (previewEl) {
             if (url && isImageUrl(url)) {
               const img = document.createElement('img');
               img.src = url;
-              img.alt = name || 'Preview';
+              img.alt = displayName || 'Preview';
               img.loading = 'lazy';
               img.onerror = function() {
                 const ext = (displayName.split('.').pop() || '').toUpperCase();
@@ -2173,19 +2226,25 @@
               };
               previewEl.innerHTML = '';
               previewEl.appendChild(img);
-              previewEl.style.display = 'block';
+              previewEl.style.display = 'flex';
             } else {
+              // Show file type icon
               const ext = (displayName.split('.').pop() || '').toUpperCase();
               previewEl.innerHTML = `<div class="file-preview-icon">${ext || 'FILE'}</div>`;
               previewEl.style.display = 'flex';
             }
           }
         } else {
+          // No file - show upload area, hide existing
           existingDiv.style.display = 'none';
           uploadDiv.style.display = 'block';
-          if (previewEl) previewEl.style.display = 'none';
+          if (previewEl) {
+            previewEl.innerHTML = '';
+            previewEl.style.display = 'none';
+          }
         }
-        updatePanelStatuses();
+        
+        // Rebind replace button for this field
         bindFileReplaceButtons();
       }
 
@@ -2254,20 +2313,35 @@
           const field = input.getAttribute('name');
           if (!field) return;
           const uploadArea = input.closest('.file-upload-area') || input.closest('.file-upload-area.small') || input.parentElement;
-          if (!uploadArea || uploadArea.closest('.file-upload-container')) return;
+          if (!uploadArea) return;
+          
+          // Already upgraded? ensure data attribute exists and skip
+          if (uploadArea.closest('.file-upload-container')) {
+            if (!uploadArea.dataset.fileUpload) {
+              uploadArea.dataset.fileUpload = field;
+            }
+            return;
+          }
+          
           uploadArea.dataset.fileUpload = field;
           const group = uploadArea.closest('.form-group') || uploadArea.parentElement;
           if (!group) return;
+          
+          // Create container and structure
           const container = document.createElement('div');
           container.className = 'file-upload-container';
           const existingDiv = createExistingTemplate(field);
+          
+          // Insert before uploadArea to preserve position, then move uploadArea inside
+          uploadArea.parentNode.insertBefore(container, uploadArea);
           container.appendChild(existingDiv);
           container.appendChild(uploadArea);
+          
+          // Clean up legacy elements
           const legacyLink = group.querySelector(`[data-file-link="${field}"]`);
           if (legacyLink) legacyLink.remove();
           const status = group.querySelector(`[data-file-status="${field}"]`);
           if (status) status.remove();
-          group.appendChild(container);
         });
       }
 
@@ -2817,6 +2891,9 @@
           const resp = await res.json();
           const payload = resp.data || {};
           const files = resp.files || {};
+          // DEBUG: Log what files the API returns
+          console.log('[loadCompanyProfile] files from API:', files);
+          console.log('[loadCompanyProfile] payload keys:', Object.keys(payload));
           const form = document.getElementById('companyProfileForm');
           if (!form) return;
           Array.from(form.querySelectorAll('[name]')).forEach((el) => {
@@ -2902,10 +2979,25 @@
       }
 
       async function saveCompanyProfile(panelKey) {
-        const btn = document.getElementById('saveCompanyProfile');
+        const mainBtn = document.getElementById('saveCompanyProfile');
         const status = document.getElementById('companyProfileStatus');
+        
+        // Find the section button if panelKey provided
+        let sectionBtn = null;
+        let sectionMeta = null;
+        if (panelKey) {
+          sectionBtn = document.querySelector(`[data-panel-key="${panelKey}"]`);
+          sectionMeta = document.querySelector(`[data-panel-save="${panelKey}"]`);
+        }
+        
+        // Disable buttons and show loading state
         if (status) status.textContent = '';
-        if (btn) btn.disabled = true;
+        if (mainBtn) mainBtn.disabled = true;
+        if (sectionBtn) {
+          sectionBtn.disabled = true;
+          sectionBtn.textContent = 'Saving...';
+        }
+        
         try {
           const payload = collectCompanyProfile();
           const res = await fetch('/api/company-profile', {
@@ -2915,18 +3007,29 @@
             body: payload,
           });
           if (!res.ok) throw new Error('Save failed');
+          
+          // Show success
           if (status) status.textContent = 'Company profile saved.';
+          if (sectionMeta) sectionMeta.textContent = 'Saved just now';
+          
           if (panelKey) {
             recordPanelSave(panelKey);
           } else {
             recordAllPanelSaves();
           }
-          // Reload profile to reflect uploaded files and statuses
+          
+          // Reload profile to reflect uploaded files
           await loadCompanyProfile();
+          
         } catch (_) {
           if (status) status.textContent = 'Could not save company profile.';
+          if (sectionMeta) sectionMeta.textContent = 'Save failed';
         } finally {
-          if (btn) btn.disabled = false;
+          if (mainBtn) mainBtn.disabled = false;
+          if (sectionBtn) {
+            sectionBtn.disabled = false;
+            sectionBtn.textContent = 'Save this section';
+          }
         }
       }
 
@@ -3165,7 +3268,7 @@
                 <label for="upload-sub${n}_certificate" class="file-upload-label">
                   <span class="upload-icon">^</span>
                   <span class="upload-text">Upload compliance certificate</span>
-                  <span class="upload-hint">PDF, JPG, PNG, DOCX (max 10MB)</span>
+                  <span class="upload-hint">PDF, JPG, PNG, DOCX (max 25MB)</span>
                 </label>
               </div>
             </div>
