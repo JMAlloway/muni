@@ -59,6 +59,10 @@ FILE_FIELDS = {
     "labor_compliance_cert",     # Prevailing wage compliance
     "conflict_of_interest",      # Ethics certification
     "references_combined",       # Combined references document
+    "emr_certificate",
+    "drug_free_policy",
+    "bank_reference_letter",
+    "quality_cert",              # ISO, etc.
 }
 
 from app.api._layout import auth_shell, page_shell

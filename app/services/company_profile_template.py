@@ -20,6 +20,13 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
     "entity_type": "",
     "state_of_incorporation": "",
     "year_established": "",
+    "employee_count_ft": "",
+    "employee_count_pt": "",
+    "cage_code": "",
+    "revenue_current": "",
+    "revenue_prior": "",
+    "revenue_two_years": "",
+    "gsa_schedule": "",
     "years_experience": "",
     "hq_address": "",
     "business_address": {"street": "", "city": "", "state": "", "zip": ""},
@@ -87,6 +94,8 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
             "effective": "",
             "expiry": "",
         },
+        "emr_rate": "",
+        "safety_program_details": "",
         "can_add_additional_insured": True,
     },
     "bonding": {
@@ -94,6 +103,12 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
         "aggregate_limit": "",
         "surety_company": "",
         "surety_contact": "",
+    },
+    "bank_reference": {
+        "bank_name": "",
+        "contact_name": "",
+        "phone": "",
+        "account_tenure_years": "",
     },
     "criminal_history_check_policy": "",
     "recordkeeping_controls": "",
@@ -107,6 +122,9 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
             "trainings_planned": [],
             "certifications": [],
         }
+    ],
+    "quality_certifications": [
+        {"type": "", "number": "", "expiry": ""}
     ],
     "recent_projects": [
         {
@@ -132,7 +150,10 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
     "full_time_employees": "",
     "safety_program_description": "",
     "emr": "",
+    "osha_incidents": "",
+    "drug_free_workplace": False,
     "naics_codes": [],
+    "sic_codes": [],
     "can_meet_timeframe": "",
     "residential_energy_program_experience": "",
     "compliance": {
