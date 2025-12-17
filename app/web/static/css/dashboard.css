@@ -1894,6 +1894,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .drawer-msg-avatar.blue {
@@ -1902,6 +1903,12 @@ body {
 
 .drawer-msg-avatar.purple {
   background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+}
+.drawer-msg-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .drawer-msg-content {

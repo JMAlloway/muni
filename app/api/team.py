@@ -13,6 +13,7 @@ from app.auth.auth_utils import require_login
 from app.auth.session import get_current_user_email
 from app.core.db import AsyncSessionLocal
 from app.core.settings import settings
+from app.storage import create_presigned_get
 from app.core.emailer import send_email
 from app.api.notifications import create_notification, send_team_notification
 
@@ -551,7 +552,7 @@ async def list_notes(request: Request, opportunity_id: str):
         res = await session.execute(
             text(
                 """
-                SELECT bn.id, bn.body, bn.mentions, bn.author_user_id, bn.created_at, u.email AS author_email
+                SELECT bn.id, bn.body, bn.mentions, bn.author_user_id, bn.created_at, u.email AS author_email, u.avatar_key
                 FROM bid_notes bn
                 LEFT JOIN users u ON u.id = bn.author_user_id
                 WHERE bn.team_id = :team AND bn.opportunity_id = :oid
@@ -576,6 +577,7 @@ async def list_notes(request: Request, opportunity_id: str):
                     "author_user_id": n[3],
                     "created_at": _fmt_ts(n[4]),
                     "author_email": n[5],
+                    "avatar_url": create_presigned_get(n[6]) if n[6] else None,
                 }
             )
     return {"notes": notes}

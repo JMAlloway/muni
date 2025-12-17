@@ -9,6 +9,12 @@
   };
 
   let chatHistory = [];
+  const userAvatarUrl =
+    window.currentUserAvatar ||
+    (() => {
+      const img = document.querySelector(".avatar-circle img, #topAvatar img");
+      return img ? img.src : null;
+    })();
 
   function getCsrf() {
     return document.getElementById("csrfTokenField")?.value || "";
@@ -135,10 +141,13 @@
     const avatarClass = isUser ? "blue" : "purple";
     const time = formatTimestamp(msg.created_at);
     const content = formatMessageContent(msg.content);
+    const avatar = isUser && userAvatarUrl
+      ? `<div class="drawer-msg-avatar"><img src="${userAvatarUrl}" alt="${author}"></div>`
+      : `<div class="drawer-msg-avatar ${avatarClass}">${initialsFor(author)}</div>`;
 
     return `
       <div class="drawer-message chat-thread ${isUser ? "own" : "assistant"}">
-        <div class="drawer-msg-avatar ${avatarClass}">${initialsFor(author)}</div>
+        ${avatar}
         <div class="drawer-msg-content">
           <div class="drawer-msg-header">
             <span class="drawer-msg-author">${author}</span>

@@ -30,6 +30,8 @@ _DEFAULT_COMPANY_PROFILE: Dict[str, Any] = {
     "service_area_list": [],
     "service_categories": [],
     "company_overview": "",
+    "experience": "",
+    "offerings": "",
     "primary_contact": {
         "name": "",
         "title": "",

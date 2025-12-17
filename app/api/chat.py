@@ -505,6 +505,16 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
         parts.append(f"Service Categories: {', '.join([c for c in profile.get('service_categories', []) if c])}")
     if profile.get("company_overview"):
         parts.append(f"Overview: {profile['company_overview']}")
+    if profile.get("experience"):
+        parts.append(f"Company Experience: {profile['experience']}")
+    if profile.get("offerings"):
+        parts.append(f"Services/Product Offerings: {profile['offerings']}")
+    if profile.get("sole_responsibility_statement"):
+        parts.append(f"Sole Responsibility Statement: {profile['sole_responsibility_statement']}")
+    if profile.get("criminal_history_check_policy"):
+        parts.append(f"Criminal History Check Policy: {profile['criminal_history_check_policy']}")
+    if profile.get("recordkeeping_controls"):
+        parts.append(f"Recordkeeping Controls: {profile['recordkeeping_controls']}")
 
     # Primary contact
     contact = profile.get("primary_contact", {})
@@ -665,6 +675,14 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
         parts.append(f"EMR: {profile['emr']}")
     if profile.get("naics_codes"):
         parts.append(f"NAICS Codes: {', '.join([c for c in profile.get('naics_codes', []) if c])}")
+    if profile.get("can_meet_timeframe") is not None:
+        parts.append(f"Can Meet RFP Timeframe: {'Yes' if profile['can_meet_timeframe'] else 'No'}")
+    attachments = profile.get("attachments", [])
+    if attachments:
+        names = [a.get("name") or a.get("filename") or a.get("id") for a in attachments if isinstance(a, dict)]
+        names = [n for n in names if n]
+        if names:
+            parts.append("Supporting Attachments: " + ", ".join(names[:10]))
 
     # Subcontractors
     subs = profile.get("subcontractors", [])

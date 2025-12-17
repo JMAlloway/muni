@@ -600,13 +600,14 @@ async def account_overview(request: Request):
                 return str(val)
 
         next_billing_at = None
+        avatar_key = None
         try:
             res = await db.execute(
                 text(
                     """
                     SELECT id, email, first_name, last_name, is_active, created_at,
                            COALESCE(Tier, tier) AS tier, team_id,
-                           stripe_customer_id, stripe_subscription_id, next_billing_at
+                           stripe_customer_id, stripe_subscription_id, avatar_key, next_billing_at
                     FROM users
                     WHERE lower(email) = lower(:email)
                     LIMIT 1
@@ -628,6 +629,7 @@ async def account_overview(request: Request):
                 team_id,
                 stripe_customer_id,
                 stripe_subscription_id,
+                avatar_key,
                 next_billing_at,
             ) = row
         except Exception:
@@ -636,8 +638,8 @@ async def account_overview(request: Request):
                 text(
                     """
                     SELECT id, email, first_name, last_name, is_active, created_at,
-                           COALESCE(Tier, tier) AS tier, team_id,
-                           stripe_customer_id, stripe_subscription_id
+                            COALESCE(Tier, tier) AS tier, team_id,
+                            stripe_customer_id, stripe_subscription_id
                     FROM users
                     WHERE lower(email) = lower(:email)
                     LIMIT 1
@@ -714,7 +716,7 @@ async def account_overview(request: Request):
                     text(
                         """
                         SELECT tm.id, tm.user_id, tm.invited_email, tm.role, tm.accepted_at, tm.invited_at,
-                               u.first_name, u.last_name, u.email
+                               u.first_name, u.last_name, u.email, u.avatar_key
                         FROM team_members tm
                         LEFT JOIN users u ON u.id = tm.user_id
                         WHERE tm.team_id = :team
@@ -724,7 +726,7 @@ async def account_overview(request: Request):
                 )
                 rows = member_res.fetchall()
                 for r in rows:
-                    mid, m_user_id, invited_email, m_role, accepted_at, invited_at, f, l, u_email = r
+                    mid, m_user_id, invited_email, m_role, accepted_at, invited_at, f, l, u_email, m_avatar_key = r
                     email_val = u_email or invited_email
                     name_val = " ".join([p for p in [(f or "").strip(), (l or "").strip()] if p]).strip()
                     members.append(
@@ -736,6 +738,7 @@ async def account_overview(request: Request):
                             "accepted": bool(accepted_at),
                             "accepted_at": accepted_at,
                             "invited_at": invited_at,
+                            "avatar_url": create_presigned_get(m_avatar_key) if m_avatar_key else None,
                         }
                     )
                     if m_user_id and str(m_user_id) == str(user_id):
@@ -811,6 +814,13 @@ async def account_overview(request: Request):
         for entry in activity_entries:
             entry["when"] = _to_iso(entry.get("when"))
 
+        avatar_url = None
+        if avatar_key:
+            try:
+                avatar_url = create_presigned_get(avatar_key)
+            except Exception:
+                avatar_url = None
+
     return {
         "user": {
             "email": email,
@@ -822,6 +832,7 @@ async def account_overview(request: Request):
             "role": user_role,
             "email_verified": bool(is_active),
             "created_at": _to_iso(created_at),
+            "avatar_url": avatar_url,
         },
         "plan": {
             "label": plan["label"],
@@ -864,6 +875,44 @@ async def update_profile(request: Request, payload: dict):
         )
         await db.commit()
     return {"ok": True}
+
+
+@router.post("/api/account/avatar", response_class=JSONResponse)
+async def upload_avatar(request: Request):
+    from app.storage import store_profile_file, create_presigned_get
+
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    user_id = await _get_user_id(user_email)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    form = await request.form()
+    file = form.get("avatar")
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+
+    storage_key = store_profile_file(user_id, "avatar", data, file.filename, file.content_type)
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("UPDATE users SET avatar_key = :key WHERE id = :uid"),
+            {"key": storage_key, "uid": user_id},
+        )
+        await db.commit()
+
+    url = create_presigned_get(storage_key)
+    return {"ok": True, "avatar_url": url}
 
 
 @router.get("/api/company-profile", response_class=JSONResponse)

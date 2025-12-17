@@ -25,6 +25,7 @@ class User(Base):
     first_tracked_at: Mapped[dt.datetime | None] = mapped_column(TIMESTAMP(timezone=True))
     stripe_customer_id: Mapped[str | None] = mapped_column(String, default=None)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String, default=None)
+    avatar_key: Mapped[str | None] = mapped_column(String, default=None)
 
 class Opportunity(Base):
     __tablename__ = "opportunity"

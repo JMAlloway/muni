@@ -339,8 +339,11 @@
       const label = isMine ? "You" : author;
       const avClass = avatarClass(author);
       const init = initials(author);
+      const avatar = n.avatar_url
+        ? `<div class="drawer-msg-avatar"><img src="${escHtml(n.avatar_url)}" alt="${escHtml(label)}"></div>`
+        : `<div class="drawer-msg-avatar${avClass ? ' ' + avClass : ''}">${escHtml(init)}</div>`;
       return `<div class="drawer-message ${isMine ? 'own' : ''}">
-        <div class="drawer-msg-avatar${avClass ? ' ' + avClass : ''}">${escHtml(init)}</div>
+        ${avatar}
         <div class="drawer-msg-content">
           <div class="drawer-msg-header">
             <span class="drawer-msg-author">${escHtml(label)}</span>
@@ -1013,7 +1016,6 @@
     }
   };
 })();
-
 
 
 
