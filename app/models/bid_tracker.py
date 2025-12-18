@@ -24,4 +24,5 @@ class UserUpload(Base):
     storage_key = Column(Text, nullable=False)  # S3 key or local path
     version = Column(Integer, default=1)
     source_note = Column(Text, default="user-upload")  # label for audit
+    folder_type = Column(String(32), default="root")  # root|ai-studio|ai-studio-output
     created_at = Column(DateTime, default=datetime.utcnow)

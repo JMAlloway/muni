@@ -59,9 +59,14 @@ async def _resolve_opportunity_id(key: str) -> int:
 @router.post("/add")
 async def upload_files(
     opportunity_id: str = Form(...),
+    folder_type: str = Form("root"),
     files: List[UploadFile] = File(...),
     user = Depends(_require_user)
 ):
+    valid_types = {"root", "ai-studio", "ai-studio-output"}
+    if folder_type not in valid_types:
+        folder_type = "root"
+
     saved = []
     oid = await _resolve_opportunity_id(opportunity_id)
     async with engine.begin() as conn:
@@ -83,9 +88,17 @@ async def upload_files(
 
             storage_key, size, mime = store_bytes(user.id, oid, data, safe_name, mime)
             await conn.exec_driver_sql("""
-                INSERT INTO user_uploads (user_id, opportunity_id, filename, mime, size, storage_key)
-                VALUES (:uid, :oid, :fn, :mime, :size, :key)
-            """, {"uid": user.id, "oid": oid, "fn": safe_name, "mime": mime, "size": size, "key": storage_key})
+                INSERT INTO user_uploads (user_id, opportunity_id, filename, mime, size, storage_key, folder_type)
+                VALUES (:uid, :oid, :fn, :mime, :size, :key, :folder_type)
+            """, {
+                "uid": user.id,
+                "oid": oid,
+                "fn": safe_name,
+                "mime": mime,
+                "size": size,
+                "key": storage_key,
+                "folder_type": folder_type,
+            })
             # get inserted row id
             row = await conn.exec_driver_sql("SELECT last_insert_rowid() AS id")
             rec_id = row.first()[0]

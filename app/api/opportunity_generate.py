@@ -35,7 +35,7 @@ DEFAULT_TEMPERATURE = 0.4
 async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
     try:
         async with engine.begin() as conn:
-            merged = await get_company_profile_cached(conn, user_id)
+            merged = await get_company_profile_cached(conn, user_id, user.get("team_id") if isinstance(user, dict) else None)
 
             file_fields = [
                 # Commonly used signature and compliance files

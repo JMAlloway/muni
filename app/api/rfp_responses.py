@@ -155,7 +155,7 @@ async def generate_rfp_response(payload: dict, user=Depends(_require_user)):
     instruction_upload_ids = payload.get("instruction_upload_ids") or []
 
     async with engine.begin() as conn:
-        company_profile = await get_company_profile_cached(conn, user["id"])
+        company_profile = await get_company_profile_cached(conn, user["id"], user.get("team_id"))
     win_themes = await _get_win_themes(user, win_theme_ids)
     knowledge_docs = await _get_knowledge_docs(user, knowledge_doc_ids)
     instruction_docs = await _get_instruction_docs(user, instruction_upload_ids)

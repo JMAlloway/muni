@@ -104,9 +104,24 @@ async def documents_page(request: Request):
   </div>
 
   <div class="folders-section fade-in stagger-2">
-    <h3 class="section-label">Folders</h3>
+    <h3 class="section-label">Document Library</h3>
     <div class="folders-grid" id="foldersGrid"></div>
-    <div class="subfolders-grid" id="subfolderGrid"></div>
+  </div>
+
+  <div class="company-profile-section fade-in stagger-2" id="companyProfileSection" style="display: none;">
+    <div class="section-header">
+      <h3 class="section-label">Company Profile Documents</h3>
+      <a href="/account#profile" class="edit-profile-link">Edit in Profile</a>
+    </div>
+    <div class="company-docs-grid" id="companyDocsGrid"></div>
+  </div>
+
+  <div class="rfp-tree-section fade-in stagger-2" id="rfpTreeSection" style="display: none;">
+    <div class="section-header">
+      <h3 class="section-label">RFP Documents</h3>
+      <button class="collapse-all-btn" id="collapseAllBtn" type="button">Collapse All</button>
+    </div>
+    <div class="rfp-tree" id="rfpTree"></div>
   </div>
 
   <div class="files-section fade-in stagger-3">
@@ -172,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const foldersGrid = document.getElementById('foldersGrid');
   const filesGrid = document.getElementById('filesGrid');
   const fileCountEl = document.getElementById('fileCount');
-  const subfolderGrid = document.getElementById('subfolderGrid');
   const selectModeBtn = document.getElementById('selectModeBtn');
   const selectionBar = document.getElementById('selectionBar');
   const selectionCount = document.getElementById('selectionCount');
@@ -184,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const selectedCountEl = document.getElementById('selectedCount');
   const bulkActions = document.getElementById('bulkActions');
   const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  const collapseAllBtn = document.getElementById('collapseAllBtn');
   let allFiles = [];
   let foldersData = [];
   let oppSelectOptions = [];
@@ -256,6 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    if (collapseAllBtn) {
+      collapseAllBtn.addEventListener('click', () => {
+        document.querySelectorAll('.rfp-folder.expanded').forEach(f => f.classList.remove('expanded'));
+        document.querySelectorAll('.rfp-subfolder.expanded').forEach(f => f.classList.remove('expanded'));
+      });
+    }
+
     if (selectModeBtn) {
       selectModeBtn.addEventListener('click', toggleSelectionMode);
     }
@@ -283,6 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
       renderFolders(foldersData);
       renderUploadSelect(oppSelectOptions);
       renderFiles(data.files || []);
+      renderCompanyDocs(data.company_docs || []);
+      renderRfpTree(oppSelectOptions, data.files || []);
     } catch (err) {
       console.error(err);
       if (fileCountEl) fileCountEl.textContent = 'Unable to load documents';
@@ -308,11 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderFolders(list) {
     foldersGrid.innerHTML = '';
-    const fallback = [
-      { id: 'active', title: 'Active Bids', count: 0 },
-      { id: 'archive', title: 'Archive', count: 0 },
-    ];
-    const folders = (list && list.length) ? list : fallback;
+    const folders = (list && list.length) ? list : [];
     folders.forEach(f => {
       const card = document.createElement('div');
       card.className = 'folder-card';
@@ -328,13 +348,17 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="folder-count">${(f.count || 0)} files</div>
         </div>`;
       card.addEventListener('click', () => {
-        state.folder = f.id;
-        renderSubfolders(f.id);
+        const fid = String(f.id || '');
+        state.folder = (fid === 'active' || fid === 'archive') ? fid : null;
         applyFilters();
+        if (fid === 'company-profile') {
+          document.getElementById('companyProfileSection')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (fid === 'rfp-tree') {
+          document.getElementById('rfpTreeSection')?.scrollIntoView({ behavior: 'smooth' });
+        }
       });
       foldersGrid.appendChild(card);
     });
-    renderSubfolders(null);
   }
 
   function updateBulkUI() {
@@ -384,39 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.file-card').forEach(card => {
       const cardId = String(card.dataset.fileId || '');
       card.classList.toggle('selected', state.selectedIds.has(cardId));
-    });
-  }
-
-  function renderSubfolders(folderId) {
-    subfolderGrid.innerHTML = '';
-    let subset = [];
-    if (folderId === 'archive') {
-      subset = oppSelectOptions.filter(o => (o.status || '').includes('archive'));
-    } else if (folderId === 'active') {
-      subset = oppSelectOptions.filter(o => !(o.status || '').includes('archive'));
-    }
-    if (!subset.length) return;
-    subset.forEach(o => {
-      const card = document.createElement('div');
-      card.className = 'subfolder-card';
-      card.dataset.opportunity = o.id;
-      card.innerHTML = `
-        <div class="subfolder-name ticker">
-          <span>${o.title || 'Opportunity'}</span>
-        </div>
-        <div class="subfolder-count">${(o.count || 0)} files</div>
-      `;
-      card.addEventListener('click', () => {
-        state.folder = 'active';
-        state.search = '';
-        searchInput.value = '';
-        document.querySelectorAll('.file-card').forEach(f => {
-          f.style.display = (f.dataset.opportunity === String(o.id)) ? 'flex' : 'none';
-        });
-        updateCountManual();
-        updateBulkUI();
-      });
-      subfolderGrid.appendChild(card);
     });
   }
 
@@ -559,6 +550,183 @@ document.addEventListener('DOMContentLoaded', () => {
     if (fileCountEl) fileCountEl.textContent = `Showing ${visible} files`;
     updateBulkUI();
   }
+
+  function renderCompanyDocs(docs) {
+    const section = document.getElementById('companyProfileSection');
+    const grid = document.getElementById('companyDocsGrid');
+    if (!docs || !docs.length) {
+      if (section) section.style.display = 'none';
+      return;
+    }
+    if (section) section.style.display = 'block';
+    if (!grid) return;
+
+    grid.innerHTML = docs.map(doc => {
+      return `
+        <div class="company-doc-card">
+          <div class="company-doc-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <div class="company-doc-info">
+            <div class="company-doc-name">${doc.display_name}</div>
+            <div class="company-doc-filename">${doc.filename || ''}</div>
+          </div>
+          <a class="company-doc-download" href="${doc.download_url}" target="_blank" rel="noopener" title="Download">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </a>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderRfpTree(opps, files) {
+    const section = document.getElementById('rfpTreeSection');
+    const tree = document.getElementById('rfpTree');
+    if (!opps || !opps.length) {
+      if (section) section.style.display = 'none';
+      return;
+    }
+    if (section) section.style.display = 'block';
+    if (!tree) return;
+
+    tree.innerHTML = opps.map(opp => {
+      const oppFiles = (files || []).filter(f => f.opportunity_id === opp.id);
+      const rootFiles = oppFiles.filter(f => f.folder_type === 'root' || !f.folder_type);
+      const aiStudioFiles = oppFiles.filter(f => f.folder_type === 'ai-studio');
+      const outputFiles = oppFiles.filter(f => f.folder_type === 'ai-studio-output');
+
+      return `
+        <div class="rfp-folder" data-opp-id="${opp.id}">
+          <div class="rfp-folder-header" onclick="toggleRfpFolder(this)">
+            <div class="rfp-folder-toggle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </div>
+            <div class="rfp-folder-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div class="rfp-folder-info">
+              <div class="rfp-folder-name">${opp.title || 'Untitled RFP'}</div>
+              <div class="rfp-folder-count">${opp.count || 0} files</div>
+            </div>
+          </div>
+          <div class="rfp-folder-content">
+            ${rootFiles.length ? `
+              <div class="rfp-files-list">
+                ${rootFiles.map(f => renderTreeFile(f)).join('')}
+              </div>
+            ` : ''}
+            ${(aiStudioFiles.length || outputFiles.length) ? `
+              <div class="rfp-subfolder" data-subfolder="ai-studio">
+                <div class="rfp-subfolder-header" onclick="toggleSubfolder(this)">
+                  <div class="rfp-subfolder-toggle">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </div>
+                  <div class="rfp-subfolder-icon ai-studio">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                  </div>
+                  <span class="rfp-subfolder-name">AI Studio</span>
+                  <span class="rfp-subfolder-count">${aiStudioFiles.length + outputFiles.length}</span>
+                </div>
+                <div class="rfp-subfolder-content">
+                  ${aiStudioFiles.length ? `
+                    <div class="rfp-files-list">
+                      ${aiStudioFiles.map(f => renderTreeFile(f)).join('')}
+                    </div>
+                  ` : ''}
+                  ${outputFiles.length ? `
+                    <div class="rfp-subfolder nested" data-subfolder="output">
+                      <div class="rfp-subfolder-header" onclick="toggleSubfolder(this)">
+                        <div class="rfp-subfolder-toggle">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"/>
+                          </svg>
+                        </div>
+                        <div class="rfp-subfolder-icon output">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <polyline points="9 15 12 12 15 15"/>
+                          </svg>
+                        </div>
+                        <span class="rfp-subfolder-name">Output</span>
+                        <span class="rfp-subfolder-count">${outputFiles.length}</span>
+                      </div>
+                      <div class="rfp-subfolder-content">
+                        <div class="rfp-files-list">
+                          ${outputFiles.map(f => renderTreeFile(f)).join('')}
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderTreeFile(file) {
+    const ext = ((file.filename || '').split('.').pop() || '').toUpperCase() || 'FILE';
+    const cls = pickPreviewClass(file.mime);
+    return `
+      <div class="tree-file-card" data-file-id="${file.id}">
+        <div class="tree-file-icon ${cls}">
+          <span class="tree-file-ext">${ext}</span>
+        </div>
+        <div class="tree-file-info">
+          <div class="tree-file-name">${file.filename || 'Untitled'}</div>
+          <div class="tree-file-meta">${file.size_label || ''} · ${file.modified_label || ''}</div>
+        </div>
+        <div class="tree-file-actions">
+          ${file.download_url ? `
+            <a class="tree-file-btn" href="${file.download_url}" target="_blank" rel="noopener" title="Download">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </a>
+          ` : ''}
+          <button class="tree-file-btn delete-btn" onclick="handleDelete(${file.id}, '${(file.filename || '').replace(/'/g, "\\'")}'); event.stopPropagation();" title="Delete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Expose toggles for inline handlers
+  window.toggleRfpFolder = function(header) {
+    const folder = header.closest('.rfp-folder');
+    folder.classList.toggle('expanded');
+  };
+
+  window.toggleSubfolder = function(header) {
+    const subfolder = header.closest('.rfp-subfolder');
+    subfolder.classList.toggle('expanded');
+  };
+
+  window.handleDelete = handleDelete;
 
   function updateCountManual() {
     let visible = 0;
@@ -710,9 +878,11 @@ async def documents_data(request: Request):
             raise HTTPException(status_code=401, detail="Not authenticated")
         uid = row[0]
 
+        # Get all user uploads with folder_type
         files_res = await conn.exec_driver_sql(
             """
-            SELECT u.id, u.filename, u.mime, u.size, u.storage_key, u.created_at, u.opportunity_id,
+            SELECT u.id, u.filename, u.mime, u.size, u.storage_key, u.created_at, 
+                   u.opportunity_id, COALESCE(u.folder_type, 'root') as folder_type,
                    o.title AS opportunity_title,
                    COALESCE(o.status, '') AS opportunity_status
             FROM user_uploads u
@@ -742,7 +912,6 @@ async def documents_data(request: Request):
                 return f"{b} B"
 
             storage_key = m.get("storage_key")
-            # Folder bucketing: archive if status contains 'archive', otherwise active
             status = (m.get("opportunity_status") or "").lower()
             folder = "archive" if "archive" in status else "active"
 
@@ -757,44 +926,92 @@ async def documents_data(request: Request):
                     "opportunity_id": m.get("opportunity_id"),
                     "opportunity_title": m.get("opportunity_title") or "Folder",
                     "folder": folder,
+                    "folder_type": m.get("folder_type") or "root",
                     "modified_label": mod_label,
                 }
             )
 
+        # Get opportunities with file counts by folder_type
         opps_res = await conn.exec_driver_sql(
             """
-            SELECT o.id, o.title, COALESCE(o.status,'') AS status, COUNT(u.id) AS count
+            SELECT o.id, o.title, COALESCE(o.status,'') AS status,
+                   COUNT(u.id) AS total_count,
+                   SUM(CASE WHEN COALESCE(u.folder_type, 'root') = 'root' THEN 1 ELSE 0 END) AS root_count,
+                   SUM(CASE WHEN u.folder_type = 'ai-studio' THEN 1 ELSE 0 END) AS ai_studio_count,
+                   SUM(CASE WHEN u.folder_type = 'ai-studio-output' THEN 1 ELSE 0 END) AS output_count
             FROM opportunities o
-            LEFT JOIN user_bid_trackers t ON t.opportunity_id = o.id
-            LEFT JOIN users u2 ON u2.id = t.user_id
+            LEFT JOIN user_bid_trackers t ON t.opportunity_id = o.id AND t.user_id = :uid
             LEFT JOIN user_uploads u ON u.opportunity_id = o.id AND u.user_id = :uid
-            WHERE u2.email = :email OR u.user_id = :uid
+            WHERE t.user_id = :uid
             GROUP BY o.id, o.title, o.status
             ORDER BY o.title
             """,
-            {"uid": uid, "email": email},
+            {"uid": uid},
         )
         opps = []
-        active_count = 0
-        archive_count = 0
         for row in opps_res.fetchall():
             m = row._mapping
             if m.get("id") is None:
                 continue
             status = (m.get("status") or "").lower()
-            is_archive = "archive" in status
-            if is_archive:
-                archive_count += m.get("count") or 0
-            else:
-                active_count += m.get("count") or 0
-            opps.append({"id": m["id"], "title": m["title"], "count": m["count"], "status": status})
+            opps.append({
+                "id": m["id"],
+                "title": m["title"],
+                "status": status,
+                "count": m["total_count"] or 0,
+                "root_count": m["root_count"] or 0,
+                "ai_studio_count": m["ai_studio_count"] or 0,
+                "output_count": m["output_count"] or 0,
+            })
+
+        # Get company profile documents
+        company_docs = []
+        try:
+            profile_res = await conn.exec_driver_sql(
+                "SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1",
+                {"uid": uid},
+            )
+            profile_row = profile_res.first()
+            if profile_row and profile_row[0]:
+                import json
+                profile_data = profile_row[0]
+                if isinstance(profile_data, str):
+                    profile_data = json.loads(profile_data)
+
+                file_fields = [
+                    ("capability_statement", "Capability Statement"),
+                    ("insurance_certificate", "Certificate of Insurance"),
+                    ("w9_upload", "W-9 Form"),
+                    ("business_license", "Business License"),
+                    ("bonding_letter", "Bonding Letter"),
+                    ("ohio_certificate", "Ohio Certificate"),
+                    ("cert_upload", "Certification"),
+                    ("financial_statements", "Financial Statements"),
+                    ("org_chart", "Organizational Chart"),
+                    ("digital_signature", "Digital Signature"),
+                    ("signature_image", "Signature Image"),
+                ]
+
+                for field_key, display_name in file_fields:
+                    storage_key = profile_data.get(field_key)
+                    file_name = profile_data.get(f"{field_key}_name", "")
+                    if storage_key and isinstance(storage_key, str):
+                        company_docs.append({
+                            "id": f"profile_{field_key}",
+                            "filename": file_name or display_name,
+                            "display_name": display_name,
+                            "download_url": create_presigned_get(storage_key),
+                            "field_key": field_key,
+                        })
+        except Exception:
+            pass
 
     folders = [
-        {"id": "active", "title": "Active Bids", "count": active_count},
-        {"id": "archive", "title": "Archive", "count": archive_count},
+        {"id": "company-profile", "title": "Company Profile Documents", "count": len(company_docs)},
+        {"id": "rfp-tree", "title": "RFP Documents", "count": len(files)},
     ]
 
-    return {"files": files, "opportunities": opps, "folders": folders}
+    return {"files": files, "opportunities": opps, "folders": folders, "company_docs": company_docs}
 
 
 

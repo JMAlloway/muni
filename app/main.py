@@ -73,6 +73,7 @@ from app.api._layout import page_shell
 from app.core.db_migrations import (
     ensure_onboarding_schema,
     ensure_uploads_schema,
+    ensure_uploads_folder_type,
     ensure_team_schema,
     ensure_user_tier_column,
     ensure_billing_schema,
@@ -322,6 +323,7 @@ async def on_startup():
         async with AsyncSessionLocal() as db:
             await create_admin_if_missing(db)
         await ensure_uploads_schema(engine)
+        await ensure_uploads_folder_type(engine)
         await ensure_onboarding_schema(engine)
         await ensure_opportunity_scope_columns(engine)
         await ensure_team_schema(engine)

@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+import mimetypes
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 # Keep under provider TPM limits (~30k tokens ≈ 120k chars) to avoid rate_limit_exceeded
 MAX_CONTEXT_CHARS = 120000
 MAX_HISTORY_MESSAGES = 10
+_profile_doc_cache: Dict[str, str] = {}
 
 
 class ChatRequest(BaseModel):
@@ -108,8 +110,9 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
             document_context = _build_document_context(prepared_text, extracted_data)
 
         # 5. Load company profile context
-        company_profile = await get_company_profile_cached(conn, user["id"])
-        company_context = _format_company_profile(company_profile)
+        company_profile = await get_company_profile_cached(conn, user["id"], user.get("team_id"))
+        profile_docs = await _extract_profile_documents(company_profile)
+        company_context = _format_company_profile(company_profile, profile_docs)
 
         # 6. Call LLM
         llm = get_llm_client()
@@ -463,8 +466,67 @@ async def _get_document_text(conn, state: Dict[str, Any], opportunity_id: str, u
 
     return _build_fallback_context(extracted)
 
+def _truncate_text(text: str, max_chars: int = 2000) -> str:
+    if not text:
+        return ""
+    return text[:max_chars] + ("..." if len(text) > max_chars else "")
 
-def _format_company_profile(profile: Dict[str, Any]) -> str:
+
+async def _extract_profile_documents(profile: Dict[str, Any]) -> List[Dict[str, str]]:
+    """
+    Pull text from company profile file attachments (capability statement, insurance, W-9, etc.)
+    so the chat model can reference them.
+    """
+    doc_fields = [
+        ("capability_statement", "Capability Statement"),
+        ("insurance_certificate", "Certificate of Insurance"),
+        ("w9_upload", "W-9 Form"),
+        ("business_license", "Business License"),
+        ("bonding_letter", "Bonding Letter"),
+        ("ohio_certificate", "Ohio Certificate"),
+        ("cert_upload", "Certification Documents"),
+        ("financial_statements", "Financial Statements"),
+        ("org_chart", "Organizational Chart"),
+        ("digital_signature", "Digital Signature"),
+        ("signature_image", "Signature Image"),
+    ]
+
+    results: List[Dict[str, str]] = []
+    processor = DocumentProcessor()
+
+    for field, label in doc_fields:
+        storage_key = profile.get(field)
+        if not storage_key or not isinstance(storage_key, str):
+            continue
+        if "UploadFile(" in storage_key or "Headers(" in storage_key:
+            continue
+
+        cached = _profile_doc_cache.get(storage_key)
+        if cached:
+            results.append({"name": label, "text": cached})
+            continue
+
+        try:
+            file_bytes = await asyncio.to_thread(read_storage_bytes, storage_key)
+            if not file_bytes:
+                continue
+            filename = profile.get(f"{field}_name") or field
+            mime = profile.get(f"{field}_mime") or (mimetypes.guess_type(filename)[0] if filename else None)
+            extracted = await asyncio.to_thread(processor.extract_text, file_bytes, mime, filename)
+            text = extracted.get("text") if isinstance(extracted, dict) else ""
+            if not text:
+                continue
+            clipped = _truncate_text(text, 2000)
+            _profile_doc_cache[storage_key] = clipped
+            results.append({"name": label, "text": clipped})
+        except Exception as exc:
+            logger.warning("Could not extract profile document %s: %s", field, exc)
+            continue
+
+    return results
+
+
+def _format_company_profile(profile: Dict[str, Any], doc_texts: Optional[List[Dict[str, str]]] = None) -> str:
     """Format company profile into readable context for the LLM."""
     parts = []
 
@@ -720,6 +782,13 @@ def _format_company_profile(profile: Dict[str, Any]) -> str:
         comp_flags.append(f"Addenda acknowledged: {', '.join([str(a) for a in addenda if a])}")
     if comp_flags:
         parts.append("Compliance: " + "; ".join(comp_flags))
+
+    if doc_texts:
+        parts.append("Company Profile Attachments:")
+        for doc in doc_texts:
+            snippet = _truncate_text(doc.get("text", ""), 1200)
+            label = doc.get("name") or "Attachment"
+            parts.append(f"- {label}: {snippet}")
 
     if not parts:
         return "No company profile information available. User should complete their company profile for better assistance."

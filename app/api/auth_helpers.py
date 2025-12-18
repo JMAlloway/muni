@@ -64,14 +64,14 @@ from typing import Any, Dict
 _company_profile_cache: Dict[str, Dict[str, Any]] = {}
 
 
-async def get_company_profile_cached(conn, user_id: str) -> Dict[str, Any]:
+async def get_company_profile_cached(conn, user_id: str, team_id: str | None = None) -> Dict[str, Any]:
     """
     Fetch user's company profile with simple caching.
     Cache is per-request lifetime (cleared on app restart).
     """
-    # Check cache
-    if user_id in _company_profile_cache:
-        return _company_profile_cache[user_id]
+    cache_key = f"{user_id}:{team_id or ''}"
+    if cache_key in _company_profile_cache:
+        return _company_profile_cache[cache_key]
 
     try:
         res = await conn.exec_driver_sql(
@@ -82,13 +82,33 @@ async def get_company_profile_cached(conn, user_id: str) -> Dict[str, Any]:
         if row and row[0]:
             data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
             profile = merge_company_profile_defaults(data)
-            _company_profile_cache[user_id] = profile
+            _company_profile_cache[cache_key] = profile
             return profile
+
+        # Fallback: if user has no profile but belongs to a team, use the team's profile if available
+        if team_id:
+            team_res = await conn.exec_driver_sql(
+                """
+                SELECT cp.data
+                FROM company_profiles cp
+                JOIN users u ON u.id = cp.user_id
+                WHERE u.team_id = :team_id
+                ORDER BY cp.updated_at DESC NULLS LAST, cp.created_at DESC NULLS LAST
+                LIMIT 1
+                """,
+                {"team_id": team_id},
+            )
+            trow = team_res.first()
+            if trow and trow[0]:
+                data = trow[0] if isinstance(trow[0], dict) else json.loads(trow[0])
+                profile = merge_company_profile_defaults(data)
+                _company_profile_cache[cache_key] = profile
+                return profile
     except Exception:
         pass
 
     default = merge_company_profile_defaults({})
-    _company_profile_cache[user_id] = default
+    _company_profile_cache[cache_key] = default
     return default
 
 

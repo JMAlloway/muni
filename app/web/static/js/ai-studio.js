@@ -483,6 +483,7 @@
     }
     const fd = new FormData();
     fd.append("opportunity_id", state.opportunityId);
+    fd.append("folder_type", "ai-studio");
     fd.append("files", file, file.name);
     const xhr = new XMLHttpRequest();
     try {
@@ -607,6 +608,7 @@
     if (!valid.length) return;
     const fd = new FormData();
     fd.append("opportunity_id", state.opportunityId);
+    fd.append("folder_type", "ai-studio-output");
     valid.forEach((f) => fd.append("files", f, f.name));
     try {
       showMessage(`Uploading docs for ${sectionKey.replace(/_/g, " ") || "section"}...`, "info");

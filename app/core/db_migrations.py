@@ -34,6 +34,21 @@ async def ensure_uploads_schema(engine) -> None:
         return
 
 
+async def ensure_uploads_folder_type(engine) -> None:
+    """Add folder_type column to user_uploads for hierarchical organization."""
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql("PRAGMA table_info('user_uploads')")
+            cols: Set[str] = {row._mapping["name"] for row in res.fetchall()}
+
+            if "folder_type" not in cols:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE user_uploads ADD COLUMN folder_type TEXT DEFAULT 'root'"
+                )
+    except Exception:
+        return
+
+
 async def ensure_opportunity_scope_columns(engine) -> None:
     """Ensure opportunities tables have summary + scope_of_work columns.
 
