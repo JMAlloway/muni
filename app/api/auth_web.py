@@ -17,6 +17,8 @@ from app.core.settings import settings
 from app.api.team import _ensure_team_feature_access
 from sqlalchemy.exc import SQLAlchemyError
 from app.storage import store_profile_file, create_presigned_get, USE_S3
+from app.api.auth_helpers import clear_company_profile_cache
+from app.services.document_processor import DocumentProcessor
 
 PROFILE_ALLOWED_EXT = {"pdf", "jpg", "jpeg", "png", "doc", "docx"}
 PROFILE_ALLOWED_MIME = {
@@ -952,6 +954,7 @@ async def get_company_profile(request: Request):
                 "key": key,
                 "name": data.get(f"{field}_name", ""),
                 "url": create_presigned_get(key),
+                "has_text": bool(data.get(f"{field}_text")),
             }
         return {"data": data, "files": files}
 
@@ -1052,10 +1055,24 @@ async def save_company_profile(request: Request):
                 storage_key = store_profile_file(user_id, key, data, val.filename, val.content_type)
                 payload[key] = storage_key
                 payload[f"{key}_name"] = safe_name
+                # Extract text content from the uploaded file
+                extracted_text = ""
+                try:
+                    processor = DocumentProcessor()
+                    mime = (val.content_type or "").lower()
+                    extraction = processor.extract_text(data, mime, safe_name)
+                    if extraction.get("status") == "success":
+                        extracted_text = extraction.get("text", "")[:50000]  # Limit to 50k chars
+                except Exception as e:
+                    logging.warning(f"Failed to extract text from {key}: {e}")
+
+                payload[f"{key}_text"] = extracted_text
+
                 files_meta[key] = {
                     "key": storage_key,
                     "name": safe_name,
                     "url": create_presigned_get(storage_key),
+                    "has_text": bool(extracted_text),
                 }
             else:
                 # Ignore non-file values for file fields to avoid storing stringified UploadFile objects
@@ -1120,6 +1137,8 @@ async def save_company_profile(request: Request):
             {"id": secrets.token_urlsafe(16), "uid": user_id, "data": json.dumps(merged_data)},
         )
         await db.commit()
+    # Clear the cached profile so AI gets fresh data
+    clear_company_profile_cache(user_id)
     file_keys = [k for k in merged_data if k in FILE_FIELDS and _valid_storage_key(merged_data.get(k))]
     try:
         saved_files = {
@@ -1127,6 +1146,7 @@ async def save_company_profile(request: Request):
                 "key": merged_data.get(field),
                 "name": merged_data.get(f"{field}_name", ""),
                 "url": create_presigned_get(merged_data.get(field)) if merged_data.get(field) else None,
+                "has_text": bool(merged_data.get(f"{field}_text")),
             }
             for field in file_keys
         }

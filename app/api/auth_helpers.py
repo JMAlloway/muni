@@ -112,9 +112,10 @@ async def get_company_profile_cached(conn, user_id: str, team_id: str | None = N
     return default
 
 
-def clear_company_profile_cache(user_id: str = None):
-    """Clear cache for a specific user or all users."""
-    if user_id:
-        _company_profile_cache.pop(user_id, None)
-    else:
-        _company_profile_cache.clear()
+def clear_company_profile_cache(user_id: str):
+    """Remove a user's company profile from cache after update."""
+    if not user_id:
+        return
+    keys_to_remove = [k for k in _company_profile_cache.keys() if k.startswith(f"{user_id}:") or k == user_id]
+    for k in keys_to_remove:
+        _company_profile_cache.pop(k, None)

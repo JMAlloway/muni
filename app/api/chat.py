@@ -14,6 +14,45 @@ from app.ai.client import get_llm_client
 from app.services.document_processor import DocumentProcessor
 from app.storage import read_storage_bytes
 
+async def _get_knowledge_context(conn, user_id: str, team_id: str = None, max_chars: int = 30000) -> str:
+    """Fetch extracted text from knowledge base documents."""
+    query = """
+        SELECT filename, doc_type, extracted_text
+        FROM knowledge_documents
+        WHERE (user_id = :uid OR (team_id = :team_id AND :team_id IS NOT NULL))
+          AND extraction_status = 'completed'
+          AND extracted_text IS NOT NULL
+          AND LENGTH(extracted_text) > 100
+        ORDER BY updated_at DESC
+        LIMIT 10
+    """
+    res = await conn.exec_driver_sql(query, {"uid": user_id, "team_id": team_id})
+    rows = res.fetchall()
+
+    if not rows:
+        return ""
+
+    parts = ["=== KNOWLEDGE BASE DOCUMENTS ==="]
+    total_chars = 0
+
+    for row in rows:
+        m = row._mapping
+        filename = m.get("filename", "Document")
+        doc_type = m.get("doc_type", "other")
+        text = m.get("extracted_text", "")
+
+        if total_chars + len(text) > max_chars:
+            remaining = max_chars - total_chars
+            if remaining > 500:
+                text = text[:remaining] + "\n[... truncated ...]"
+            else:
+                break
+
+        parts.append(f"\n--- {filename} ({doc_type}) ---\n{text}")
+        total_chars += len(text)
+
+    return "\n".join(parts)
+
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
@@ -22,6 +61,19 @@ logger = logging.getLogger(__name__)
 MAX_CONTEXT_CHARS = 120000
 MAX_HISTORY_MESSAGES = 10
 _profile_doc_cache: Dict[str, str] = {}
+PROFILE_DOC_FIELDS: List[tuple[str, str]] = [
+    ("capability_statement", "Capability Statement"),
+    ("insurance_certificate", "Certificate of Insurance"),
+    ("w9_upload", "W-9 Form"),
+    ("business_license", "Business License"),
+    ("bonding_letter", "Bonding Letter"),
+    ("ohio_certificate", "Ohio Certificate"),
+    ("cert_upload", "Certification Documents"),
+    ("financial_statements", "Financial Statements"),
+    ("org_chart", "Organizational Chart"),
+    ("digital_signature", "Digital Signature"),
+    ("signature_image", "Signature Image"),
+]
 
 
 class ChatRequest(BaseModel):
@@ -114,6 +166,9 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
         profile_docs = await _extract_profile_documents(company_profile)
         company_context = _format_company_profile(company_profile, profile_docs)
 
+        # 5b. Load knowledge base documents
+        knowledge_context = await _get_knowledge_context(conn, user["id"], user.get("team_id"))
+
         # 6. Call LLM
         llm = get_llm_client()
         if not llm:
@@ -124,6 +179,7 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
 You have access to:
 1. The FULL TEXT of the RFP document
 2. The user's COMPANY PROFILE with their qualifications, experience, and capabilities
+3. Supporting documents from the company's knowledge base
 
 === COMPANY PROFILE START ===
 {company_context}
@@ -132,6 +188,8 @@ You have access to:
 === RFP DOCUMENT START ===
 {document_context}
 === RFP DOCUMENT END ===
+
+{knowledge_context if knowledge_context else ""}
 
 INSTRUCTIONS:
 1. Answer questions by finding relevant information from BOTH the RFP and the company profile
@@ -477,40 +535,35 @@ async def _extract_profile_documents(profile: Dict[str, Any]) -> List[Dict[str, 
     Pull text from company profile file attachments (capability statement, insurance, W-9, etc.)
     so the chat model can reference them.
     """
-    doc_fields = [
-        ("capability_statement", "Capability Statement"),
-        ("insurance_certificate", "Certificate of Insurance"),
-        ("w9_upload", "W-9 Form"),
-        ("business_license", "Business License"),
-        ("bonding_letter", "Bonding Letter"),
-        ("ohio_certificate", "Ohio Certificate"),
-        ("cert_upload", "Certification Documents"),
-        ("financial_statements", "Financial Statements"),
-        ("org_chart", "Organizational Chart"),
-        ("digital_signature", "Digital Signature"),
-        ("signature_image", "Signature Image"),
-    ]
-
     results: List[Dict[str, str]] = []
     processor = DocumentProcessor()
 
-    for field, label in doc_fields:
+    for field, label in PROFILE_DOC_FIELDS:
+        inline_text = profile.get(f"{field}_text")
+        inline_name = profile.get(f"{field}_name") or label
         storage_key = profile.get(field)
-        if not storage_key or not isinstance(storage_key, str):
+        has_storage = bool(storage_key) and isinstance(storage_key, str) and "UploadFile(" not in storage_key and "Headers(" not in storage_key
+
+        if inline_text:
+            clipped = _truncate_text(str(inline_text), 2000)
+            if has_storage:
+                _profile_doc_cache[storage_key] = clipped
+            results.append({"name": inline_name, "text": clipped})
             continue
-        if "UploadFile(" in storage_key or "Headers(" in storage_key:
+
+        if not has_storage:
             continue
 
         cached = _profile_doc_cache.get(storage_key)
         if cached:
-            results.append({"name": label, "text": cached})
+            results.append({"name": inline_name, "text": cached})
             continue
 
         try:
             file_bytes = await asyncio.to_thread(read_storage_bytes, storage_key)
             if not file_bytes:
                 continue
-            filename = profile.get(f"{field}_name") or field
+            filename = inline_name or field
             mime = profile.get(f"{field}_mime") or (mimetypes.guess_type(filename)[0] if filename else None)
             extracted = await asyncio.to_thread(processor.extract_text, file_bytes, mime, filename)
             text = extracted.get("text") if isinstance(extracted, dict) else ""
@@ -518,7 +571,7 @@ async def _extract_profile_documents(profile: Dict[str, Any]) -> List[Dict[str, 
                 continue
             clipped = _truncate_text(text, 2000)
             _profile_doc_cache[storage_key] = clipped
-            results.append({"name": label, "text": clipped})
+            results.append({"name": inline_name, "text": clipped})
         except Exception as exc:
             logger.warning("Could not extract profile document %s: %s", field, exc)
             continue
@@ -768,6 +821,45 @@ def _format_company_profile(profile: Dict[str, Any], doc_texts: Optional[List[Di
                 sub_line += f" | License: {sub['license_number']}"
             parts.append(sub_line)
 
+    # Uploaded document contents
+    doc_fields = [
+        ("capability_statement_text", "Capability Statement"),
+        ("insurance_certificate_text", "Insurance Certificate"),
+        ("bonding_letter_text", "Bonding Letter"),
+        ("w9_upload_text", "W-9 Form"),
+        ("business_license_text", "Business License"),
+        ("previous_contracts_text", "Previous Contracts"),
+        ("org_chart_text", "Organization Chart"),
+        ("financial_statements_text", "Financial Statements"),
+        ("cert_upload_text", "Certifications"),
+        ("ohio_certificate_text", "Ohio Certificate"),
+        ("safety_sheets_text", "Safety Data Sheets"),
+        ("warranty_info_text", "Warranty Information"),
+        ("price_list_upload_text", "Price List"),
+        ("product_catalogs_text", "Product Catalogs"),
+        ("debarment_certification_text", "Debarment Certification"),
+        ("labor_compliance_cert_text", "Labor Compliance Certificate"),
+        ("conflict_of_interest_text", "Conflict of Interest Disclosure"),
+    ]
+
+    doc_content_parts = []
+    for field_key, label in doc_fields:
+        content = profile.get(field_key, "")
+        if content and len(content.strip()) > 50:  # Only include meaningful content
+            truncated = content[:8000] if len(content) > 8000 else content
+            doc_content_parts.append(f"\n=== {label} ===\n{truncated}")
+
+    # Include reference letters
+    for i in range(1, 6):
+        ref_text = profile.get(f"ref{i}_letter_text", "")
+        if ref_text and len(ref_text.strip()) > 50:
+            truncated = ref_text[:4000] if len(ref_text) > 4000 else ref_text
+            doc_content_parts.append(f"\n=== Reference Letter {i} ===\n{truncated}")
+
+    if doc_content_parts:
+        parts.append("\n\n--- UPLOADED DOCUMENT CONTENTS ---")
+        parts.extend(doc_content_parts)
+
     # Compliance & declarations
     compliance = profile.get("compliance", {})
     comp_flags = []
@@ -783,12 +875,30 @@ def _format_company_profile(profile: Dict[str, Any], doc_texts: Optional[List[Di
     if comp_flags:
         parts.append("Compliance: " + "; ".join(comp_flags))
 
-    if doc_texts:
+    attachment_entries: List[tuple[str, str]] = []
+    seen_labels = set()
+    for doc in doc_texts or []:
+        text_val = doc.get("text") if isinstance(doc, dict) else None
+        if not text_val:
+            continue
+        label = doc.get("name") or "Attachment"
+        attachment_entries.append((label, _truncate_text(str(text_val), 1200)))
+        seen_labels.add(label.lower())
+    for field, label in PROFILE_DOC_FIELDS:
+        text_val = profile.get(f"{field}_text")
+        if not text_val:
+            continue
+        display_name = profile.get(f"{field}_name") or label
+        canonical = display_name.lower()
+        if canonical in seen_labels or label.lower() in seen_labels:
+            continue
+        attachment_entries.append((display_name, _truncate_text(str(text_val), 1200)))
+        seen_labels.update({canonical, label.lower()})
+
+    if attachment_entries:
         parts.append("Company Profile Attachments:")
-        for doc in doc_texts:
-            snippet = _truncate_text(doc.get("text", ""), 1200)
-            label = doc.get("name") or "Attachment"
-            parts.append(f"- {label}: {snippet}")
+        for name, snippet in attachment_entries:
+            parts.append(f"- {name}: {snippet}")
 
     if not parts:
         return "No company profile information available. User should complete their company profile for better assistance."

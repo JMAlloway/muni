@@ -19,6 +19,45 @@ from app.storage import read_storage_bytes, create_presigned_get, store_bytes
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team, get_company_profile_cached
 from app.services.response_library import ResponseLibrary
 
+async def _get_knowledge_context(conn, user_id: str, team_id: str = None, max_chars: int = 30000) -> str:
+    """Fetch extracted text from knowledge base documents."""
+    query = """
+        SELECT filename, doc_type, extracted_text
+        FROM knowledge_documents
+        WHERE (user_id = :uid OR (team_id = :team_id AND :team_id IS NOT NULL))
+          AND extraction_status = 'completed'
+          AND extracted_text IS NOT NULL
+          AND LENGTH(extracted_text) > 100
+        ORDER BY updated_at DESC
+        LIMIT 10
+    """
+    res = await conn.exec_driver_sql(query, {"uid": user_id, "team_id": team_id})
+    rows = res.fetchall()
+
+    if not rows:
+        return ""
+
+    parts = ["=== KNOWLEDGE BASE DOCUMENTS ==="]
+    total_chars = 0
+
+    for row in rows:
+        m = row._mapping
+        filename = m.get("filename", "Document")
+        doc_type = m.get("doc_type", "other")
+        text = m.get("extracted_text", "")
+
+        if total_chars + len(text) > max_chars:
+            remaining = max_chars - total_chars
+            if remaining > 500:
+                text = text[:remaining] + "\n[... truncated ...]"
+            else:
+                break
+
+        parts.append(f"\n--- {filename} ({doc_type}) ---\n{text}")
+        total_chars += len(text)
+
+    return "\n".join(parts)
+
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-generate"])
 
 response_lib = ResponseLibrary()
@@ -155,6 +194,7 @@ def _build_doc_prompt(
     company: Dict[str, Any],
     instructions_text: str = "",
     section_instructions: Dict[str, str] | None = None,
+    knowledge_context: str = "",
 ) -> list[dict]:
     instr = _sanitize_text(instructions_text, max_chars=MAX_INSTR_CHARS) or _sanitize_text(
         extracted.get("submission_instructions", ""), max_chars=MAX_INSTR_CHARS
@@ -276,6 +316,7 @@ SIGNATURE AVAILABLE:
         if signature_url
         else "SIGNATURE AVAILABLE: None provided."
     )
+    knowledge_block = f"KNOWLEDGE BASE DOCUMENTS:\n{knowledge_context}" if knowledge_context else ""
 
     return [
         {
@@ -294,6 +335,8 @@ RFP REQUIREMENTS:
 
 COMPANY PROFILE:
 {company_json}
+
+{knowledge_block}
 
 SIGNATURE DETAILS:
 {signature_block}
@@ -432,8 +475,11 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
     if not llm:
         raise HTTPException(status_code=503, detail="LLM client unavailable")
 
+    async with engine.begin() as conn:
+        knowledge_context = await _get_knowledge_context(conn, user["id"], user.get("team_id"))
+
     instructions_text = await _load_instruction_text(user["id"], instruction_upload_ids)
-    prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions)
+    prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions, knowledge_context)
     try:
         resp = llm.chat(prompt, temperature=DEFAULT_TEMPERATURE, format="json")
         data = json.loads(resp)
