@@ -280,10 +280,11 @@ SIGNATURE AVAILABLE:
     return [
         {
             "role": "system",
-            "content": """You are an expert government proposal writer with 20+ years of experience winning contracts. 
+            "content": """You are an expert government proposal writer with 20+ years of experience winning contracts.
 Generate professional, compliant, and compelling proposal content.
-Write substantive content - never use placeholders or generic filler.
-Tailor every section to the specific RFP requirements and company qualifications.
+Write substantive content - NEVER use placeholders, generic filler, or template text like "Company Name".
+You MUST use the ACTUAL company name, personnel names, certifications, and experience data from the COMPANY PROFILE provided.
+Tailor every section to the specific RFP requirements and the company's actual qualifications from their profile.
 When a signature asset is available, incorporate it into cover letters using the provided HTML block.""",
         },
         {
@@ -327,8 +328,14 @@ REQUIREMENTS:
    - Use <h3>Subsection</h3> for sub-points
    - Wrap paragraphs in <p>...</p> tags
    - Use <ul><li>...</li></ul> for bullet lists
-   - Use <strong>Company Name</strong> for emphasis on key terms
+   - Use <strong>...</strong> for emphasis on key terms like the company name
    - Use <em>...</em> for certifications and titles
+
+CRITICAL - USE ACTUAL COMPANY DATA:
+   - The company's legal name from the profile is provided above - USE IT, never write "Company Name" as placeholder
+   - Use the ACTUAL company name, contact names, certifications, and experience from the COMPANY PROFILE section
+   - NEVER use placeholder text like "Company Name", "[Company]", "Your Company", or similar
+   - Every reference to the company must use their real name from the legal_name field in the profile
 
 2. STRUCTURE: Each section should include:
    - Opening paragraph introducing the topic
@@ -346,11 +353,14 @@ REQUIREMENTS:
      <strong>{signature_name}</strong><br>
      {company.get('legal_name', '')}
 
-4. CONTENT:
-   - Use specific details from the company profile (names, experience, certifications)
-   - Match the RFP's tone and address stated requirements
-   - Include concrete examples of relevant past projects
-   - Reference specific certifications, years of experience, team members
+4. CONTENT - USE REAL DATA FROM COMPANY PROFILE:
+   - Extract and use the company's legal_name field - this is their actual business name
+   - Reference their actual certifications (MBE, SBE, EDGE, WBE status from certifications_status)
+   - Include their real key_personnel names, roles, and bios
+   - Cite their actual recent_projects with real client names and descriptions
+   - Use their real years_experience, years_in_business, and service_area data
+   - Reference their actual insurance, bonding, and contractor_licenses information
+   - Match the RFP's tone and address stated requirements using this real company data
 
 5. Submission checklist must include ALL narrative/form items required for submission
 6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
