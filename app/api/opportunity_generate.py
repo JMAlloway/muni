@@ -72,10 +72,12 @@ MAX_INSTR_CHARS = 6000
 DEFAULT_TEMPERATURE = 0.4
 
 
-async def _get_company_profile(user_id: Any) -> Dict[str, Any]:
+async def _get_company_profile(user: Any) -> Dict[str, Any]:
     try:
+        user_id = user["id"] if isinstance(user, dict) else user
+        team_id = user.get("team_id") if isinstance(user, dict) else None
         async with engine.begin() as conn:
-            merged = await get_company_profile_cached(conn, user_id, user.get("team_id") if isinstance(user, dict) else None)
+            merged = await get_company_profile_cached(conn, user_id, team_id)
 
             file_fields = [
                 # Commonly used signature and compliance files
@@ -490,7 +492,7 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
     except Exception:
         extracted = {}
 
-    company_profile = await _get_company_profile(user["id"])
+    company_profile = await _get_company_profile(user)
     instruction_upload_ids = []
     section_instructions: Dict[str, str] = {}
     try:

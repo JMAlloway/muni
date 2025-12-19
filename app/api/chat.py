@@ -73,6 +73,23 @@ PROFILE_DOC_FIELDS: List[tuple[str, str]] = [
     ("org_chart", "Organizational Chart"),
     ("digital_signature", "Digital Signature"),
     ("signature_image", "Signature Image"),
+    ("previous_contracts", "Previous Contracts"),
+    ("product_catalogs", "Product Catalogs"),
+    ("price_list_upload", "Price List"),
+    ("safety_sheets", "Safety Data Sheets"),
+    ("warranty_info", "Warranty Information"),
+    ("debarment_certification", "Debarment Certification"),
+    ("labor_compliance_cert", "Labor Compliance Certificate"),
+    ("conflict_of_interest", "Conflict of Interest Disclosure"),
+    ("emr_certificate", "EMR Certificate"),
+    ("drug_free_policy", "Drug Free Policy"),
+    ("bank_reference_letter", "Bank Reference Letter"),
+    ("quality_cert", "Quality Certification"),
+    ("ref1_letter", "Reference Letter 1"),
+    ("ref2_letter", "Reference Letter 2"),
+    ("ref3_letter", "Reference Letter 3"),
+    ("ref4_letter", "Reference Letter 4"),
+    ("ref5_letter", "Reference Letter 5"),
 ]
 
 
@@ -165,6 +182,12 @@ async def send_chat_message(req: ChatRequest, user=Depends(require_user_with_tea
         company_profile = await get_company_profile_cached(conn, user["id"], user.get("team_id"))
         profile_docs = await _extract_profile_documents(company_profile)
         company_context = _format_company_profile(company_profile, profile_docs)
+        company_name_hint = (company_profile.get("dba") or company_profile.get("legal_name") or "").strip()
+        name_guidance = (
+            f'\n9. Use the company name "{company_name_hint}" instead of generic terms like "the company".'
+            if company_name_hint
+            else ""
+        )
 
         # 5b. Load knowledge base documents
         knowledge_context = await _get_knowledge_context(conn, user["id"], user.get("team_id"))
@@ -199,7 +222,7 @@ INSTRUCTIONS:
 5. Be specific - quote exact RFP language and reference specific company qualifications
 6. If the company profile doesn't have relevant info, mention what information might be needed
 7. For strategic questions like "what should we highlight?" - identify the company's strengths that align with RFP evaluation criteria
-8. Be helpful and thorough - these are important business documents"""
+8. Be helpful and thorough - these are important business documents{name_guidance}"""
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(chat_history)

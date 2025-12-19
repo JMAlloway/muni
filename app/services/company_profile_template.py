@@ -3,6 +3,7 @@ Helpers for normalized company profile fields used by generators.
 Profiles are stored as JSON blobs; we merge defaults without forcing schema migrations.
 """
 
+import logging
 from copy import deepcopy
 from typing import Any, Dict, MutableMapping
 
@@ -10,7 +11,9 @@ from typing import Any, Dict, MutableMapping
 _MAX_DEPTH = 10
 _MAX_TOTAL_FIELDS = 256
 _MAX_LIST_LENGTH = 100
-_MAX_STRING_LENGTH = 10_000
+_MAX_STRING_LENGTH = 100_000
+
+logger = logging.getLogger(__name__)
 
 
 # Keep defaults as a module-level constant so we can cheaply clone it.
@@ -222,17 +225,26 @@ def _sanitize_profile(
                 raise ValueError(f"Unknown company profile field: {key}")
             if value is None:
                 continue
-            sanitized[key] = _sanitize_extra(value, depth=depth + 1, field_counter=field_counter)
+            try:
+                sanitized[key] = _sanitize_extra(value, depth=depth + 1, field_counter=field_counter)
+            except ValueError as exc:
+                logger.warning("Skipping invalid extra company profile field '%s': %s", key, exc)
             continue
         if value is None:
             continue
 
-        sanitized[key] = _sanitize_value(
-            value,
-            template_value=template[key],
-            depth=depth + 1,
-            field_counter=field_counter,
-        )
+        try:
+            sanitized_value = _sanitize_value(
+                value,
+                template_value=template[key],
+                depth=depth + 1,
+                field_counter=field_counter,
+            )
+        except ValueError as exc:
+            logger.warning("Skipping invalid company profile field '%s': %s", key, exc)
+            continue
+
+        sanitized[key] = sanitized_value
 
     return sanitized
 
@@ -285,12 +297,16 @@ def _sanitize_value(value: Any, template_value: Any, depth: int, field_counter: 
 
     if isinstance(template_value, dict):
         if not isinstance(value, dict):
-            raise ValueError("Expected an object for company profile section.")
+            # Be forgiving: if value should be a dict but isn't, return empty dict
+            return {}
         return _sanitize_profile(value, template_value, depth=depth, field_counter=field_counter)
 
     if isinstance(template_value, list):
         if not isinstance(value, list):
-            raise ValueError("Expected a list in company profile section.")
+            # Be forgiving: if value should be a list but isn't, wrap single items or skip
+            if value is None or value == "":
+                return []
+            value = [value]  # Wrap single item in a list
         if len(value) > _MAX_LIST_LENGTH:
             raise ValueError(f"Company profile lists are limited to {_MAX_LIST_LENGTH} items.")
 
@@ -309,23 +325,32 @@ def _sanitize_value(value: Any, template_value: Any, depth: int, field_counter: 
         return cleaned_list
 
     if isinstance(template_value, bool):
-        if not isinstance(value, bool):
-            raise ValueError("Expected a boolean value in company profile.")
-        return value
+        if isinstance(value, bool):
+            return value
+        # Be forgiving: convert truthy/falsy values
+        if isinstance(value, str):
+            return value.lower() in ("true", "yes", "1", "on")
+        return bool(value)
 
     if isinstance(template_value, (int, float)) and not isinstance(template_value, bool):
-        if not isinstance(value, (int, float)):
-            raise ValueError("Expected a numeric value in company profile.")
-        return value
+        if isinstance(value, (int, float)):
+            return value
+        # Be forgiving: try to convert strings to numbers
+        try:
+            return float(value) if "." in str(value) else int(value)
+        except (ValueError, TypeError):
+            return 0
 
     if isinstance(template_value, str):
+        # Be forgiving: convert non-strings to strings
         if not isinstance(value, str):
-            raise ValueError("Expected a string value in company profile.")
+            value = str(value) if value is not None else ""
         if len(value) > _MAX_STRING_LENGTH:
-            raise ValueError(f"String values are limited to {_MAX_STRING_LENGTH} characters.")
+            value = value[:_MAX_STRING_LENGTH]  # Truncate instead of error
         return value
 
-    raise ValueError("Unsupported company profile value type.")
+    # Unknown type - try to return as-is or empty string
+    return value if value is not None else ""
 
 
 def _merge_defaults(target: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:

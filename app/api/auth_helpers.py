@@ -58,6 +58,7 @@ async def ensure_user_can_access_opportunity(user: dict, opportunity_id: str) ->
 # Company profile caching helper
 # ------------------------------
 import json
+import logging
 from typing import Any, Dict
 
 # Simple in-memory cache (cleared on restart)
@@ -104,8 +105,8 @@ async def get_company_profile_cached(conn, user_id: str, team_id: str | None = N
                 profile = merge_company_profile_defaults(data)
                 _company_profile_cache[cache_key] = profile
                 return profile
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"Failed to load company profile for user {user_id}: {e}")
 
     default = merge_company_profile_defaults({})
     _company_profile_cache[cache_key] = default
