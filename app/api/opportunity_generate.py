@@ -17,7 +17,7 @@ from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
 from app.storage import read_storage_bytes, create_presigned_get, store_bytes
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team, get_company_profile_cached
-from app.api.chat import _format_company_profile
+from app.api.chat import _format_company_profile, _extract_profile_documents
 from app.services.response_library import ResponseLibrary
 
 async def _get_knowledge_context(conn, user_id: str, team_id: str = None, max_chars: int = 30000) -> str:
@@ -198,6 +198,7 @@ def _build_doc_prompt(
     instructions_text: str = "",
     section_instructions: Dict[str, str] | None = None,
     knowledge_context: str = "",
+    profile_docs: list[dict] | None = None,
 ) -> list[dict]:
     instr = _sanitize_text(instructions_text, max_chars=MAX_INSTR_CHARS) or _sanitize_text(
         extracted.get("submission_instructions", ""), max_chars=MAX_INSTR_CHARS
@@ -285,7 +286,8 @@ def _build_doc_prompt(
 
     extracted_json = _truncate_json_for_prompt(extracted, MAX_PROMPT_JSON_CHARS)
     # Use formatted readable text instead of raw JSON for better AI comprehension
-    company_formatted = _format_company_profile(company)
+    # Include extracted text from uploaded profile documents (capability statement, insurance, etc.)
+    company_formatted = _format_company_profile(company, profile_docs)
     if not company_formatted.strip():
         company_formatted = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
     signature_url = (
@@ -509,8 +511,12 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
     async with engine.begin() as conn:
         knowledge_context = await _get_knowledge_context(conn, user["id"], user.get("team_id"))
 
+    # Extract text content from uploaded company profile documents (capability statement, insurance, etc.)
+    # This ensures the AI can reference actual document contents, not just metadata
+    profile_docs = await _extract_profile_documents(company_profile)
+
     instructions_text = await _load_instruction_text(user["id"], instruction_upload_ids)
-    prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions, knowledge_context)
+    prompt = _build_doc_prompt(extracted, company_profile, instructions_text, section_instructions, knowledge_context, profile_docs)
     try:
         resp = llm.chat(prompt, temperature=DEFAULT_TEMPERATURE, format="json")
         data = json.loads(resp)
