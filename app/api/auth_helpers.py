@@ -104,8 +104,9 @@ async def get_company_profile_cached(conn, user_id: str, team_id: str | None = N
                 profile = merge_company_profile_defaults(data)
                 _company_profile_cache[cache_key] = profile
                 return profile
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to load company profile for user {user_id}: {e}")
 
     default = merge_company_profile_defaults({})
     _company_profile_cache[cache_key] = default

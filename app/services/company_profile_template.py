@@ -10,7 +10,7 @@ from typing import Any, Dict, MutableMapping
 _MAX_DEPTH = 10
 _MAX_TOTAL_FIELDS = 256
 _MAX_LIST_LENGTH = 100
-_MAX_STRING_LENGTH = 10_000
+_MAX_STRING_LENGTH = 100_000
 
 
 # Keep defaults as a module-level constant so we can cheaply clone it.

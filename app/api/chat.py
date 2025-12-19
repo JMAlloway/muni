@@ -73,6 +73,23 @@ PROFILE_DOC_FIELDS: List[tuple[str, str]] = [
     ("org_chart", "Organizational Chart"),
     ("digital_signature", "Digital Signature"),
     ("signature_image", "Signature Image"),
+    ("previous_contracts", "Previous Contracts"),
+    ("product_catalogs", "Product Catalogs"),
+    ("price_list_upload", "Price List"),
+    ("safety_sheets", "Safety Data Sheets"),
+    ("warranty_info", "Warranty Information"),
+    ("debarment_certification", "Debarment Certification"),
+    ("labor_compliance_cert", "Labor Compliance Certificate"),
+    ("conflict_of_interest", "Conflict of Interest Disclosure"),
+    ("emr_certificate", "EMR Certificate"),
+    ("drug_free_policy", "Drug Free Policy"),
+    ("bank_reference_letter", "Bank Reference Letter"),
+    ("quality_cert", "Quality Certification"),
+    ("ref1_letter", "Reference Letter 1"),
+    ("ref2_letter", "Reference Letter 2"),
+    ("ref3_letter", "Reference Letter 3"),
+    ("ref4_letter", "Reference Letter 4"),
+    ("ref5_letter", "Reference Letter 5"),
 ]
 
 
