@@ -1179,8 +1179,14 @@ async def team_settings(request: Request):
         return RedirectResponse("/login?next=/account/team", status_code=303)
 
 @router.get("/account/preferences", response_class=HTMLResponse)
-async def account_preferences_redirect():
-    return RedirectResponse("/preferences", status_code=303)
+async def account_preferences(request: Request):
+    """Serve account page with notifications tab (contains preferences)"""
+    user_email = get_current_user_email(request)
+    if not user_email:
+        return RedirectResponse("/login?next=/account/preferences", status_code=303)
+
+    static_account = Path(__file__).resolve().parent.parent / "web" / "static" / "account.html"
+    return FileResponse(static_account)
 
     body = """
 <section class="card team-shell">
@@ -1457,3 +1463,98 @@ async def accept_invite_ui(request: Request, email: str = ""):
     """
     body = body.replace("{EMAIL}", user_email or "")
     return HTMLResponse(page_shell(body, title="Accept Team Invite", user_email=user_email))
+
+
+# --- Alert Preferences API ---
+@router.get("/api/me/preferences", response_class=JSONResponse)
+async def get_user_preferences(request: Request):
+    """Get current user's alert preferences"""
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("""
+                SELECT digest_frequency, agency_filter, sms_phone, sms_opt_in, sms_phone_verified
+                FROM users
+                WHERE lower(email) = lower(:email)
+                LIMIT 1
+            """),
+            {"email": user_email}
+        )
+        row = res.fetchone()
+
+        if not row:
+            return {
+                "digest_frequency": "weekly",
+                "agency_filter": [],
+                "sms_phone": "",
+                "sms_opt_in": False,
+                "sms_phone_verified": False
+            }
+
+        agency_filter = row[1]
+        if agency_filter and isinstance(agency_filter, str):
+            try:
+                agency_filter = json.loads(agency_filter)
+            except:
+                agency_filter = []
+        elif not agency_filter:
+            agency_filter = []
+
+        return {
+            "digest_frequency": row[0] or "weekly",
+            "agency_filter": agency_filter,
+            "sms_phone": row[2] or "",
+            "sms_opt_in": bool(row[3]),
+            "sms_phone_verified": bool(row[4])
+        }
+
+
+@router.post("/api/me/preferences", response_class=JSONResponse)
+async def update_user_preferences(request: Request):
+    """Update current user's alert preferences"""
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    try:
+        data = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    digest_frequency = data.get("digest_frequency", "weekly")
+    if digest_frequency not in ["daily", "weekly", "none"]:
+        digest_frequency = "weekly"
+
+    agency_filter = data.get("agency_filter", [])
+    if not isinstance(agency_filter, list):
+        agency_filter = []
+
+    sms_phone = data.get("sms_phone", "").strip()
+    sms_opt_in = bool(data.get("sms_opt_in", False))
+
+    agency_filter_json = json.dumps(agency_filter)
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users
+                SET digest_frequency = :freq,
+                    agency_filter = :agencies,
+                    sms_phone = :phone,
+                    sms_opt_in = :opt_in
+                WHERE lower(email) = lower(:email)
+            """),
+            {
+                "email": user_email,
+                "freq": digest_frequency,
+                "agencies": agency_filter_json,
+                "phone": sms_phone,
+                "opt_in": 1 if sms_opt_in else 0
+            }
+        )
+        await db.commit()
+
+    return {"ok": True, "message": "Preferences updated successfully"}
