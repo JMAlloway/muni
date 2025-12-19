@@ -17,6 +17,7 @@ from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
 from app.storage import read_storage_bytes, create_presigned_get, store_bytes
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team, get_company_profile_cached
+from app.api.chat import _format_company_profile
 from app.services.response_library import ResponseLibrary
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunity-generate"])
@@ -241,7 +242,11 @@ def _build_doc_prompt(
     user_context_block = "\n".join(context_lines) if context_lines else "None provided."
 
     extracted_json = _truncate_json_for_prompt(extracted, MAX_PROMPT_JSON_CHARS)
-    company_json = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
+    # Use formatted readable text instead of raw JSON for better AI comprehension
+    company_formatted = _format_company_profile(company)
+    if not company_formatted.strip():
+        # Fallback to JSON if formatting returns empty
+        company_formatted = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
     signature_url = (
         company.get("signature_image_url")
         or company.get("digital_signature_url")
@@ -294,7 +299,7 @@ RFP REQUIREMENTS:
 {extracted_json}
 
 COMPANY PROFILE:
-{company_json}
+{company_formatted}
 
 SIGNATURE DETAILS:
 {signature_block}
