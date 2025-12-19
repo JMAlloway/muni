@@ -17,6 +17,7 @@ from app.services.company_profile_template import merge_company_profile_defaults
 from app.ai.client import get_llm_client
 from app.storage import read_storage_bytes, create_presigned_get, store_bytes
 from app.api.auth_helpers import ensure_user_can_access_opportunity, require_user_with_team, get_company_profile_cached
+from app.api.chat import _format_company_profile
 from app.services.response_library import ResponseLibrary
 
 async def _get_knowledge_context(conn, user_id: str, team_id: str = None, max_chars: int = 30000) -> str:
@@ -281,7 +282,10 @@ def _build_doc_prompt(
     user_context_block = "\n".join(context_lines) if context_lines else "None provided."
 
     extracted_json = _truncate_json_for_prompt(extracted, MAX_PROMPT_JSON_CHARS)
-    company_json = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
+    # Use formatted readable text instead of raw JSON for better AI comprehension
+    company_formatted = _format_company_profile(company)
+    if not company_formatted.strip():
+        company_formatted = _truncate_json_for_prompt(company, MAX_PROMPT_JSON_CHARS)
     signature_url = (
         company.get("signature_image_url")
         or company.get("digital_signature_url")
@@ -306,6 +310,16 @@ def _build_doc_prompt(
         signature_name = signature_name.strip()
     if isinstance(signature_title, str):
         signature_title = signature_title.strip()
+    company_name = (
+        (company.get("legal_name")
+         or company.get("dba")
+         or company.get("company_name")
+         or company.get("legalName")
+         or "")
+        .strip()
+    )
+    if not company_name:
+        company_name = "the company"
     signature_block = (
         f"""
 SIGNATURE AVAILABLE:
@@ -335,7 +349,10 @@ RFP REQUIREMENTS:
 {extracted_json}
 
 COMPANY PROFILE:
-{company_json}
+{company_formatted}
+
+COMPANY NAME (USE EXACTLY AS WRITTEN, NO PLACEHOLDERS):
+{company_name}
 
 {knowledge_block}
 
@@ -373,6 +390,7 @@ REQUIREMENTS:
    - Use <ul><li>...</li></ul> for bullet lists
    - Use <strong>...</strong> for emphasis on key terms like the company name
    - Use <em>...</em> for certifications and titles
+   - Replace any placeholder tokens like "[Company Legal Name]" with the actual company name: {company_name}
 
 CRITICAL - USE ACTUAL COMPANY DATA:
    - The company's legal name from the profile is provided above - USE IT, never write "Company Name" as placeholder
@@ -404,6 +422,7 @@ CRITICAL - USE ACTUAL COMPANY DATA:
    - Use their real years_experience, years_in_business, and service_area data
    - Reference their actual insurance, bonding, and contractor_licenses information
    - Match the RFP's tone and address stated requirements using this real company data
+   - Never leave placeholders such as "[Company Legal Name]" or "our company"—replace with: {company_name}
 
 5. Submission checklist must include ALL narrative/form items required for submission
 6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
