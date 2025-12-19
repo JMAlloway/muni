@@ -86,6 +86,100 @@ def _account_links_html() -> str:
         </nav>
     """
 
+
+def _cookie_consent_html() -> str:
+    """Returns the cookie consent banner and settings modal HTML."""
+    return """
+<!-- Cookie Consent Banner -->
+<div id="cookieConsentBanner" class="cookie-consent-banner">
+  <div class="cookie-consent-content">
+    <div class="cookie-consent-text">
+      <h3>We value your privacy</h3>
+      <p>
+        We use cookies to enhance your experience. Essential cookies are required for the site to work.
+        Optional cookies help us process payments securely via Stripe.
+        <a href="/cookies">Learn more about our cookie policy</a>.
+      </p>
+    </div>
+    <div class="cookie-consent-actions">
+      <button id="cookieAcceptAll" class="cookie-consent-btn cookie-consent-btn-accept">
+        Accept All
+      </button>
+      <button id="cookieRejectAll" class="cookie-consent-btn cookie-consent-btn-reject">
+        Reject Optional
+      </button>
+      <button id="cookieSettings" class="cookie-consent-btn cookie-consent-btn-settings">
+        Customize
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cookie Settings Modal -->
+<div id="cookieSettingsModal" class="cookie-settings-modal">
+  <div class="cookie-settings-content">
+    <div class="cookie-settings-header">
+      <h2>Cookie Preferences</h2>
+      <button id="cookieSettingsClose" class="cookie-settings-close" aria-label="Close">×</button>
+    </div>
+    <div class="cookie-settings-body">
+      <p style="margin-bottom: 24px; color: #6b7280; font-size: 14px;">
+        Manage your cookie preferences below. Essential cookies cannot be disabled as they are required for the site to function.
+      </p>
+
+      <div class="cookie-category">
+        <div class="cookie-category-header">
+          <h3 class="cookie-category-title">Essential Cookies</h3>
+          <label class="cookie-toggle">
+            <input type="checkbox" checked disabled>
+            <span class="cookie-toggle-slider"></span>
+          </label>
+        </div>
+        <p class="cookie-category-description">
+          These cookies are necessary for the website to function and cannot be disabled.
+          They include authentication, security, and session management.
+        </p>
+      </div>
+
+      <div class="cookie-category">
+        <div class="cookie-category-header">
+          <h3 class="cookie-category-title">Analytics Cookies</h3>
+          <label class="cookie-toggle">
+            <input type="checkbox" id="cookie-analytics">
+            <span class="cookie-toggle-slider"></span>
+          </label>
+        </div>
+        <p class="cookie-category-description">
+          Help us understand how you use our site so we can improve your experience.
+          Currently not in use.
+        </p>
+      </div>
+
+      <div class="cookie-category">
+        <div class="cookie-category-header">
+          <h3 class="cookie-category-title">Payment Processing</h3>
+          <label class="cookie-toggle">
+            <input type="checkbox" id="cookie-marketing">
+            <span class="cookie-toggle-slider"></span>
+          </label>
+        </div>
+        <p class="cookie-category-description">
+          Enable Stripe payment processing for subscription billing. Required if you want to upgrade your account.
+        </p>
+      </div>
+    </div>
+    <div class="cookie-settings-footer">
+      <button id="cookieCloseSettings" class="cookie-consent-btn cookie-consent-btn-reject">
+        Cancel
+      </button>
+      <button id="cookieSaveSettings" class="cookie-consent-btn cookie-consent-btn-accept">
+        Save Preferences
+      </button>
+    </div>
+  </div>
+</div>
+    """
+
 _TIER_ORDER = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
 
 
@@ -224,6 +318,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
 <link rel="stylesheet" href="/static/css/dashboard.css">
+<link rel="stylesheet" href="/static/css/cookie-consent.css">
 </head>
 <body>
 <div class="app-shell">
@@ -364,6 +459,8 @@ __NOTIF_JS__
 })();
 </script>
 
+__COOKIE_CONSENT__
+<script src="/static/js/cookie-consent.js"></script>
 </body>
 </html>
 
@@ -376,6 +473,7 @@ __NOTIF_JS__
         .replace("__CRUMB__", title)
         .replace("__BODY__", body_html)
         .replace("__NOTIF_JS__", notif_js)
+        .replace("__COOKIE_CONSENT__", _cookie_consent_html())
     )
     return html
 
@@ -396,6 +494,7 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
   <title>__TITLE__</title>
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/marketing.css">
+  <link rel="stylesheet" href="/static/css/cookie-consent.css">
 </head>
 <body class="marketing-body">
   <nav class="navbar">
@@ -459,6 +558,8 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
     </div>
   </footer>
 
+  __COOKIE_CONSENT__
+  <script src="/static/js/cookie-consent.js"></script>
   <script src="/static/js/marketing.js"></script>
 </body>
 </html>
@@ -469,6 +570,7 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
         .replace("__CTA_URL__", cta_url)
         .replace("__LOGIN_URL__", login_url)
         .replace("__HERO_CTA__", hero_cta)
+        .replace("__COOKIE_CONSENT__", _cookie_consent_html())
     )
 
 
@@ -487,6 +589,7 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
   <title>__TITLE__</title>
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/auth.css">
+  <link rel="stylesheet" href="/static/css/cookie-consent.css">
 </head>
 <body class="auth-body">
   <div class="__WRAPPER__">
@@ -514,6 +617,8 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
       <a href="/terms">Terms</a>
     </div>
   </div>
+  __COOKIE_CONSENT__
+  <script src="/static/js/cookie-consent.js"></script>
 </body>
 </html>
     """
@@ -522,4 +627,5 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
         .replace("__BODY__", body_html)
         .replace("__WRAPPER__", wrapper_cls)
         .replace("__CARD__", card_cls)
+        .replace("__COOKIE_CONSENT__", _cookie_consent_html())
     )
