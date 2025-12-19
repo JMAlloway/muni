@@ -18,6 +18,11 @@ router = APIRouter(tags=["preferences"])
 
 @router.get("/preferences", response_class=HTMLResponse)
 async def get_preferences(request: Request):
+    return RedirectResponse("/account#tab-notifications", status_code=301)
+
+
+@router.get("/preferences-legacy", response_class=HTMLResponse)
+async def get_preferences_legacy(request: Request):
     user_email = get_current_user_email(request)
 
     known_agencies = [

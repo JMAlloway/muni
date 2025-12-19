@@ -10,6 +10,44 @@ from app.services.opportunity_feed import fetch_landing_snapshot
 router = APIRouter(tags=["marketing"])
 
 
+def _policy_paragraph(text: str) -> str:
+    return f'<p style="margin: 0;">{text}</p>'
+
+
+def _policy_list_html(items: list[str]) -> str:
+    items_html = "\n".join(f"<li>{item}</li>" for item in items)
+    return f'<ul style="margin: 0; padding-left: 20px; display: grid; gap: 6px;">{items_html}</ul>'
+
+
+def _policy_section_html(title: str, body_html: str) -> str:
+    return f"""
+      <div style="display: grid; gap: 8px;">
+        <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">{title}</h3>
+        {body_html}
+      </div>
+    """
+
+
+def _policy_page_html(badge: str, title: str, intro: str, sections: list[str]) -> str:
+    sections_html = "\n".join(sections)
+    return f"""
+    <section class="features-section" style="padding: 80px 0;">
+      <div class="container">
+        <div style="max-width: 920px; margin: 0 auto; background: #ffffff; border: 1px solid var(--border-light); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-md); display: grid; gap: 20px;">
+          <div style="display: grid; gap: 6px;">
+            <span class="section-badge">{badge}</span>
+            <h1 style="margin: 0; font-size: 2rem;">{title}</h1>
+            <p style="margin: 0; color: var(--text-secondary);">{intro}</p>
+          </div>
+          <div style="display: grid; gap: 16px; color: var(--text-secondary); font-size: 1rem; line-height: 1.7;">
+            {sections_html}
+          </div>
+        </div>
+      </div>
+    </section>
+    """
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     user_email = get_current_user_email(request)
@@ -329,6 +367,203 @@ async def home(request: Request):
     return HTMLResponse(
         marketing_shell(body_html, title="EasyRFP - Win Local Bids Faster", user_email=user_email)
     )
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    user_email = get_current_user_email(request)
+    sections = [
+        _policy_section_html(
+            "Information we collect",
+            _policy_list_html(
+                [
+                    "Account details such as name, email, company, and billing data.",
+                    "Usage data like pages viewed, actions taken, and device information.",
+                    "Files and content you upload, including documents and metadata.",
+                ]
+            ),
+        ),
+        _policy_section_html(
+            "How we use information",
+            _policy_list_html(
+                [
+                    "Provide and maintain the service, including account access and security.",
+                    "Improve features, troubleshoot issues, and support your team.",
+                    "Process payments and prevent fraud.",
+                    "Send service notices and product updates.",
+                ]
+            ),
+        ),
+        _policy_section_html(
+            "Cookies and tracking",
+            _policy_paragraph(
+                'We use essential cookies to run the site. Optional cookies may be used for analytics and payment processing. See our <a href="/cookies">Cookie Policy</a> for details.'
+            ),
+        ),
+        _policy_section_html(
+            "Data sharing",
+            _policy_list_html(
+                [
+                    "Service providers that help us operate the platform (hosting, analytics, payments).",
+                    "Legal or regulatory requests when required.",
+                    "With your consent or at your direction.",
+                ]
+            ),
+        ),
+        _policy_section_html(
+            "Data retention",
+            _policy_paragraph(
+                "We retain data for as long as needed to provide the service, meet legal obligations, and resolve disputes."
+            ),
+        ),
+        _policy_section_html(
+            "Your choices",
+            _policy_list_html(
+                [
+                    "Update profile and billing details in your account settings.",
+                    "Request data export or deletion, subject to legal requirements.",
+                    "Manage optional cookie preferences from the cookie banner or the Cookie Policy page.",
+                ]
+            ),
+        ),
+        _policy_section_html(
+            "Contact us",
+            _policy_paragraph('Questions? Reach out via the <a href="/support">Support</a> page.'),
+        ),
+    ]
+    body_html = _policy_page_html(
+        badge="Privacy",
+        title="Privacy Policy",
+        intro="Effective date: December 19, 2024. This policy explains how EasyRFP collects, uses, and protects your information.",
+        sections=sections,
+    )
+    return HTMLResponse(marketing_shell(body_html, title="Privacy Policy - EasyRFP", user_email=user_email))
+
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms_of_service(request: Request):
+    user_email = get_current_user_email(request)
+    sections = [
+        _policy_section_html(
+            "Account eligibility",
+            _policy_paragraph(
+                "You must be authorized to create an account and keep your information accurate and up to date."
+            ),
+        ),
+        _policy_section_html(
+            "Acceptable use",
+            _policy_list_html(
+                [
+                    "Use the service for lawful business purposes.",
+                    "Do not attempt to access other accounts or data.",
+                    "Do not upload malicious code or abusive content.",
+                    "Respect third-party portal terms when using generated content.",
+                ]
+            ),
+        ),
+        _policy_section_html(
+            "Subscriptions and billing",
+            _policy_paragraph(
+                "Paid plans are billed in advance. You are responsible for applicable taxes and fees. You may cancel at any time; access continues through the end of the billing period."
+            ),
+        ),
+        _policy_section_html(
+            "Your content",
+            _policy_paragraph(
+                "You retain ownership of the content you upload. You grant us a limited license to store and process it solely to provide the service."
+            ),
+        ),
+        _policy_section_html(
+            "Third-party services",
+            _policy_paragraph(
+                "We use trusted providers, such as Stripe for payments. Their terms and policies apply to their services."
+            ),
+        ),
+        _policy_section_html(
+            "Availability",
+            _policy_paragraph(
+                "We aim for high availability but do not guarantee uninterrupted service. Maintenance and outages may occur."
+            ),
+        ),
+        _policy_section_html(
+            "Limitation of liability",
+            _policy_paragraph(
+                "To the extent permitted by law, EasyRFP is not liable for indirect or consequential damages arising from use of the service."
+            ),
+        ),
+        _policy_section_html(
+            "Termination",
+            _policy_paragraph(
+                "We may suspend or terminate access for violations of these terms. You may close your account at any time."
+            ),
+        ),
+        _policy_section_html(
+            "Changes to these terms",
+            _policy_paragraph(
+                "We may update these terms from time to time. Continued use of the service means you accept the updated terms."
+            ),
+        ),
+        _policy_section_html(
+            "Contact us",
+            _policy_paragraph('Questions? Reach out via the <a href="/support">Support</a> page.'),
+        ),
+    ]
+    body_html = _policy_page_html(
+        badge="Terms",
+        title="Terms of Service",
+        intro="These terms govern your use of EasyRFP. By accessing or using the service, you agree to them.",
+        sections=sections,
+    )
+    return HTMLResponse(marketing_shell(body_html, title="Terms of Service - EasyRFP", user_email=user_email))
+
+
+@router.get("/cookies", response_class=HTMLResponse)
+async def cookie_policy(request: Request):
+    user_email = get_current_user_email(request)
+    sections = [
+        _policy_section_html(
+            "What are cookies",
+            _policy_paragraph(
+                "Cookies are small files stored on your device that help websites remember preferences and improve functionality."
+            ),
+        ),
+        _policy_section_html(
+            "Cookie categories",
+            _policy_list_html(
+                [
+                    "<strong>Essential</strong>: Required for authentication, security, and basic site functionality.",
+                    "<strong>Analytics</strong>: Help us understand usage and improve performance.",
+                    "<strong>Payment processing</strong>: Used for Stripe checkout and billing.",
+                ]
+            ),
+        ),
+        _policy_section_html(
+            "Consent cookie",
+            _policy_paragraph(
+                'We store your preferences in a cookie named <strong>cookie_consent</strong> for 365 days. It is set for the "/" path with SameSite=Lax.'
+            ),
+        ),
+        _policy_section_html(
+            "Manage your preferences",
+            _policy_paragraph(
+                "You can update your choices at any time. Use the button below to open the cookie settings."
+            )
+            + '<div><button type="button" class="btn-ghost" data-cookie-open>Cookie Preferences</button></div>',
+        ),
+        _policy_section_html(
+            "Learn more",
+            _policy_paragraph(
+                'For details on how we use data, see our <a href="/privacy">Privacy Policy</a>.'
+            ),
+        ),
+    ]
+    body_html = _policy_page_html(
+        badge="Cookies",
+        title="Cookie Policy",
+        intro="This policy explains how EasyRFP uses cookies and how you can manage your preferences.",
+        sections=sections,
+    )
+    return HTMLResponse(marketing_shell(body_html, title="Cookie Policy - EasyRFP", user_email=user_email))
 
 
 @router.get("/landing-test", response_class=HTMLResponse)

@@ -374,7 +374,7 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
   <div id="saveIndicator" class="save-indicator hidden">Saved</div>
 
   <!-- Chat Sidebar -->
-  <aside class="chat-sidebar" id="chatSidebar">
+  <aside class="chat-sidebar collapsed" id="chatSidebar">
     <div class="chat-header">
       <h3>Ask about this RFP</h3>
       <button type="button" id="toggleChat" class="chat-toggle" title="Toggle chat">
@@ -393,7 +393,7 @@ async def ai_tools_page(request: Request) -> HTMLResponse:
   </aside>
 
   <!-- Floating Chat Button (when sidebar is closed) -->
-  <button type="button" id="openChatBtn" class="chat-fab" title="Ask about RFP">
+  <button type="button" id="openChatBtn" class="chat-fab visible" title="Ask about RFP">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
     </svg>

@@ -86,6 +86,85 @@ def _account_links_html() -> str:
         </nav>
     """
 
+
+def _cookie_consent_html() -> str:
+    return """
+<div class="cookie-consent" id="cookieConsentBanner" role="dialog" aria-live="polite" aria-label="Cookie consent" aria-hidden="true">
+  <div class="cookie-consent-content">
+    <div class="cookie-consent-text">
+      <div class="cookie-consent-title">We use cookies</div>
+      <p>We use essential cookies to make EasyRFP work. Optional cookies help us improve the product and process payments.</p>
+      <div class="cookie-consent-links">
+        <a href="/privacy">Privacy Policy</a>
+        <span class="cookie-consent-dot">|</span>
+        <a href="/cookies">Cookie Policy</a>
+      </div>
+    </div>
+    <div class="cookie-consent-actions">
+      <button type="button" class="cookie-btn primary" data-consent-action="accept">Accept All</button>
+      <button type="button" class="cookie-btn secondary" data-consent-action="reject">Reject Optional</button>
+      <button type="button" class="cookie-btn ghost" data-consent-action="customize">Customize</button>
+    </div>
+  </div>
+</div>
+
+<div class="cookie-modal" id="cookieConsentModal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="cookie-modal-overlay" data-cookie-close></div>
+  <div class="cookie-modal-card" role="document">
+    <div class="cookie-modal-header">
+      <h3>Cookie Preferences</h3>
+      <button type="button" class="cookie-modal-close" data-cookie-close aria-label="Close">
+        <span aria-hidden="true">x</span>
+      </button>
+    </div>
+    <div class="cookie-modal-body">
+      <p class="cookie-modal-intro">Choose which cookies you want to allow. Essential cookies are always on.</p>
+      <div class="cookie-toggle">
+        <div class="cookie-toggle-info">
+          <div class="cookie-toggle-title">Essential cookies</div>
+          <div class="cookie-toggle-desc">Required for authentication and security.</div>
+        </div>
+        <div class="cookie-toggle-control">
+          <label class="cookie-switch">
+            <input type="checkbox" id="cookieNecessary" checked disabled aria-label="Essential cookies required">
+            <span class="cookie-slider"></span>
+          </label>
+          <span class="cookie-toggle-label">Required</span>
+        </div>
+      </div>
+      <div class="cookie-toggle">
+        <div class="cookie-toggle-info">
+          <div class="cookie-toggle-title">Analytics cookies</div>
+          <div class="cookie-toggle-desc">Help us understand usage and improve performance.</div>
+        </div>
+        <div class="cookie-toggle-control">
+          <label class="cookie-switch">
+            <input type="checkbox" id="cookieAnalytics" aria-label="Allow analytics cookies">
+            <span class="cookie-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="cookie-toggle">
+        <div class="cookie-toggle-info">
+          <div class="cookie-toggle-title">Payment processing</div>
+          <div class="cookie-toggle-desc">Used for Stripe checkout and billing.</div>
+        </div>
+        <div class="cookie-toggle-control">
+          <label class="cookie-switch">
+            <input type="checkbox" id="cookieMarketing" aria-label="Allow payment processing cookies">
+            <span class="cookie-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="cookie-modal-footer">
+      <button type="button" class="cookie-btn secondary" data-consent-action="reject">Reject Optional</button>
+      <button type="button" class="cookie-btn primary" data-consent-action="save">Save Preferences</button>
+    </div>
+  </div>
+</div>
+    """
+
 _TIER_ORDER = {"free": 0, "starter": 1, "professional": 2, "enterprise": 3}
 
 
@@ -224,6 +303,7 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>__TITLE__</title>
 <link rel="stylesheet" href="/static/css/dashboard.css">
+<link rel="stylesheet" href="/static/css/cookie-consent.css">
 </head>
 <body>
 <div class="app-shell">
@@ -328,6 +408,8 @@ def page_shell(body_html: str, title: str, user_email: Optional[str]) -> str:
   </div>
 </div>
 
+__COOKIE_CONSENT__
+
 <script>
 __NOTIF_JS__
 
@@ -364,6 +446,8 @@ __NOTIF_JS__
 })();
 </script>
 
+<script src="/static/js/cookie-consent.js"></script>
+
 </body>
 </html>
 
@@ -376,6 +460,7 @@ __NOTIF_JS__
         .replace("__CRUMB__", title)
         .replace("__BODY__", body_html)
         .replace("__NOTIF_JS__", notif_js)
+        .replace("__COOKIE_CONSENT__", _cookie_consent_html())
     )
     return html
 
@@ -396,6 +481,7 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
   <title>__TITLE__</title>
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/marketing.css">
+  <link rel="stylesheet" href="/static/css/cookie-consent.css">
 </head>
 <body class="marketing-body">
   <nav class="navbar">
@@ -459,7 +545,10 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
     </div>
   </footer>
 
+  __COOKIE_CONSENT__
+
   <script src="/static/js/marketing.js"></script>
+  <script src="/static/js/cookie-consent.js"></script>
 </body>
 </html>
     """
@@ -469,6 +558,7 @@ def marketing_shell(body_html: str, title: str, user_email: Optional[str]) -> st
         .replace("__CTA_URL__", cta_url)
         .replace("__LOGIN_URL__", login_url)
         .replace("__HERO_CTA__", hero_cta)
+        .replace("__COOKIE_CONSENT__", _cookie_consent_html())
     )
 
 
@@ -487,6 +577,7 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
   <title>__TITLE__</title>
   <link rel="stylesheet" href="/static/css/dashboard.css">
   <link rel="stylesheet" href="/static/css/auth.css">
+  <link rel="stylesheet" href="/static/css/cookie-consent.css">
 </head>
 <body class="auth-body">
   <div class="__WRAPPER__">
@@ -514,6 +605,8 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
       <a href="/terms">Terms</a>
     </div>
   </div>
+  __COOKIE_CONSENT__
+  <script src="/static/js/cookie-consent.js"></script>
 </body>
 </html>
     """
@@ -522,4 +615,5 @@ def auth_shell(body_html: str, title: str, wrapper_class: str = "", card_class: 
         .replace("__BODY__", body_html)
         .replace("__WRAPPER__", wrapper_cls)
         .replace("__CARD__", card_cls)
+        .replace("__COOKIE_CONSENT__", _cookie_consent_html())
     )

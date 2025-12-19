@@ -333,6 +333,8 @@
   display: none;
   padding-top: 8px;
   position: relative;
+  max-width: 1400px;
+  width: 100%;
 }
 
 .tab-content.active {
@@ -346,8 +348,9 @@
 /* ===== ACCOUNT GRID ===== */
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
+  max-width: 1400px;
 }
 
 /* ===== ACCOUNT CARDS ===== */
@@ -1249,6 +1252,8 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   margin-bottom: 24px;
+  max-width: 1200px;
+  width: 100%;
 }
 
 .team-header-info {
@@ -1291,9 +1296,10 @@
 
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
   margin-bottom: 24px;
+  max-width: 1200px;
 }
 
 .team-card {
@@ -1787,7 +1793,6 @@
   .account-grid {
     grid-template-columns: 1fr;
   }
-  
   .plan-card {
     grid-column: span 1;
   }

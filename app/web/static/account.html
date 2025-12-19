@@ -5,7 +5,6 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>My Account - EasyRFP</title>
-<link href="/static/css/base.css" rel="stylesheet"/>
 <link href="/static/css/dashboard.css" rel="stylesheet"/>
 <link href="/static/css/account.css" rel="stylesheet"/>
 </head>
@@ -26,22 +25,22 @@
 </svg>
 <span>EasyRFP</span>
 </div>
-<div class="nav-label">MENU</div>
+<div class="nav-label">Main Menu</div>
 <nav class="navlinks">
 <a class="nav-link" href="/">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
 <polyline points="9 22 9 12 15 12 15 22"></polyline>
 </svg>
-          Home
-        </a>
+<span class="nav-text">Home</span>
+</a>
 <a class="nav-link" href="/opportunities">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
 <circle cx="11" cy="11" r="8"></circle>
 <path d="m21 21-4.35-4.35"></path>
 </svg>
-          Discover Bids
-        </a>
+<span class="nav-text">Discover Bids</span>
+</a>
 <a class="nav-link" href="/tracker/dashboard">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
 <rect height="7" width="7" x="3" y="3"></rect>
@@ -49,15 +48,21 @@
 <rect height="7" width="7" x="14" y="14"></rect>
 <rect height="7" width="7" x="3" y="14"></rect>
 </svg>
-          My Dashboard
-        </a>
+<span class="nav-text">My Dashboard</span>
+</a>
 <a class="nav-link" href="/documents">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
 <polyline points="14 2 14 8 20 8"></polyline>
 </svg>
-          Documents
-        </a>
+<span class="nav-text">Documents</span>
+</a>
+<a class="nav-link" href="/ai-tools">
+<svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
+<path d="M12 3l1.84 3.73L18 8.27l-3 2.92.71 4.14L12 13.77l-3.71 1.95L9 11.19l-3-2.92 4.16-.54L12 3z"></path>
+</svg>
+<span class="nav-text">AI Studio</span>
+</a>
 <a class="nav-link" href="/calendar">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
 <rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect>
@@ -65,71 +70,47 @@
 <line x1="8" x2="8" y1="2" y2="6"></line>
 <line x1="3" x2="21" y1="10" y2="10"></line>
 </svg>
-          Calendar
-        </a>
-</nav>
-<div class="nav-label">ACCOUNT</div>
-<nav class="navlinks">
+<span class="nav-text">Calendar</span>
+</a>
 <a class="nav-link active" href="/account">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
-<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-<circle cx="12" cy="7" r="4"></circle>
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<polyline points="14 2 14 8 20 8"></polyline>
 </svg>
-          My Account
-        </a>
-<a class="nav-link" href="/account/preferences">
-<svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
-<circle cx="12" cy="12" r="3"></circle>
-<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-</svg>
-          Settings
-        </a>
+<span class="nav-text">My Account</span>
+</a>
+</nav>
+<div class="nav-label" style="margin-top: 24px;">Account</div>
+<nav class="navlinks">
 <a class="nav-link" href="/support">
 <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20">
 <circle cx="12" cy="12" r="10"></circle>
 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
 <line x1="12" x2="12.01" y1="17" y2="17"></line>
 </svg>
-          Support
-        </a>
+<span class="nav-text">Support</span>
+</a>
 </nav>
 </aside>
 <div class="content">
 <div class="topbar" role="banner">
 <div class="topbar-left">
-<a aria-label="Home" class="top-pill top-home" href="/">
-<span aria-hidden="true" class="top-home-icon"></span>
-<span class="top-label">Home</span>
-</a>
-<span class="top-pill top-tier" role="status">
-<span class="top-label">Tier:</span> <strong id="topTierLabel">--</strong>
-<a class="top-upgrade" href="/billing">Upgrade</a>
-</span>
+<div class="breadcrumb">
+<span class="breadcrumb-item">Home</span>
+<span class="breadcrumb-sep">/</span>
+<span class="breadcrumb-current">Account</span>
+</div>
 </div>
 <div class="topbar-right">
-<button aria-label="Notifications" class="icon-btn" id="notifBtn" type="button">
-<img alt="" class="icon-img" src="/static/img/bell.png"/><span aria-hidden="true" class="notif-dot"></span>
+<button class="topbar-btn" id="notifBtn" aria-label="Notifications">
+<svg width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+</svg>
+<span class="notification-dot notif-dot"></span>
 </button>
-<div class="top-dropdown">
-<button aria-label="Help" class="icon-btn" id="help-btn" type="button">?</button>
-<div class="top-menu" id="help-menu" role="menu">
-<a href="/privacy" role="menuitem">Privacy Policy</a>
-<a href="/terms" role="menuitem">Terms of Service</a>
-</div>
-</div>
-<div class="top-dropdown">
-<button aria-expanded="false" aria-haspopup="menu" class="avatar-button" id="avatar-btn" type="button">
-<span class="avatar-halo">
-<span class="avatar-circle" id="topAvatar">--</span>
-</span>
-<span aria-hidden="true" class="top-caret">&gt;</span>
-</button>
-<div class="top-menu" id="avatar-menu" role="menu">
-<a href="/account" role="menuitem">My Account</a>
-<a href="/account/preferences" role="menuitem">Preferences</a>
-<a href="/billing" role="menuitem">Account Billing</a>
-<a href="/logout" role="menuitem">Logout</a>
-</div>
+<div class="user-avatar" title="Account">
+<span id="topAvatar">--</span>
 </div>
 </div>
 </div>
@@ -1920,6 +1901,67 @@
 <div class="tab-content" id="tab-notifications">
 <div class="settings-section fade-in">
 <div class="settings-header">
+<h3>Alert Preferences</h3>
+<p>Configure how and when you receive bid opportunity alerts.</p>
+</div>
+<div class="settings-form">
+<div class="form-row">
+<div class="form-group">
+<label for="alertDigestFrequency">Digest Frequency</label>
+<select class="form-select" id="alertDigestFrequency">
+<option value="daily">Daily (last 24h of activity)</option>
+<option value="weekly">Weekly (last 7 days)</option>
+<option value="none">No email yet</option>
+</select>
+<span class="form-hint">Choose how often we email new opportunities.</span>
+</div>
+<div class="form-group">
+<label for="alertSmsPhone">SMS Phone</label>
+<input class="form-input" id="alertSmsPhone" placeholder="(555) 555-5555" type="text"/>
+<span class="form-hint">SMS alerts require a paid plan.</span>
+</div>
+</div>
+<div class="form-group">
+<label>Agency Filters</label>
+<div class="agency-grid" id="alertAgencyFilters">
+<label class="agency-choice"><input type="checkbox" value="City of Columbus"/>City of Columbus</label>
+<label class="agency-choice"><input type="checkbox" value="City of Grove City"/>City of Grove City</label>
+<label class="agency-choice"><input type="checkbox" value="City of Gahanna"/>City of Gahanna</label>
+<label class="agency-choice"><input type="checkbox" value="City of Marysville"/>City of Marysville</label>
+<label class="agency-choice"><input type="checkbox" value="City of Whitehall"/>City of Whitehall</label>
+<label class="agency-choice"><input type="checkbox" value="City of Grandview Heights"/>City of Grandview Heights</label>
+<label class="agency-choice"><input type="checkbox" value="city of Worthington"/>city of Worthington</label>
+<label class="agency-choice"><input type="checkbox" value="Solid Waste Authority of Central Ohio (SWACO)"/>Solid Waste Authority of Central Ohio (SWACO)</label>
+<label class="agency-choice"><input type="checkbox" value="Central Ohio Transit Authority (COTA)"/>Central Ohio Transit Authority (COTA)</label>
+<label class="agency-choice"><input type="checkbox" value="Franklin County, Ohio"/>Franklin County, Ohio</label>
+<label class="agency-choice"><input type="checkbox" value="City of Westerville"/>City of Westerville</label>
+<label class="agency-choice"><input type="checkbox" value="Columbus Metropolitan Library"/>Columbus Metropolitan Library</label>
+<label class="agency-choice"><input type="checkbox" value="Columbus Metropolitan Housing Authority"/>Columbus Metropolitan Housing Authority</label>
+<label class="agency-choice"><input type="checkbox" value="Columbus and Franklin County Metro Parks"/>Columbus and Franklin County Metro Parks</label>
+<label class="agency-choice"><input type="checkbox" value="Columbus Regional Airport Authority (CRAA)"/>Columbus Regional Airport Authority (CRAA)</label>
+<label class="agency-choice"><input type="checkbox" value="Mid-Ohio Regional Planning Commission (MORPC)"/>Mid-Ohio Regional Planning Commission (MORPC)</label>
+<label class="agency-choice"><input type="checkbox" value="Dublin City Schools"/>Dublin City Schools</label>
+<label class="agency-choice"><input type="checkbox" value="Village of Minerva Park"/>Village of Minerva Park</label>
+<label class="agency-choice"><input type="checkbox" value="City of New Albany"/>City of New Albany</label>
+<label class="agency-choice"><input type="checkbox" value="Ohio Buys"/>Ohio Buys</label>
+</div>
+<span class="form-hint">If you leave all unchecked, you'll get everything we track.</span>
+</div>
+<div class="form-group">
+<label class="checkbox-label">
+<input id="alertSmsOptIn" type="checkbox"/>
+Send me SMS alerts (due soon + digest)
+</label>
+<span class="form-hint">Carrier rates may apply.</span>
+</div>
+<div class="form-actions">
+<button class="btn-primary" id="saveAlertPrefs" type="button">Save Preferences</button>
+<span class="form-hint" id="alertPrefsStatus" aria-live="polite"></span>
+</div>
+</div>
+</div>
+<div class="settings-section fade-in">
+<div class="settings-header">
 <h3>Email Notifications</h3>
 <p>Choose what updates you want to receive via email.</p>
 </div>
@@ -2166,35 +2208,52 @@
 
       const tabs = document.querySelectorAll('.account-tab');
       const tabContents = document.querySelectorAll('.tab-content');
-      const goToTeamTab = () => {
-        const tab = document.querySelector('.account-tab[data-tab="team"]');
-        if (!tab) return;
-        tab.click();
-      };
+
+      function showTab(tabId, options = {}) {
+        if (!tabId) return;
+        const updateHash = options.updateHash === true;
+        tabs.forEach(t => t.classList.remove('active'));
+        const activeTab = document.querySelector(`.account-tab[data-tab="${tabId}"]`);
+        if (activeTab) activeTab.classList.add('active');
+
+        tabContents.forEach(content => {
+          content.classList.remove('active');
+          if (content.id === `tab-${tabId}`) {
+            content.classList.add('active');
+            content.querySelectorAll('.fade-in').forEach((el, i) => {
+              el.style.opacity = '0';
+              el.style.transform = 'translateY(16px)';
+              setTimeout(() => {
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+              }, 50 * i);
+            });
+          }
+        });
+
+        if (updateHash) {
+          history.replaceState(null, '', `#tab-${tabId}`);
+        }
+        if (tabId === 'notifications') {
+          loadAlertPreferences();
+        }
+      }
 
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
           const tabId = tab.dataset.tab;
-          
-          tabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          
-          tabContents.forEach(content => {
-            content.classList.remove('active');
-            if (content.id === `tab-${tabId}`) {
-              content.classList.add('active');
-              content.querySelectorAll('.fade-in').forEach((el, i) => {
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(16px)';
-                setTimeout(() => {
-                  el.style.opacity = '1';
-                  el.style.transform = 'translateY(0)';
-                }, 50 * i);
-              });
-            }
-          });
+          showTab(tabId, { updateHash: true });
         });
       });
+
+      function handleHashNavigation() {
+        const hash = window.location.hash || '';
+        if (!hash.startsWith('#tab-')) return;
+        const tabId = hash.replace('#tab-', '');
+        if (!document.querySelector(`.account-tab[data-tab="${tabId}"]`)) return;
+        showTab(tabId);
+      }
+      window.addEventListener('hashchange', handleHashNavigation);
 
       setTimeout(() => {
         document.querySelectorAll('.fade-in').forEach((el, i) => {
@@ -2261,11 +2320,6 @@
         }
       });
 
-      // Invite/Team shortcuts
-      document.getElementById('qaInviteMember')?.addEventListener('click', goToTeamTab);
-      document.getElementById('teamInviteBtn')?.addEventListener('click', goToTeamTab);
-      document.getElementById('teamInviteCardBtn')?.addEventListener('click', goToTeamTab);
-
       // Dynamic wiring -------------------------------------------------
       const planPricing = {
         free: { amount: '$0', period: '/month', limit: 1 },
@@ -2313,6 +2367,175 @@
       function getCSRF() {
         try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || ''; } catch (_) { return ''; }
       }
+
+      let alertPrefsLoaded = false;
+      let alertPrefsLoading = false;
+
+      function setAlertPrefsStatus(message, tone = '') {
+        const status = document.getElementById('alertPrefsStatus');
+        if (!status) return;
+        status.textContent = message || '';
+        if (tone === 'success') {
+          status.style.color = '#16a34a';
+        } else if (tone === 'error') {
+          status.style.color = '#ef4444';
+        } else {
+          status.style.color = '';
+        }
+      }
+
+      function getAlertAgencySelections() {
+        return Array.from(document.querySelectorAll('#alertAgencyFilters input[type="checkbox"]'))
+          .filter((el) => el.checked)
+          .map((el) => el.value);
+      }
+
+      function applyAlertPreferences(data = {}) {
+        const freqEl = document.getElementById('alertDigestFrequency');
+        const smsPhoneEl = document.getElementById('alertSmsPhone');
+        const smsOptInEl = document.getElementById('alertSmsOptIn');
+        if (freqEl) {
+          const freq = String(data.digest_frequency || 'daily').toLowerCase();
+          freqEl.value = ['daily', 'weekly', 'none'].includes(freq) ? freq : 'daily';
+        }
+        if (smsPhoneEl) smsPhoneEl.value = data.sms_phone || '';
+        if (smsOptInEl) smsOptInEl.checked = Boolean(data.sms_opt_in);
+        const selected = new Set(Array.isArray(data.agency_filter) ? data.agency_filter : []);
+        document.querySelectorAll('#alertAgencyFilters input[type="checkbox"]').forEach((el) => {
+          el.checked = selected.has(el.value);
+        });
+      }
+
+      async function loadAlertPreferences(force = false) {
+        if (alertPrefsLoading) return;
+        if (alertPrefsLoaded && !force) return;
+        const freqEl = document.getElementById('alertDigestFrequency');
+        if (!freqEl) return;
+        alertPrefsLoading = true;
+        setAlertPrefsStatus('Loading preferences...');
+        try {
+          const res = await fetch('/api/me/preferences', { credentials: 'include' });
+          if (!res.ok) throw new Error('load failed');
+          const data = await res.json();
+          applyAlertPreferences(data);
+          alertPrefsLoaded = true;
+          setAlertPrefsStatus('');
+        } catch (_) {
+          setAlertPrefsStatus('Could not load preferences.', 'error');
+        } finally {
+          alertPrefsLoading = false;
+        }
+      }
+
+      async function saveAlertPreferences() {
+        const btn = document.getElementById('saveAlertPrefs');
+        const freqEl = document.getElementById('alertDigestFrequency');
+        const smsPhoneEl = document.getElementById('alertSmsPhone');
+        const smsOptInEl = document.getElementById('alertSmsOptIn');
+        if (!freqEl) return;
+        btn && (btn.disabled = true);
+        setAlertPrefsStatus('');
+        try {
+          const payload = {
+            digest_frequency: freqEl.value,
+            agency_filter: getAlertAgencySelections(),
+            sms_phone: (smsPhoneEl?.value || '').trim(),
+            sms_opt_in: Boolean(smsOptInEl?.checked),
+          };
+          const res = await fetch('/api/me/preferences', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': getCSRF(),
+            },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error('save failed');
+          alertPrefsLoaded = true;
+          setAlertPrefsStatus('Saved successfully!', 'success');
+        } catch (_) {
+          setAlertPrefsStatus('Could not save preferences.', 'error');
+        } finally {
+          btn && (btn.disabled = false);
+        }
+      }
+
+      const inviteModal = document.getElementById('teamInviteModal');
+      const inviteEmailInput = document.getElementById('teamInviteEmail');
+      const inviteRoleSelect = document.getElementById('teamInviteRole');
+      const inviteStatus = document.getElementById('teamInviteStatus');
+      const inviteSendBtn = document.getElementById('teamInviteSend');
+
+      function setInviteStatus(message, tone = '') {
+        if (!inviteStatus) return;
+        inviteStatus.textContent = message || '';
+        if (tone === 'success') {
+          inviteStatus.style.color = '#16a34a';
+        } else if (tone === 'error') {
+          inviteStatus.style.color = '#ef4444';
+        } else {
+          inviteStatus.style.color = '';
+        }
+      }
+
+      function openInviteModal() {
+        if (!inviteModal) return;
+        inviteModal.style.display = 'flex';
+        setInviteStatus('');
+        if (inviteEmailInput) {
+          inviteEmailInput.value = '';
+          inviteEmailInput.focus();
+        }
+        if (inviteRoleSelect) inviteRoleSelect.value = 'member';
+      }
+
+      function closeInviteModal() {
+        if (!inviteModal) return;
+        inviteModal.style.display = 'none';
+      }
+
+      async function sendTeamInvite() {
+        const email = (inviteEmailInput?.value || '').trim().toLowerCase();
+        if (!email) {
+          setInviteStatus('Enter a valid email address.', 'error');
+          return;
+        }
+        inviteSendBtn && (inviteSendBtn.disabled = true);
+        setInviteStatus('');
+        try {
+          const res = await fetch('/api/team/invite', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCSRF() },
+            body: JSON.stringify({ email, role: inviteRoleSelect?.value || 'member' }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(data?.detail || 'Could not send invite.');
+          }
+          setInviteStatus(`Invite sent to ${email}.`, 'success');
+          await loadAccount();
+          setTimeout(closeInviteModal, 600);
+        } catch (err) {
+          setInviteStatus(err?.message || 'Could not send invite.', 'error');
+        } finally {
+          inviteSendBtn && (inviteSendBtn.disabled = false);
+        }
+      }
+
+      inviteModal?.addEventListener('click', (event) => {
+        if (event.target === inviteModal) closeInviteModal();
+      });
+      document.getElementById('teamInviteClose')?.addEventListener('click', closeInviteModal);
+      document.getElementById('teamInviteCancel')?.addEventListener('click', closeInviteModal);
+      inviteSendBtn?.addEventListener('click', sendTeamInvite);
+      inviteEmailInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          sendTeamInvite();
+        }
+      });
 
       function initials(str) {
         if (!str) return '??';
@@ -3009,8 +3232,8 @@
       }
 
       const inviteFlow = () => {
-        // Skip the email prompt; send users to the Team tab to manage invites.
-        document.querySelector('.account-tab[data-tab=\"team\"]')?.click();
+        showTab('team', { updateHash: true });
+        openInviteModal();
       };
 
       async function loadAccount() {
@@ -4176,6 +4399,7 @@
       document.querySelectorAll('#profileFirstName, #profileLastName, #profileEmail, #profilePhone, #profileJobTitle').forEach((el) => {
         el.addEventListener('input', () => savePersonalDraft(personalFormValues()));
       });
+      document.getElementById('saveAlertPrefs')?.addEventListener('click', saveAlertPreferences);
       upgradeFileInputs();
       bindFileReplaceButtons();
       bindFilePreviews();
@@ -4192,11 +4416,41 @@
         progressTimeout = setTimeout(calculateProfileProgress, 500);
       });
 
+      handleHashNavigation();
       bindTeamHandlers();
       loadAccount();
       loadCompanyProfile();
     });
-  </script>
+</script>
+  <div class="modal-overlay" id="teamInviteModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Invite Team Member</h3>
+        <button class="modal-close" id="teamInviteClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="teamInviteEmail">Email address</label>
+          <input type="email" class="form-input" id="teamInviteEmail" placeholder="teammate@company.com">
+          <span class="form-hint">We will email an invite link.</span>
+        </div>
+        <div class="form-group">
+          <label for="teamInviteRole">Role</label>
+          <select class="form-select" id="teamInviteRole">
+            <option value="member">Member</option>
+            <option value="viewer">Viewer</option>
+            <option value="manager">Manager</option>
+          </select>
+          <span class="form-hint">Managers can invite and edit permissions.</span>
+        </div>
+        <span class="form-hint" id="teamInviteStatus" aria-live="polite"></span>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="teamInviteCancel" type="button">Cancel</button>
+        <button class="btn-primary" id="teamInviteSend" type="button">Send Invite</button>
+      </div>
+    </div>
+  </div>
   <div class="modal-overlay" id="quickSetupModal" style="display:none;">
     <div class="modal quick-setup-modal">
       <div class="modal-header">

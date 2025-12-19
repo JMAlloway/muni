@@ -857,6 +857,112 @@ async def account_overview(request: Request):
     }
 
 
+@router.get("/api/me/preferences", response_class=JSONResponse)
+async def get_user_preferences(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text(
+                """
+                SELECT digest_frequency, agency_filter, sms_phone, sms_opt_in, sms_phone_verified
+                FROM users
+                WHERE lower(email) = lower(:email)
+                LIMIT 1
+                """
+            ),
+            {"email": user_email},
+        )
+        row = res.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    digest_frequency = (row[0] or "daily").strip().lower()
+    if digest_frequency not in ("daily", "weekly", "none"):
+        digest_frequency = "daily"
+
+    agency_filter = []
+    raw_agency = row[1]
+    if isinstance(raw_agency, list):
+        agency_filter = raw_agency
+    elif raw_agency:
+        try:
+            parsed = json.loads(raw_agency)
+            if isinstance(parsed, list):
+                agency_filter = parsed
+        except Exception:
+            agency_filter = []
+
+    sms_phone = row[2] or ""
+    sms_opt_in = bool(row[3])
+
+    return {
+        "digest_frequency": digest_frequency,
+        "agency_filter": agency_filter,
+        "sms_phone": sms_phone,
+        "sms_opt_in": sms_opt_in,
+    }
+
+
+@router.post("/api/me/preferences", response_class=JSONResponse)
+async def update_user_preferences(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    user_id = await _get_user_id(user_email)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    digest_frequency = (payload.get("digest_frequency") or "daily").strip().lower()
+    if digest_frequency not in ("daily", "weekly", "none"):
+        digest_frequency = "daily"
+
+    agency_filter = payload.get("agency_filter") or []
+    if not isinstance(agency_filter, list):
+        agency_filter = []
+    agency_filter = [str(a).strip() for a in agency_filter if str(a).strip()]
+    agency_json = json.dumps(agency_filter)
+
+    sms_phone = (payload.get("sms_phone") or "").strip()
+    sms_opt_in = bool(payload.get("sms_opt_in"))
+    sms_verified = 1 if (sms_opt_in and sms_phone) else 0
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text(
+                """
+                UPDATE users
+                SET digest_frequency = :freq,
+                    agency_filter = :agency,
+                    sms_phone = :sms_phone,
+                    sms_opt_in = :sms_opt_in,
+                    sms_phone_verified = :sms_verified
+                WHERE id = :uid
+                """
+            ),
+            {
+                "freq": digest_frequency,
+                "agency": agency_json,
+                "sms_phone": sms_phone,
+                "sms_opt_in": 1 if sms_opt_in else 0,
+                "sms_verified": sms_verified,
+                "uid": user_id,
+            },
+        )
+        await db.commit()
+
+    return {"ok": True}
+
+
 @router.post("/api/account/profile", response_class=JSONResponse)
 async def update_profile(request: Request, payload: dict):
     user_email = get_current_user_email(request)
@@ -1179,8 +1285,13 @@ async def team_settings(request: Request):
         return RedirectResponse("/login?next=/account/team", status_code=303)
 
 @router.get("/account/preferences", response_class=HTMLResponse)
-async def account_preferences_redirect():
-    return RedirectResponse("/preferences", status_code=303)
+async def account_preferences(request: Request):
+    user_email = get_current_user_email(request)
+    if not user_email:
+        return RedirectResponse("/login?next=/account", status_code=303)
+
+    static_account = Path(__file__).resolve().parent.parent / "web" / "static" / "account.html"
+    return FileResponse(static_account)
 
     body = """
 <section class="card team-shell">
