@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+import logging
 import datetime as dt
 import json
 import uuid
@@ -11,6 +12,7 @@ from app.auth.session import get_current_user_email
 from app.core.db import AsyncSessionLocal
 
 router = APIRouter(tags=["notifications"])
+logger = logging.getLogger(__name__)
 async def get_team_member_ids(session, team_id: str) -> list[str]:
     res = await session.execute(
         text("SELECT user_id FROM team_members WHERE team_id = :t AND user_id IS NOT NULL AND accepted_at IS NOT NULL"),
@@ -118,6 +120,33 @@ async def create_notification(
         },
     )
     return notif_id
+
+
+async def safe_create_notification(
+    session,
+    *,
+    recipient_user_id: str,
+    notif_type: str,
+    title: str,
+    body: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Create notification with error logging instead of silent failure."""
+    try:
+        return await create_notification(
+            session,
+            recipient_user_id=recipient_user_id,
+            notif_type=notif_type,
+            title=title,
+            body=body,
+            metadata=metadata,
+        )
+    except Exception as exc:
+        logger.error(
+            f"Failed to create notification type={notif_type} for user={recipient_user_id}: {exc}",
+            exc_info=True,
+        )
+        return None
 
 
 async def _get_user(session, email: str):

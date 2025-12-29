@@ -474,6 +474,11 @@
 <button class="btn-ghost" type="button" id="skipQuickSetup">Skip for now</button>
 </div>
 </div>
+<div class="profile-actions">
+<button class="btn-primary btn-large" id="saveCompanyProfile" type="button">Save Company Profile</button>
+<button class="btn-ghost" id="resetCompanyProfile" type="button">Reset</button>
+<span class="save-hint" id="companyProfileStatus" aria-live="polite"></span>
+</div>
 <div class="profile-panels" id="companyProfileForm">
 <section class="profile-panel">
 <div class="panel-header">
@@ -2368,6 +2373,59 @@ Send me SMS alerts (due soon + digest)
         try { return (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || ''; } catch (_) { return ''; }
       }
 
+      function ensureFormFieldAttributes() {
+        const usedIds = new Set();
+        document.querySelectorAll('[id]').forEach((el) => {
+          if (el.id) usedIds.add(el.id);
+        });
+
+        const slugify = (value) => String(value || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+        let autoIndex = 0;
+        const makeUniqueId = (base) => {
+          let candidate = base || `field-${autoIndex++}`;
+          while (usedIds.has(candidate)) {
+            candidate = `${base}-${autoIndex++}`;
+          }
+          usedIds.add(candidate);
+          return candidate;
+        };
+
+        document.querySelectorAll('input, select, textarea').forEach((field) => {
+          if (field.tagName === 'INPUT') {
+            const type = (field.getAttribute('type') || '').toLowerCase();
+            if (['hidden', 'submit', 'button', 'reset'].includes(type)) return;
+          }
+
+          if (!field.id) {
+            const source = field.getAttribute('name')
+              || field.getAttribute('data-field')
+              || field.getAttribute('value')
+              || field.getAttribute('placeholder')
+              || field.getAttribute('type')
+              || field.tagName.toLowerCase();
+            const slug = slugify(source) || `field-${autoIndex++}`;
+            field.id = makeUniqueId(`field-${slug}`);
+          }
+
+          if (!field.name) {
+            field.name = field.getAttribute('data-field') || field.id;
+          }
+        });
+
+        document.querySelectorAll('.form-group').forEach((group) => {
+          const label = group.querySelector('label');
+          if (!label || label.getAttribute('for')) return;
+          if (label.querySelector('input, select, textarea')) return;
+          const field = group.querySelector('input, select, textarea');
+          if (!field || !field.id) return;
+          label.setAttribute('for', field.id);
+        });
+      }
+
       let alertPrefsLoaded = false;
       let alertPrefsLoading = false;
 
@@ -2722,6 +2780,63 @@ Send me SMS alerts (due soon + digest)
         bindFileReplaceButtons();
       }
 
+      function setFileWarning(field, message) {
+        const existingDiv = document.querySelector(`[data-file-existing="${field}"]`);
+        if (!existingDiv) return;
+        const details = existingDiv.querySelector('.file-existing-details');
+        if (!details) return;
+        let warningEl = details.querySelector(`[data-file-warning="${field}"]`);
+        if (!message) {
+          if (warningEl) warningEl.remove();
+          return;
+        }
+        if (!warningEl) {
+          warningEl = document.createElement('span');
+          warningEl.className = 'file-existing-warning';
+          warningEl.dataset.fileWarning = field;
+          details.appendChild(warningEl);
+        }
+        warningEl.textContent = message;
+      }
+
+      function setFileExtractionStatus(field, meta = {}, payload = {}) {
+        const existingDiv = document.querySelector(`[data-file-existing="${field}"]`);
+        if (!existingDiv) return;
+        const metaEl = existingDiv.querySelector('.file-existing-meta');
+        if (!metaEl) return;
+
+        const storedText = payload?.[`${field}_text`];
+        const storedCount = payload?.[`${field}_word_count`];
+        const hasText = meta?.has_text !== undefined ? meta.has_text : Boolean(storedText);
+        const rawCount = meta?.word_count ?? storedCount;
+        const wordCount = Number.isFinite(Number(rawCount)) ? Number(rawCount) : 0;
+        const status = meta?.extraction_status ?? payload?.[`${field}_extraction_status`];
+        const error = meta?.extraction_error ?? payload?.[`${field}_extraction_error`];
+
+        metaEl.classList.remove('extraction-success', 'extraction-warning', 'extraction-pending');
+
+        if (hasText) {
+          metaEl.textContent = wordCount ? `Text extracted - ${wordCount} words` : 'Text extracted';
+          metaEl.classList.add('extraction-success');
+          return;
+        }
+
+        if (error) {
+          metaEl.textContent = `Text not extracted - ${error}`;
+          metaEl.classList.add('extraction-warning');
+          return;
+        }
+
+        if (status) {
+          metaEl.textContent = 'Text not extracted';
+          metaEl.classList.add('extraction-pending');
+          return;
+        }
+
+        metaEl.textContent = 'Text not extracted';
+        metaEl.classList.add('extraction-pending');
+      }
+
       function markFileSelection(input, displayName) {
         if (!input) return;
         const field = input.getAttribute('name');
@@ -2744,6 +2859,7 @@ Send me SMS alerts (due soon + digest)
           existingDiv.style.display = 'none';
           uploadDiv.style.display = 'block';
         }
+        if (field) setFileWarning(field, '');
       }
 
       function createExistingTemplate(field) {
@@ -3585,6 +3701,21 @@ Send me SMS alerts (due soon + digest)
             const displayName = meta.name || payload[`${key}_name`] || payload[key] || 'Uploaded file';
             showExistingFile(key, displayName, meta.url);
           });
+          fileFields.forEach((field) => {
+            const meta = files?.[field] || {};
+            setFileExtractionStatus(field, meta, payload);
+            const warningFlag = meta.scanned_warning ?? payload?.[`${field}_scanned_warning`];
+            const storageKey = meta.key || payload?.[field];
+            const hasStorage = Boolean(storageKey)
+              && typeof storageKey === 'string'
+              && !storageKey.includes('UploadFile(')
+              && !storageKey.includes('Headers(');
+            if (warningFlag && hasStorage) {
+              setFileWarning(field, 'Scanned PDF detected. AI may not read this file.');
+            } else {
+              setFileWarning(field, '');
+            }
+          });
           updatePanelStatuses();
           calculateProfileProgress();
         } catch (_) { /* noop */ }
@@ -3595,6 +3726,10 @@ Send me SMS alerts (due soon + digest)
         if (!form) return new FormData();
         const data = new FormData();
         const multi = {};
+        const debugFiles = [];
+        const fileInputs = Array.from(form.querySelectorAll('input[type="file"][name]'));
+        const fileWithSelection = fileInputs.filter((input) => input.files && input.files.length);
+        console.log(`[CompanyProfile] File inputs: ${fileInputs.length}, with selection: ${fileWithSelection.length}`);
         Array.from(form.querySelectorAll('[name]')).forEach((el) => {
           const key = el.getAttribute('name');
           if (!key) return;
@@ -3612,6 +3747,14 @@ Send me SMS alerts (due soon + digest)
           } else if (el.type === 'file') {
             if (el.files && el.files.length) {
               Array.from(el.files).forEach((file) => data.append(key, file));
+              Array.from(el.files).forEach((file) => {
+                debugFiles.push({
+                  field: key,
+                  name: file.name,
+                  size: file.size,
+                  type: file.type || '',
+                });
+              });
             }
           } else if (el.multiple && el.tagName === 'SELECT') {
             const selected = Array.from(el.selectedOptions).map((o) => o.value).filter(Boolean);
@@ -3623,6 +3766,11 @@ Send me SMS alerts (due soon + digest)
         Object.entries(multi).forEach(([key, values]) => {
           data.append(key, values.join(','));
         });
+        if (debugFiles.length) {
+          console.log('[CompanyProfile] Collected file uploads:', debugFiles);
+        } else {
+          console.warn('[CompanyProfile] No files collected in payload');
+        }
         return data;
       }
 
@@ -4400,6 +4548,7 @@ Send me SMS alerts (due soon + digest)
         el.addEventListener('input', () => savePersonalDraft(personalFormValues()));
       });
       document.getElementById('saveAlertPrefs')?.addEventListener('click', saveAlertPreferences);
+      ensureFormFieldAttributes();
       upgradeFileInputs();
       bindFileReplaceButtons();
       bindFilePreviews();
@@ -4676,7 +4825,7 @@ Send me SMS alerts (due soon + digest)
 </div>
 </div>
 <div class="crop-controls">
-<label>Zoom</label>
+<label for="cropZoom">Zoom</label>
 <input id="cropZoom" max="3" min="1" step="0.1" type="range" value="1"/>
 </div>
 </div>

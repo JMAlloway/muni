@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from typing import List
+import logging
 import os, uuid, re
 from pathlib import Path
 from sqlalchemy import text
+from app.core.db import AsyncSessionLocal
 from app.core.db_core import engine
 from app.auth import require_admin
 from app.auth.session import get_current_user_email
@@ -111,23 +113,28 @@ async def upload_files(
             })
         # notify team about uploads
         try:
-            team_res = await conn.exec_driver_sql("SELECT team_id FROM users WHERE id = :uid LIMIT 1", {"uid": user.id})
+            team_res = await conn.exec_driver_sql(
+                "SELECT team_id FROM users WHERE id = :uid LIMIT 1",
+                {"uid": user.id},
+            )
             trow = team_res.first()
             team_id = trow[0] if trow else None
             if team_id and saved:
                 from app.api.notifications import send_team_notification
 
-                await send_team_notification(
-                    conn,
-                    team_id=str(team_id),
-                    exclude_user_id=user.id,
-                    notif_type="upload",
-                    title="Document uploaded",
-                    body=f"{user.email} uploaded {len(saved)} file(s)",
-                    metadata={"opportunity_id": oid},
-                )
-        except Exception:
-            pass
+                async with AsyncSessionLocal() as notif_session:
+                    await send_team_notification(
+                        notif_session,
+                        team_id=str(team_id),
+                        exclude_user_id=user.id,
+                        notif_type="upload",
+                        title="Document uploaded",
+                        body=f"{user.email} uploaded {len(saved)} file(s)",
+                        metadata={"opportunity_id": oid},
+                    )
+                    await notif_session.commit()
+        except Exception as exc:
+            logging.error(f"Failed to send upload notification: {exc}", exc_info=True)
     return {"ok": True, "files": saved}
 
 @router.get("/list/{opportunity_id}")

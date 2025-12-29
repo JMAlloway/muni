@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy import text
 from typing import Optional, Any
 import logging
+import mimetypes
 import json
 import datetime as dt
 from pathlib import Path
@@ -16,7 +17,7 @@ from app.auth.session import create_session_token, get_current_user_email, SESSI
 from app.core.settings import settings
 from app.api.team import _ensure_team_feature_access
 from sqlalchemy.exc import SQLAlchemyError
-from app.storage import store_profile_file, create_presigned_get, USE_S3
+from app.storage import store_profile_file, create_presigned_get, read_storage_bytes, USE_S3
 from app.api.auth_helpers import clear_company_profile_cache
 from app.services.document_processor import DocumentProcessor
 
@@ -1055,12 +1056,29 @@ async def get_company_profile(request: Request):
             if not _valid_storage_key(key):
                 data.pop(field, None)
                 data.pop(f"{field}_name", None)
+                data.pop(f"{field}_mime", None)
+                data.pop(f"{field}_text", None)
+                data.pop(f"{field}_scanned_warning", None)
+                data.pop(f"{field}_extraction_status", None)
+                data.pop(f"{field}_extraction_error", None)
+                data.pop(f"{field}_word_count", None)
                 continue
+            text_value = data.get(f"{field}_text") or ""
+            word_count = data.get(f"{field}_word_count")
+            if word_count is None and text_value:
+                word_count = len(text_value.split())
+            extraction_status = data.get(f"{field}_extraction_status")
+            if not extraction_status and text_value:
+                extraction_status = "success"
             files[field] = {
                 "key": key,
                 "name": data.get(f"{field}_name", ""),
                 "url": create_presigned_get(key),
-                "has_text": bool(data.get(f"{field}_text")),
+                "has_text": bool(text_value),
+                "word_count": word_count or 0,
+                "extraction_status": extraction_status or "",
+                "extraction_error": data.get(f"{field}_extraction_error") or "",
+                "scanned_warning": bool(data.get(f"{field}_scanned_warning")),
             }
         return {"data": data, "files": files}
 
@@ -1142,6 +1160,7 @@ async def save_company_profile(request: Request):
         payload = await request.json()
     else:
         form = await request.form()
+        uploaded_fields = []
         for key, val in form.multi_items():
             if isinstance(val, UploadFile):
                 if not val.filename:
@@ -1159,26 +1178,76 @@ async def save_company_profile(request: Request):
                 if len(data) > PROFILE_MAX_MB * 1024 * 1024:
                     raise HTTPException(status_code=413, detail=f"File too large (> {PROFILE_MAX_MB} MB)")
                 storage_key = store_profile_file(user_id, key, data, val.filename, val.content_type)
+                uploaded_fields.append(key)
+                logging.info(
+                    "Company profile upload received: field=%s name=%s size=%s mime=%s",
+                    key,
+                    safe_name,
+                    len(data),
+                    val.content_type or "",
+                )
                 payload[key] = storage_key
                 payload[f"{key}_name"] = safe_name
+                payload[f"{key}_mime"] = val.content_type or ""
                 # Extract text content from the uploaded file
                 extracted_text = ""
+                extraction_status = "pending"
+                extraction_error = None
+                word_count = 0
+                extraction_meta = {}
                 try:
                     processor = DocumentProcessor()
                     mime = (val.content_type or "").lower()
                     extraction = processor.extract_text(data, mime, safe_name)
-                    if extraction.get("status") == "success":
-                        extracted_text = extraction.get("text", "")[:50000]  # Limit to 50k chars
-                except Exception as e:
-                    logging.warning(f"Failed to extract text from {key}: {e}")
+                    extraction_status = extraction.get("status", "unknown")
+                    extraction_meta = extraction.get("metadata") or {}
+                    if extraction_status == "success":
+                        extracted_text = (extraction.get("text") or "")[:50000]
+                        word_count = extraction_meta.get("word_count") or len(extracted_text.split())
+                        logging.info(
+                            "Extracted %s words from %s (%s)",
+                            word_count,
+                            key,
+                            safe_name,
+                        )
+                        if not extracted_text.strip():
+                            extraction_error = "Text extraction returned empty."
+                        elif extraction_meta.get("suspected_scanned"):
+                            extraction_error = (
+                                "Document appears to be scanned (image-based). "
+                                "Text extraction may be incomplete."
+                            )
+                            logging.warning(
+                                "Scanned PDF detected for %s (%s)",
+                                key,
+                                safe_name,
+                            )
+                    elif extraction_status == "unsupported":
+                        extraction_error = f"Text extraction not supported for {mime or ext} files"
+                        logging.info("Skipping text extraction for %s: %s", key, extraction_error)
+                    else:
+                        extraction_error = extraction.get("error") or "Unknown extraction error"
+                        logging.warning("Extraction failed for %s: %s", key, extraction_error)
+                except Exception as exc:
+                    extraction_status = "error"
+                    extraction_error = str(exc)
+                    logging.error("Failed to extract text from %s: %s", key, exc, exc_info=True)
 
                 payload[f"{key}_text"] = extracted_text
+                payload[f"{key}_extraction_status"] = extraction_status
+                payload[f"{key}_extraction_error"] = extraction_error or ""
+                payload[f"{key}_word_count"] = word_count
+                payload[f"{key}_scanned_warning"] = bool(extraction_meta.get("suspected_scanned"))
 
                 files_meta[key] = {
                     "key": storage_key,
                     "name": safe_name,
                     "url": create_presigned_get(storage_key),
                     "has_text": bool(extracted_text),
+                    "extraction_status": extraction_status,
+                    "extraction_error": extraction_error,
+                    "word_count": word_count,
+                    "scanned_warning": bool(extraction_meta.get("suspected_scanned")),
                 }
             else:
                 # Ignore non-file values for file fields to avoid storing stringified UploadFile objects
@@ -1198,36 +1267,105 @@ async def save_company_profile(request: Request):
             if isinstance(v, list):
                 payload[k] = ",".join(v)
 
+        if uploaded_fields:
+            logging.info(
+                "Company profile upload fields: %s",
+                ", ".join(sorted(set(uploaded_fields))),
+            )
+        else:
+            logging.info("Company profile upload had no file parts")
+
     merged_data = existing_data.copy()
 
     # Apply non-file fields from the incoming payload
     for key, value in payload.items():
-        if key in FILE_FIELDS or (key.endswith("_name") and key[:-5] in FILE_FIELDS):
+        if (
+            key in FILE_FIELDS
+            or (key.endswith("_name") and key[:-5] in FILE_FIELDS)
+            or (key.endswith("_text") and key[:-5] in FILE_FIELDS)
+            or (key.endswith("_mime") and key[:-5] in FILE_FIELDS)
+            or (key.endswith("_scanned_warning") and key[:-len("_scanned_warning")] in FILE_FIELDS)
+            or (key.endswith("_extraction_status") and key[:-len("_extraction_status")] in FILE_FIELDS)
+            or (key.endswith("_extraction_error") and key[:-len("_extraction_error")] in FILE_FIELDS)
+            or (key.endswith("_word_count") and key[:-len("_word_count")] in FILE_FIELDS)
+        ):
             continue
         merged_data[key] = value
 
-    # Handle file fields: prefer new upload/value; otherwise keep existing keys/names
+    def has_value(val: object) -> bool:
+        return val not in (None, "", "null", "undefined")
+
+    # Handle file fields: prefer new upload/value; otherwise keep existing keys/names/text
     for field in FILE_FIELDS:
         incoming_val = payload.get(field)
         incoming_name = payload.get(f"{field}_name")
+        incoming_text = payload.get(f"{field}_text")
+        incoming_mime = payload.get(f"{field}_mime")
+        incoming_scanned = payload.get(f"{field}_scanned_warning")
+        incoming_status = payload.get(f"{field}_extraction_status")
+        incoming_error = payload.get(f"{field}_extraction_error")
+        incoming_word_count = payload.get(f"{field}_word_count")
 
-        has_incoming_val = incoming_val not in (None, "", "null", "undefined")
-        has_incoming_name = incoming_name not in (None, "", "null", "undefined")
+        has_incoming_val = has_value(incoming_val)
 
         if has_incoming_val:
             merged_data[field] = incoming_val
-        elif field in existing_data:
-            merged_data[field] = existing_data[field]
+            merged_data[f"{field}_name"] = incoming_name or ""
+            merged_data[f"{field}_text"] = incoming_text or ""
+            merged_data[f"{field}_mime"] = incoming_mime or ""
+            merged_data[f"{field}_scanned_warning"] = bool(incoming_scanned)
+            merged_data[f"{field}_extraction_status"] = incoming_status or ""
+            merged_data[f"{field}_extraction_error"] = incoming_error or ""
+            merged_data[f"{field}_word_count"] = int(incoming_word_count or 0)
+        else:
+            if field in existing_data:
+                merged_data[field] = existing_data[field]
 
-        if has_incoming_name:
-            merged_data[f"{field}_name"] = incoming_name
-        elif f"{field}_name" in existing_data:
-            merged_data[f"{field}_name"] = existing_data[f"{field}_name"]
+            if has_value(incoming_name):
+                merged_data[f"{field}_name"] = incoming_name
+            elif f"{field}_name" in existing_data:
+                merged_data[f"{field}_name"] = existing_data[f"{field}_name"]
+
+            if incoming_text is not None:
+                merged_data[f"{field}_text"] = incoming_text
+            elif f"{field}_text" in existing_data:
+                merged_data[f"{field}_text"] = existing_data[f"{field}_text"]
+
+            if has_value(incoming_mime):
+                merged_data[f"{field}_mime"] = incoming_mime
+            elif f"{field}_mime" in existing_data:
+                merged_data[f"{field}_mime"] = existing_data[f"{field}_mime"]
+
+            if incoming_scanned is not None:
+                merged_data[f"{field}_scanned_warning"] = bool(incoming_scanned)
+            elif f"{field}_scanned_warning" in existing_data:
+                merged_data[f"{field}_scanned_warning"] = existing_data[f"{field}_scanned_warning"]
+
+            if incoming_status is not None:
+                merged_data[f"{field}_extraction_status"] = incoming_status
+            elif f"{field}_extraction_status" in existing_data:
+                merged_data[f"{field}_extraction_status"] = existing_data[f"{field}_extraction_status"]
+
+            if incoming_error is not None:
+                merged_data[f"{field}_extraction_error"] = incoming_error
+            elif f"{field}_extraction_error" in existing_data:
+                merged_data[f"{field}_extraction_error"] = existing_data[f"{field}_extraction_error"]
+
+            if incoming_word_count is not None:
+                merged_data[f"{field}_word_count"] = incoming_word_count
+            elif f"{field}_word_count" in existing_data:
+                merged_data[f"{field}_word_count"] = existing_data[f"{field}_word_count"]
 
         # Drop invalid storage keys that may have been stringified UploadFile objects
         if field in merged_data and not _valid_storage_key(merged_data.get(field)):
             merged_data.pop(field, None)
             merged_data.pop(f"{field}_name", None)
+            merged_data.pop(f"{field}_text", None)
+            merged_data.pop(f"{field}_mime", None)
+            merged_data.pop(f"{field}_scanned_warning", None)
+            merged_data.pop(f"{field}_extraction_status", None)
+            merged_data.pop(f"{field}_extraction_error", None)
+            merged_data.pop(f"{field}_word_count", None)
 
     async with AsyncSessionLocal() as db:
         await db.execute(
@@ -1253,6 +1391,10 @@ async def save_company_profile(request: Request):
                 "name": merged_data.get(f"{field}_name", ""),
                 "url": create_presigned_get(merged_data.get(field)) if merged_data.get(field) else None,
                 "has_text": bool(merged_data.get(f"{field}_text")),
+                "word_count": merged_data.get(f"{field}_word_count") or 0,
+                "extraction_status": merged_data.get(f"{field}_extraction_status") or "",
+                "extraction_error": merged_data.get(f"{field}_extraction_error") or "",
+                "scanned_warning": bool(merged_data.get(f"{field}_scanned_warning")),
             }
             for field in file_keys
         }
@@ -1264,6 +1406,93 @@ async def save_company_profile(request: Request):
         f"{len(file_keys)} files"
     )
     return {"ok": True, "files": saved_files or files_meta}
+
+
+@router.post("/api/company-profile/reextract", response_class=JSONResponse)
+async def reextract_profile_documents(request: Request):
+    """Re-extract text from all company profile documents that don't have _text fields."""
+    user_email = get_current_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Login required")
+    user_id = await _get_user_id(user_email)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text("SELECT data FROM company_profiles WHERE user_id = :uid LIMIT 1"),
+            {"uid": user_id},
+        )
+        row = res.fetchone()
+        if not row:
+            return {"ok": True, "extracted": 0, "message": "No profile found"}
+        try:
+            data = row[0] if isinstance(row[0], dict) else json.loads(row[0] or "{}")
+        except Exception:
+            data = {}
+
+    processor = DocumentProcessor()
+    extracted_count = 0
+    errors = []
+
+    for field in FILE_FIELDS:
+        storage_key = data.get(field)
+        existing_text = data.get(f"{field}_text")
+
+        if not storage_key or not _valid_storage_key(storage_key):
+            continue
+        if existing_text and len(str(existing_text).strip()) > 50:
+            continue
+
+        try:
+            file_bytes = read_storage_bytes(storage_key)
+            if not file_bytes:
+                errors.append(f"{field}: File not found in storage")
+                continue
+
+            filename = data.get(f"{field}_name", field)
+            mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+            result = processor.extract_text(file_bytes, mime, filename)
+            if result.get("status") == "success":
+                extracted_text = (result.get("text") or "")[:50000]
+                if extracted_text and len(extracted_text.strip()) > 10:
+                    data[f"{field}_text"] = extracted_text
+                    extracted_count += 1
+                    logging.info(
+                        f"Re-extracted {len(extracted_text)} chars from {field}"
+                    )
+                else:
+                    errors.append(
+                        f"{field}: Extraction returned empty (possibly scanned PDF)"
+                    )
+            else:
+                errors.append(f"{field}: {result.get('error', 'Unknown error')}")
+        except Exception as exc:
+            errors.append(f"{field}: {str(exc)}")
+            logging.warning(f"Failed to re-extract {field}: {exc}")
+
+    if extracted_count > 0:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                text(
+                    """
+                    UPDATE company_profiles
+                    SET data = :data, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = :uid
+                    """
+                ),
+                {"data": json.dumps(data), "uid": user_id},
+            )
+            await db.commit()
+        clear_company_profile_cache(user_id)
+
+    return {
+        "ok": True,
+        "extracted": extracted_count,
+        "errors": errors if errors else None,
+        "message": f"Re-extracted text from {extracted_count} documents",
+    }
 
 
 # --- minimal /account (optional) ------------------------------------

@@ -199,6 +199,7 @@ def _build_doc_prompt(
     section_instructions: Dict[str, str] | None = None,
     knowledge_context: str = "",
     profile_docs: Optional[List[Dict[str, str]]] = None,
+    custom_instructions: str = "",
 ) -> list[dict]:
     instr = _sanitize_text(instructions_text, max_chars=MAX_INSTR_CHARS) or _sanitize_text(
         extracted.get("submission_instructions", ""), max_chars=MAX_INSTR_CHARS
@@ -263,13 +264,32 @@ def _build_doc_prompt(
     sections_json_parts = []
     section_names = []
     context_lines = []
+
+    def normalize_key(s: str) -> str:
+        """Match frontend: name.toLowerCase().replace(/[^a-z0-9]+/g, '_')"""
+        return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+
     for s in sections_to_generate:
         name = s["name"]
         reqs = s["requirements"]
         limit = s["limit"]
-        key = name.lower().replace(" ", "_").replace("'", "")
-        key_alt = re.sub(r"[^a-z0-9]+", "_", name.lower())
-        user_context = section_instructions.get(key) or section_instructions.get(key_alt) or ""
+        key = normalize_key(name)
+        key_with_underscores = re.sub(r"[^a-z0-9]+", "_", name.lower())
+        user_context = (
+            section_instructions.get(key)
+            or section_instructions.get(key_with_underscores)
+            or section_instructions.get(name.lower().replace(" ", "_"))
+            or ""
+        )
+        if section_instructions:
+            logging.debug(
+                "Section '%s' -> keys tried: [%s, %s], available keys: %s, matched: %s",
+                name,
+                key,
+                key_with_underscores,
+                list(section_instructions.keys()),
+                bool(user_context),
+            )
         if user_context:
             safe_context = user_context.replace("\\", "\\\\").replace('"', '\\"')
             user_note = f"MUST INCLUDE USER CONTEXT: {safe_context}. Then address: {reqs}{limit}"
@@ -283,6 +303,12 @@ def _build_doc_prompt(
     sections_json = ",\n".join(sections_json_parts)
     section_names_list = ", ".join(f'"{n}"' for n in section_names if n)
     user_context_block = "\n".join(context_lines) if context_lines else "None provided."
+    global_instructions_block = ""
+    if custom_instructions and custom_instructions.strip():
+        global_instructions_block = f"""
+GLOBAL USER INSTRUCTIONS (APPLY TO ALL SECTIONS):
+{_sanitize_text(custom_instructions, max_chars=2000)}
+""".strip()
 
     extracted_json = _truncate_json_for_prompt(extracted, MAX_PROMPT_JSON_CHARS)
     # Use formatted readable text instead of raw JSON for better AI comprehension
@@ -373,6 +399,8 @@ AGENCY CONTACT:
 USER CONTEXT PROVIDED (per section):
 {user_context_block}
 
+{global_instructions_block}
+
 Generate a complete proposal response with this EXACT JSON structure:
 {{
   "response_sections": {{
@@ -430,6 +458,7 @@ CRITICAL - USE ACTUAL COMPANY DATA:
 5. Submission checklist must include ALL narrative/form items required for submission
 6. Use the EXACT section names as JSON keys (preserve spaces and capitalization)
 7. If USER CONTEXT is provided for a section, incorporate that specific information prominently
+8. If GLOBAL USER INSTRUCTIONS are provided, apply them across ALL generated content
 """.strip(),
         },
     ]
@@ -496,12 +525,15 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
     company_profile = await _get_company_profile(user)
     instruction_upload_ids = []
     section_instructions: Dict[str, str] = {}
+    custom_instructions = ""
     try:
         instruction_upload_ids = (payload or {}).get("instruction_upload_ids") or []
         section_instructions = (payload or {}).get("section_instructions") or {}
+        custom_instructions = (payload or {}).get("custom_instructions") or ""
     except Exception:
         instruction_upload_ids = []
         section_instructions = {}
+        custom_instructions = ""
 
     llm = get_llm_client()
     if not llm:
@@ -519,6 +551,7 @@ async def generate_submission_docs(opportunity_id: str, payload: dict | None = N
         section_instructions,
         knowledge_context,
         profile_docs,
+        custom_instructions,
     )
     try:
         resp = llm.chat(prompt, temperature=DEFAULT_TEMPERATURE, format="json")

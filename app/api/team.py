@@ -1,4 +1,5 @@
 from typing import List, Optional
+import logging
 import re
 import json
 
@@ -15,7 +16,7 @@ from app.core.db import AsyncSessionLocal
 from app.core.settings import settings
 from app.storage import create_presigned_get
 from app.core.emailer import send_email
-from app.api.notifications import create_notification, send_team_notification
+from app.api.notifications import create_notification, get_team_member_ids
 
 router = APIRouter(tags=["team"])
 ALLOWED_ROLES = {"owner", "manager", "member", "viewer"}
@@ -312,8 +313,10 @@ async def invite_member(request: Request, payload: dict):
                     body=f"{user_email} invited you to join {team_name}",
                     metadata={"team_id": team_id, "inviter_email": user_email},
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.error(
+                    f"Failed to send team invite notification: {exc}", exc_info=True
+                )
 
         await session.commit()
 
@@ -328,8 +331,8 @@ async def invite_member(request: Request, payload: dict):
         <p>If you don't have an account yet, sign up with that email first, then click Accept.</p>
         """
         await asyncio.to_thread(send_email, invite_email, "EasyRFP team invite", html_body)
-    except Exception:
-        pass
+    except Exception as exc:
+        logging.error(f"Failed to send invite email: {exc}", exc_info=True)
 
     return {"ok": True, "team_id": team_id, "invited": invite_email}
 
@@ -409,6 +412,34 @@ async def accept_invite(request: Request):
             ),
             {"email": user_email, "team": team_id},
         )
+        # Notify team owner that invite was accepted
+        try:
+            owner_res = await session.execute(
+                text(
+                    """
+                    SELECT t.owner_user_id, u.email as owner_email
+                    FROM teams t
+                    JOIN users u ON u.id = t.owner_user_id
+                    WHERE t.id = :team_id
+                    """
+                ),
+                {"team_id": team_id},
+            )
+            owner_row = owner_res.fetchone()
+            if owner_row and str(owner_row[0]) != str(user_id):
+                await create_notification(
+                    session,
+                    recipient_user_id=str(owner_row[0]),
+                    notif_type="invite_accepted",
+                    title="Team invite accepted",
+                    body=f"{user_email} joined your team",
+                    metadata={"team_id": team_id, "new_member_email": user_email},
+                )
+        except Exception as exc:
+            logging.error(
+                f"Failed to notify owner of accepted invite: {exc}",
+                exc_info=True,
+            )
         await session.commit()
 
     return {"ok": True, "team_id": team_id}
@@ -471,6 +502,20 @@ async def remove_member(request: Request, member_id: str):
                 text("UPDATE users SET team_id = NULL WHERE id = :uid AND team_id = :team"),
                 {"uid": target_user_id, "team": team_id},
             )
+            try:
+                await create_notification(
+                    session,
+                    recipient_user_id=str(target_user_id),
+                    notif_type="removed_from_team",
+                    title="Removed from team",
+                    body="You have been removed from the team",
+                    metadata={"team_id": team_id},
+                )
+            except Exception as exc:
+                logging.error(
+                    f"Failed to notify removed member: {exc}",
+                    exc_info=True,
+                )
         await session.commit()
 
     return {"ok": True, "removed": target_email or target_user_id}
@@ -533,6 +578,21 @@ async def update_member_role(request: Request, member_id: str, payload: dict):
             text("UPDATE team_members SET role = :role WHERE id = :id"),
             {"role": new_role, "id": member_id},
         )
+        if target_user_id:
+            try:
+                await create_notification(
+                    session,
+                    recipient_user_id=str(target_user_id),
+                    notif_type="role_changed",
+                    title="Your role was updated",
+                    body=f"Your team role has been changed to {new_role}",
+                    metadata={"team_id": team_id, "new_role": new_role},
+                )
+            except Exception as exc:
+                logging.error(
+                    f"Failed to notify member of role change: {exc}",
+                    exc_info=True,
+                )
         await session.commit()
 
     return {"ok": True, "role": new_role}
@@ -636,21 +696,62 @@ async def add_note(request: Request, payload: dict):
                 "created_at": dt.datetime.utcnow(),
             },
         )
-        # notify team about note
+        # Send specific mention notifications
+        mentioned_user_ids = set()
+        if final_mentions:
+            for mentioned_email in final_mentions:
+                try:
+                    mention_user_res = await session.execute(
+                        text("SELECT id FROM users WHERE lower(email) = lower(:email) LIMIT 1"),
+                        {"email": mentioned_email},
+                    )
+                    mention_user_row = mention_user_res.fetchone()
+                    if mention_user_row:
+                        mentioned_user_id = str(mention_user_row[0])
+                        if mentioned_user_id in mentioned_user_ids:
+                            continue
+                        mentioned_user_ids.add(mentioned_user_id)
+                        if mentioned_user_id != str(user_id):
+                            await create_notification(
+                                session,
+                                recipient_user_id=mentioned_user_id,
+                                notif_type="mention",
+                                title="You were mentioned",
+                                body=f"{user_email} mentioned you in a note",
+                                metadata={
+                                    "opportunity_id": opportunity_id,
+                                    "author_email": user_email,
+                                },
+                            )
+                except Exception as exc:
+                    logging.error(
+                        f"Failed to send mention notification to {mentioned_email}: {exc}",
+                        exc_info=True,
+                    )
+
+        # notify team about note (exclude author and mentioned users)
         note_title = "New bid note"
         note_body = f"{user_email} added a note on opportunity {opportunity_id}"
         try:
-            await send_team_notification(
-                session,
-                team_id=team_id,
-                exclude_user_id=user_id,
-                notif_type="bid_note",
-                title=note_title,
-                body=note_body,
-                metadata={"opportunity_id": opportunity_id},
+            all_member_ids = await get_team_member_ids(session, team_id)
+            for member_id in all_member_ids:
+                if str(member_id) == str(user_id):
+                    continue
+                if str(member_id) in mentioned_user_ids:
+                    continue
+                await create_notification(
+                    session,
+                    recipient_user_id=str(member_id),
+                    notif_type="bid_note",
+                    title=note_title,
+                    body=note_body,
+                    metadata={"opportunity_id": opportunity_id},
+                )
+        except Exception as exc:
+            logging.error(
+                f"Failed to send team notification for bid note: {exc}",
+                exc_info=True,
             )
-        except Exception:
-            pass
         await session.commit()
 
     return {"ok": True}

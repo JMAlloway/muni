@@ -587,7 +587,7 @@ async def _extract_profile_documents(profile: Dict[str, Any]) -> List[Dict[str, 
             if not file_bytes:
                 continue
             filename = inline_name or field
-            mime = profile.get(f"{field}_mime") or (mimetypes.guess_type(filename)[0] if filename else None)
+            mime = profile.get(f"{field}_mime") or mimetypes.guess_type(filename)[0] or "application/octet-stream"
             extracted = await asyncio.to_thread(processor.extract_text, file_bytes, mime, filename)
             text = extracted.get("text") if isinstance(extracted, dict) else ""
             if not text:

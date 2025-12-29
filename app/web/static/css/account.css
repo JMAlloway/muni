@@ -2738,6 +2738,24 @@
   font-weight: 500;
 }
 
+.file-existing-meta.extraction-success {
+  color: #16a34a;
+}
+
+.file-existing-meta.extraction-warning {
+  color: #b45309;
+}
+
+.file-existing-meta.extraction-pending {
+  color: #64748b;
+}
+
+.file-existing-warning {
+  font-size: 12px;
+  color: #b45309;
+  font-weight: 600;
+}
+
 .file-existing-actions {
   display: flex;
   gap: 8px;

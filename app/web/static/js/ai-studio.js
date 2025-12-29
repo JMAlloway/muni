@@ -1083,14 +1083,23 @@
 
   function getSectionInstructions() {
     const instructions = {};
-    if (!els.generateOptions) return instructions;
-    els.generateOptions.querySelectorAll(".section-instruction-input").forEach((input) => {
+    if (!els.generateOptions) {
+      console.warn("[AI Studio] generateOptions element not found");
+      return instructions;
+    }
+    const inputs = els.generateOptions.querySelectorAll(".section-instruction-input");
+    console.log(`[AI Studio] Found ${inputs.length} section instruction inputs`);
+    inputs.forEach((input) => {
       const section = input.dataset.section;
       const value = input.value.trim();
+      console.log(
+        `[AI Studio] Section "${section}": "${value.substring(0, 50)}${value.length > 50 ? "..." : ""}"`
+      );
       if (section && value) {
         instructions[section] = value;
       }
     });
+    console.log("[AI Studio] Collected section instructions:", instructions);
     return instructions;
   }
 
@@ -1341,6 +1350,7 @@
       if (Object.keys(sectionInstructions).length > 0) {
         payload.section_instructions = sectionInstructions;
       }
+      console.log("[AI Studio] Sending payload:", JSON.stringify(payload, null, 2));
       const res = await fetch(
         `/api/opportunities/${encodeURIComponent(state.opportunityId)}/generate`,
         {

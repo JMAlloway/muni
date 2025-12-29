@@ -45,6 +45,10 @@
       success: { icon: "✅", cls: "success" },
       info: { icon: "ℹ️", cls: "info" },
     };
+    mapping.mention = mapping.urgent;
+    mapping.invite_accepted = mapping.success;
+    mapping.removed_from_team = mapping.warning;
+    mapping.role_changed = mapping.info;
     return mapping[type] || mapping.info;
   }
 
